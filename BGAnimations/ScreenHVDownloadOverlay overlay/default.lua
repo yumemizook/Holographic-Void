@@ -311,9 +311,4 @@ queuePanel.HidePanelCommand = function(self)
 	self:visible(false)
 end
 
--- ============================================================
--- CUSTOM CURSOR (loaded globally via this overlay)
--- ============================================================
-t[#t + 1] = LoadActor("../_cursor")
-
 return t

@@ -12,6 +12,20 @@ local t = Def.ActorFrame {
 }
 
 -- ============================================================
+-- DEBUG: Click Logger (temporary)
+-- ============================================================
+t[#t + 1] = LoadFont("Common Normal") .. {
+	Name = "ClickDebug",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 60):zoom(0.5):diffuse(brightText)
+		self:DrawOrder(1000)
+		self:shadowlength(1)
+		self:diffusealpha(0.2)
+		self:settext("ClickDebug ready")
+	end
+}
+
+-- ============================================================
 -- LAYOUT CONSTANTS
 -- ============================================================
 local panelX = 8                      -- Left panel left edge
@@ -23,6 +37,58 @@ local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
 local bgCard = color("0.06,0.06,0.06,0.9")
+
+HV = HV or {}
+HV.LoginState = HV.LoginState or {
+	visible = false,
+	focused = "email",
+	email = "",
+	password = "",
+	status = "Tab / Enter to switch fields"
+}
+local loginState = HV.LoginState
+
+local loginBtnW = 180
+local loginBtnH = 28
+local loginBtnCX = panelX + panelW / 2
+local loginBtnCY = SCREEN_BOTTOM - 24
+
+local function GetOnlineStatus()
+	local connected = DLMAN:IsLoggedIn()
+	if connected then
+		return true, "EtternaOnline", "Online"
+	end
+	return false, "", "Offline"
+end
+
+local function DeviceBtnToChar(btn, shifted)
+	local letter = btn:match("^DeviceButton_([a-z])$")
+	if letter then return shifted and letter:upper() or letter end
+	local digit = btn:match("^DeviceButton_([0-9])$")
+	if digit then
+		if shifted then
+			local shiftMap = { ["1"] = "!", ["2"] = "@", ["3"] = "#", ["4"] = "$", ["5"] = "%",
+				["6"] = "^", ["7"] = "&", ["8"] = "*", ["9"] = "(", ["0"] = ")" }
+			return shiftMap[digit] or digit
+		end
+		return digit
+	end
+	local symMap = {
+		["DeviceButton_period"] = shifted and ">" or ".",
+		["DeviceButton_comma"] = shifted and "<" or ",",
+		["DeviceButton_slash"] = shifted and "?" or "/",
+		["DeviceButton_backslash"] = shifted and "|" or "\\",
+		["DeviceButton_minus"] = shifted and "_" or "-",
+		["DeviceButton_equals"] = shifted and "+" or "=",
+		["DeviceButton_semicolon"] = shifted and ":" or ";",
+		["DeviceButton_apostrophe"] = shifted and "\"" or "'",
+		["DeviceButton_left bracket"] = shifted and "{" or "[",
+		["DeviceButton_right bracket"] = shifted and "}" or "]",
+		["DeviceButton_grave"] = shifted and "~" or "`",
+		["DeviceButton_space"] = " ",
+	}
+	return symMap[btn]
+end
 
 -- ============================================================
 -- LEFT PANEL BACKGROUND
@@ -646,86 +712,45 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- MOUSE SUPPORT: Wheel Scroll + Click
+-- LOGIN BUTTON (bottom integrated)
 -- ============================================================
-local wheelX = SCREEN_WIDTH - 180    -- from metrics.ini MusicWheelX
-local wheelY = SCREEN_CENTER_Y       -- from metrics.ini MusicWheelY
-local wheelItemH = 36                -- from metrics.ini ItemTransformFunction spacing
-local wheelNumItems = 35             -- from metrics.ini NumWheelItems
-local wheelItemW = 340               -- approximate clickable width
-local lastHoveredWheelItem = nil
-
 t[#t + 1] = Def.ActorFrame {
-	Name = "MouseHandler",
-	BeginCommand = function(self)
-		local screen = SCREENMAN:GetTopScreen()
-		if not screen then return end
-
-		-- Per-frame hover tracking for wheel items
-		self:SetUpdateFunction(function()
-			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-			-- Determine which wheel item the mouse is over (center item = index 0)
-			local halfVisible = math.floor(wheelNumItems / 2)
-			local hovered = nil
-			for i = -halfVisible, halfVisible do
-				local iy = wheelY + i * wheelItemH
-				if mx >= wheelX - wheelItemW / 2 and mx <= wheelX + wheelItemW / 2
-					and my >= iy - wheelItemH / 2 and my <= iy + wheelItemH / 2 then
-					hovered = i
-					break
-				end
-			end
-			lastHoveredWheelItem = hovered
-		end)
-
-		-- InputCallback for scroll and click
-		screen:AddInputCallback(function(event)
-			if event.type == "InputEventType_Release" then return end
-			local btn = event.DeviceInput.button
-
-			-- Mouse wheel -> scroll the MusicWheel directly
-			local scroll = GetMouseScrollDirection(btn)
-			if scroll ~= 0 then
-				local scr = SCREENMAN:GetTopScreen()
-				if scr then
-					local mw = scr:GetMusicWheel()
-					if mw then
-						mw:Move(scroll)
-						mw:Move(0) -- flush the move
-					end
-				end
-				return
-			end
-
-			-- Mouse left click
-			if IsMouseLeftClick(btn) then
-				local scr = SCREENMAN:GetTopScreen()
-				if not scr then return end
-
-				-- Click on a wheel item
-				if lastHoveredWheelItem then
-					local mw = scr:GetMusicWheel()
-					if mw then
-						-- Move the wheel to the clicked item first
-						if lastHoveredWheelItem ~= 0 then
-							for _ = 1, math.abs(lastHoveredWheelItem) do
-								if lastHoveredWheelItem > 0 then
-									mw:Move(1)
-								else
-									mw:Move(-1)
-								end
-							end
-							mw:Move(0) -- flush
-						else
-							-- Already centered, simulate pressing Start to select/open
-							mw:Select()
-						end
-					end
-				end
-				return
+	Name = "LoginDock",
+	InitCommand = function(self)
+		self:xy(loginBtnCX, loginBtnCY)
+		self:SetUpdateFunction(function(af)
+			local connected = DLMAN:IsLoggedIn()
+			local btnBg = af:GetChild("ProfileBtnBg")
+			local btnText = af:GetChild("ProfileBtnText")
+			if connected then
+				local user = DLMAN:GetUsername()
+				btnText:settext(user ~= "" and ("PROFILE · " .. user) or "PROFILE")
+				btnBg:diffuse(color("0.12,0.3,0.16,1"))
+				btnText:diffuse(color("0.65,1,0.72,1"))
+			else
+				btnText:settext("LOGIN TO ETTERNAONLINE")
+				btnBg:diffuse(color("0.08,0.16,0.22,0.95"))
+				btnText:diffuse(accentColor)
 			end
 		end)
-	end
+	end,
+
+	Def.Quad {
+		Name = "ProfileBtnBg",
+		InitCommand = function(self)
+			self:zoomto(loginBtnW, loginBtnH):diffuse(color("0.08,0.16,0.22,0.95"))
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(loginBtnW + 2, loginBtnH + 2):diffuse(accentColor):diffusealpha(0.35)
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "ProfileBtnText",
+		InitCommand = function(self)
+			self:zoom(0.34):diffuse(accentColor):settext("LOGIN TO ETTERNAONLINE")
+		end	}
 }
 
 return t
