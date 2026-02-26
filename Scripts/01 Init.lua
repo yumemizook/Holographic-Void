@@ -91,3 +91,20 @@ function HV.Text(params)
 end
 
 Trace("Holographic Void: 01 Init.lua loaded.")
+
+-- ============================================================
+-- RATE HELPERS (used across screens)
+-- ============================================================
+function getCurRateValue()
+	local so = GAMESTATE:GetSongOptionsObject("ModsLevel_Current")
+	if so and so:MusicRate() then return so:MusicRate() end
+	so = GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred")
+	if so and so:MusicRate() then return so:MusicRate() end
+	return 1
+end
+
+function getCurRateString()
+	local rate = getCurRateValue()
+	if not rate then return "1.0x" end
+	return string.format("%.2fx", rate)
+end

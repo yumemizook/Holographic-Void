@@ -118,33 +118,30 @@ HVColor.ClearType = {
 	WF      = color("#E0E0E0"), -- Muted White (White Flag - 1xW2 FC)
 	SDP     = color("#CFD198"), -- Muted Yellow (Single Digit Perfects)
 	PFC     = color("#CFD198"), -- Muted Yellow (Perfect Full Combo)
-	BF      = color("#98B8CF"), -- Muted Blue-Gray (Black Flag - 1xW3 FC)
+	BF      = color("#B898CF"), -- Muted Purple (Black Flag - 1xW3 FC)
 	SDG     = color("#A0CFAB"), -- Muted Green (Single Digit Greats)
 	FC      = color("#A0CFAB"), -- Muted Green (Full Combo)
 	MF      = color("#CF9898"), -- Muted Red (Miss Flag - 1xMiss)
 	SDCB    = color("#80C0CF"), -- Muted Cyan (Single Digit Combo Breakers)
-	EXHC    = color("#E0B080"), -- Muted Orange (Extra Hard Clear)
-	HClear  = color("#CF9898"), -- Muted Red (Hard Clear)
 	Clear   = color("#5ABAFF"), -- Accent Blue
-	EClear  = color("#A0CFAB"), -- Muted Green (Easy Clear)
-	AClear  = color("#B898CF"), -- Muted Purple (Assist Clear)
 	Failed  = color("#CF9898"), -- Muted Red
 	Invalid = color("#454545"), -- Dim Gray
 	NoPlay  = color("#252525"), -- Darkest Gray
+	None    = color("#252525"), -- Darkest Gray
 }
 
 --- Get a color for a Clear Type string.
 function HVColor.GetClearTypeColor(ct)
 	if not ct then return HVColor.ClearType.Clear end
-	ct = ct:upper():gsub(" ", ""):gsub("CLEARTYPE_", "")
+	local s = ct:upper():gsub(" ", ""):gsub("CLEARTYPE_", "")
 	
-	if HVColor.ClearType[ct] then return HVColor.ClearType[ct] end
+	if HVColor.ClearType[s] then return HVColor.ClearType[s] end
 	
 	-- Fallback patterns
-	if ct:find("MARVELOUS") then return HVColor.ClearType.MFC end
-	if ct:find("PERFECT")   then return HVColor.ClearType.PFC end
-	if ct:find("COMBO")     then return HVColor.ClearType.FC end
-	if ct:find("FAILED")    then return HVColor.ClearType.Failed end
+	if s:find("MARVELOUS") then return HVColor.ClearType.MFC end
+	if s:find("PERFECT")   then return HVColor.ClearType.PFC end
+	if s:find("COMBO")     then return HVColor.ClearType.FC end
+	if s:find("FAILED")    then return HVColor.ClearType.Failed end
 	return HVColor.ClearType.Clear
 end
 
@@ -188,9 +185,15 @@ function HVColor.GetGradeColor(grade)
 	-- Tier 5-7 = AAA variants
 	-- Tier 8-10 = AA variants
 	-- Tier 11-13 = A variants
-	if s:find("TIER01") then return HVColor.Grade.AAAAA end
-	if s:find("TIER02") or s:find("TIER03") or s:find("TIER04") then return HVColor.Grade.AAAA end
-	if s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
+	-- Tier 1-3 = AAAA/AAAAA (Top family)
+	-- Tier 4-7 = AAA family
+	-- Tier 8-10 = AA family
+	-- Tier 11-13 = A family
+	-- Tier 14 = B
+	-- Tier 15 = C
+	-- Tier 16 = D
+	if s:find("TIER01") or s:find("TIER02") or s:find("TIER03") then return HVColor.Grade.AAAA end
+	if s:find("TIER04") or s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
 	if s:find("TIER08") or s:find("TIER09") or s:find("TIER10") then return HVColor.Grade.AA end
 	if s:find("TIER11") or s:find("TIER12") or s:find("TIER13") then return HVColor.Grade.A end
 	if s:find("TIER14") then return HVColor.Grade.B end

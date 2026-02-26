@@ -7,25 +7,6 @@
 --   - Player profile + avatar at bottom-left
 --   - Overall rating display with hover skillset tooltip
 
-local t = Def.ActorFrame {
-	Name = "SelectMusicDecorations",
-	BeginCommand = function(self)
-		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
-			if event.type == "InputEventType_FirstPress" and IsMouseLeftClick(event.DeviceInput.button) then
-				-- Check avatar click ONLY when overlay is hidden
-				local overlay = self:GetChild("ProfileOverlay")
-				if overlay and not overlay:GetVisible() then
-					if IsMouseOver(panelX + 16, profileY, 40, 40) then
-						MESSAGEMAN:Broadcast("ToggleProfileOverlay")
-					end
-				end
-			end
-		end)
-	end
-}
-
--- ClickDebug was moved to overlay/default.lua for better visibility
-
 -- ============================================================
 -- LAYOUT CONSTANTS
 -- ============================================================
@@ -39,6 +20,14 @@ local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
 local bgCard = color("0.06,0.06,0.06,0.9")
 local profileY = SCREEN_HEIGHT - 90
+
+local profileOverlayActor = nil -- Local reference for the overlay
+
+local t = Def.ActorFrame {
+	Name = "SelectMusicDecorations"
+}
+
+-- ClickDebug was moved to overlay/default.lua for better visibility
 
 HV = HV or {}
 HV.LoginState = HV.LoginState or {
@@ -272,16 +261,22 @@ t[#t + 1] = Def.ActorFrame {
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local bpms = song:GetDisplayBpms()
-				if bpms[1] == bpms[2] then
-					self:settext(string.format("%.0f", bpms[1]))
+				local rate = getCurRateValue() or 1
+				local b1 = bpms[1] * rate
+				local b2 = bpms[2] * rate
+				if math.abs(b1 - b2) < 1 then
+					self:settext(string.format("%.0f", b1))
 				else
-					self:settext(string.format("%.0f-%.0f", bpms[1], bpms[2]))
+					self:settext(string.format("%.0f-%.0f", b1, b2))
 				end
 			else
 				self:settext("---")
 			end
 		end,
 		CurrentSongChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		CurrentRateChangedMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -303,6 +298,8 @@ t[#t + 1] = Def.ActorFrame {
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local len = song:MusicLengthSeconds()
+				local rate = getCurRateValue() or 1
+				if rate > 0 then len = len / rate end
 				local mins = math.floor(len / 60)
 				local secs = math.floor(len % 60)
 				self:settext(string.format("%d:%02d", mins, secs))
@@ -313,6 +310,9 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end,
 		CurrentSongChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		CurrentRateChangedMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -481,6 +481,276 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
+-- DIFFICULTY SELECTOR TABS (Vertical, right of sidebar)
+-- ============================================================
+local diffSelectorY = msdY + 80
+local diffTabW = 70
+local diffTabH = 22
+local diffNames = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
+local diffShort = {"BG", "EZ", "MD", "HD", "CH", "ED"}
+local diffSelectorX = panelX + panelW + 14
+local diffSelectorTopY = panelY + 8
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "DifficultySelector",
+	InitCommand = function(self)
+		self:xy(diffSelectorX, diffSelectorTopY)
+	end,
+
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:halign(0):valign(0):zoom(0.28):diffuse(accentColor)
+			self:settext("CHART")
+		end
+	}
+}
+
+for di, dname in ipairs(diffNames) do
+	t[#t + 1] = Def.ActorFrame {
+		Name = "DiffTab_" .. dname,
+		InitCommand = function(self)
+			self:xy(diffSelectorX, diffSelectorTopY + 16 + (di - 1) * (diffTabH + 3))
+		end,
+
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(diffTabW, diffTabH)
+					:diffuse(color("0.08,0.08,0.08,1"))
+			end,
+			SetMessageCommand = function(self)
+				local song = GAMESTATE:GetCurrentSong()
+				if not song then self:diffusealpha(0.3) return end
+				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+				if not allSteps then self:diffusealpha(0.3) return end
+				local found = false
+				for _, st in ipairs(allSteps) do
+					if ToEnumShortString(st:GetDifficulty()) == dname then
+						found = true
+						break
+					end
+				end
+				if not found then
+					self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(0.15)
+				else
+					local curSteps = GAMESTATE:GetCurrentSteps()
+					if curSteps and ToEnumShortString(curSteps:GetDifficulty()) == dname then
+						self:diffuse(HVColor.Difficulty[dname] or accentColor):diffusealpha(0.4)
+					else
+						self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(1)
+					end
+				end
+			end,
+			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		},
+
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:halign(0):valign(0.5)
+					:xy(6, diffTabH / 2)
+					:zoom(0.26):diffuse(mainText)
+				self:settext(diffShort[di])
+			end,
+			SetMessageCommand = function(self)
+				local song = GAMESTATE:GetCurrentSong()
+				if not song then self:diffusealpha(0.3) return end
+				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+				if not allSteps then self:diffusealpha(0.3) return end
+				local found = false
+				for _, st in ipairs(allSteps) do
+					if ToEnumShortString(st:GetDifficulty()) == dname then
+						found = true
+						break
+					end
+				end
+				self:diffusealpha(found and 1 or 0.2)
+			end,
+			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		},
+
+		LoadFont("Common Normal") .. {
+			Name = "MSDVal",
+			InitCommand = function(self)
+				self:halign(1):valign(0.5)
+					:xy(diffTabW - 6, diffTabH / 2)
+					:zoom(0.26):diffuse(dimText)
+			end,
+			SetMessageCommand = function(self)
+				local song = GAMESTATE:GetCurrentSong()
+				if not song then self:settext("") return end
+				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+				if not allSteps then self:settext("") return end
+				for _, st in ipairs(allSteps) do
+					if ToEnumShortString(st:GetDifficulty()) == dname then
+						local msd = st:GetMSD(getCurRateValue(), 1)
+						if msd and msd > 0 then
+							self:settext(string.format("%.1f", msd))
+							self:diffuse(HVColor.GetMSDRatingColor(msd))
+						else
+							self:settext("-")
+							self:diffuse(dimText)
+						end
+						return
+					end
+				end
+				self:settext("")
+			end,
+			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
+			CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
+		}
+	}
+end
+
+-- Difficulty selector click handler (vertical layout)
+t[#t + 1] = Def.ActorFrame {
+	Name = "DiffSelectorClickHandler",
+	BeginCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen then return end
+		screen:AddInputCallback(function(event)
+			if event.type ~= "InputEventType_FirstPress" then return end
+			local btn = event.DeviceInput.button
+			if btn ~= "DeviceButton_left mouse button" then return end
+			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+			local song = GAMESTATE:GetCurrentSong()
+			if not song then return end
+			for di2, dname2 in ipairs(diffNames) do
+				local tx = diffSelectorX
+				local ty = diffSelectorTopY + 16 + (di2 - 1) * (diffTabH + 3)
+				if mx >= tx and mx <= tx + diffTabW and my >= ty and my <= ty + diffTabH then
+					local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+					if allSteps then
+						for _, st in ipairs(allSteps) do
+							if ToEnumShortString(st:GetDifficulty()) == dname2 then
+								GAMESTATE:SetCurrentSteps(PLAYER_1, st)
+								return true
+							end
+						end
+					end
+				end
+			end
+		end)
+	end
+}
+
+-- ============================================================
+-- PERSONAL BEST DISPLAY (Under MSD rating in sidebar)
+-- ============================================================
+local pbY = msdY + 70
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "PersonalBestFrame",
+	InitCommand = function(self)
+		self:xy(panelX + 16, pbY)
+	end,
+
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(-4)
+				:zoomto(panelW - 32, 1)
+				:diffuse(color("0.12,0.12,0.12,1"))
+		end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBHeader",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(2):zoom(0.28):diffuse(accentColor)
+			self:settext("PERSONAL BEST")
+		end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBScore",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(18):zoom(0.55):diffuse(brightText)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local wifePct = score:GetWifeScore() * 100
+				if wifePct >= 99 then
+					self:settext(string.format("%.4f%%", wifePct))
+				else
+					self:settext(string.format("%.2f%%", wifePct))
+				end
+				self:diffuse(brightText)
+			else
+				self:settext("No Score")
+				self:diffuse(dimText)
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBDetails",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(36):zoom(0.26):diffuse(subText)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local gradeShort = ToEnumShortString(score:GetWifeGrade())
+				local grade = THEME:GetString("Grade", gradeShort)
+				local rate = score:GetMusicRate()
+				local date = score:GetDate()
+				self:settext(string.format("%s · %.2fx · %s", grade, rate, date))
+				self:diffuse(subText)
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBGrade",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local gradeStr = ToEnumShortString(score:GetWifeGrade())
+				self:settext(THEME:GetString("Grade", gradeStr))
+				self:diffuse(HVColor.GetGradeColor(gradeStr))
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	-- Clear Type Lamp
+	LoadFont("Common Normal") .. {
+		Name = "PBClearType",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(panelW - 32):y(40):zoom(0.24)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local ct = getDetailedClearType(score)
+				self:settext(THEME:GetString("ClearTypes", ct))
+				self:diffuse(HVColor.GetClearTypeColor(ct))
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	}
+}
+
+-- ============================================================
 -- PLAYER PROFILE + AVATAR (bottom-left corner)
 -- ============================================================
 
@@ -509,7 +779,9 @@ t[#t + 1] = Def.ActorFrame {
 			local profile = PROFILEMAN:GetProfile(PLAYER_1)
 			if profile then
 				local avatarPath = nil
-				if profile.GetAvatarPath then avatarPath = profile:GetAvatarPath() end
+				if profile.GetAvatarPath and type(profile.GetAvatarPath) == "function" then 
+					avatarPath = profile:GetAvatarPath() 
+				end
 				if avatarPath and avatarPath ~= "" and FILEMAN:DoesFileExist(avatarPath) then
 					self:Load(avatarPath)
 				else
@@ -639,205 +911,28 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- PROFILE OVERLAY
 -- ============================================================
-local overlayW, overlayH = SCREEN_WIDTH * 0.8, SCREEN_HEIGHT * 0.7
-local colW, scorePageSize = overlayW / 3, 10
-
--- Define columns as local variables first
-local skillsetCol = Def.ActorFrame { 
-	Name = "SkillsetColumn", InitCommand = function(self) self:x(-colW) end,
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:y(-overlayH / 2 + 70):zoom(0.4):diffuse(accentColor):settext("SKILLSETS") end }
-}
-local topScoresCol = Def.ActorFrame { 
-	Name = "TopScoresColumn", InitCommand = function(self) self:x(0) end,
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:y(-overlayH / 2 + 70):zoom(0.4):diffuse(accentColor):settext("TOP SCORES (ONLINE)") end }
-}
-local recentScoresCol = Def.ActorFrame { 
-	Name = "RecentScoresColumn", InitCommand = function(self) self:x(colW) end,
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:y(-overlayH / 2 + 70):zoom(0.4):diffuse(accentColor):settext("RECENT SCORES") end }
-}
-
--- Skillset Rows in Overlay
-for i, ss in ipairs(skillsets) do
-	skillsetCol[#skillsetCol + 1] = Def.ActorFrame {
-		InitCommand = function(self) self:y(-overlayH / 2 + 100 + (i * 22)) end,
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):x(-colW / 2 + 20):zoom(0.35):diffuse(subText):settext(ss) end
-		},
-		LoadFont("Common Normal") .. {
-			Name = "Val",
-			InitCommand = function(self) self:halign(1):x(colW / 2 - 20):zoom(0.4):diffuse(mainText) end,
-			UpdateOverlaySkillsetsMessageCommand = function(self)
-				local val = 0
-				if DLMAN:IsLoggedIn() then 
-					val = DLMAN:GetSkillsetRating(ss)
-				else
-					local profile = PROFILEMAN:GetProfile(PLAYER_1)
-					if profile then
-						if ss == "Overall" then
-							val = profile:GetPlayerRating()
-						else
-							-- Profile index mapping: Stream(0), JS(1), ... Tech(6)
-							-- Our loop: Overall(1), Stream(2) ... Tech(8)
-							-- So engine index = i - 2
-							local engineSS = i - 2
-							if engineSS >= 0 and profile.GetPlayerSkillsetRating then
-								local ok, res = pcall(function() return profile:GetPlayerSkillsetRating(engineSS) end)
-								if ok then val = res or 0 end
-							end
-						end
-					end
-				end
-				self:settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
-			end
-		}
-	}
-end
-
--- Score Rows Logic
-local function AddScoreRows(column, namePrefix)
-	for i = 1, scorePageSize do
-		column[#column + 1] = Def.ActorFrame {
-			Name = namePrefix .. i,
-			InitCommand = function(self) self:y(-overlayH / 2 + 100 + (i * 28)) end,
-			LoadFont("Common Normal") .. {
-				Name = "Title",
-				InitCommand = function(self) self:halign(0):x(-colW / 2 + 10):y(-6):zoom(0.28):diffuse(mainText):maxwidth(colW * 2.5) end
-			},
-			LoadFont("Common Normal") .. {
-				Name = "Details",
-				InitCommand = function(self) self:halign(0):x(-colW / 2 + 10):y(6):zoom(0.22):diffuse(dimText) end
-			},
-			LoadFont("Common Normal") .. {
-				Name = "Score",
-				InitCommand = function(self) self:halign(1):x(colW / 2 - 10):zoom(0.32):diffuse(accentColor) end
-			}
-		}
-	end
-end
-AddScoreRows(topScoresCol, "Top")
-AddScoreRows(recentScoresCol, "Recent")
-
-local profileOverlay = Def.ActorFrame {
-	Name = "ProfileOverlay",
-	InitCommand = function(self)
-		self.topPage = 1
-		self.recentPage = 1
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
-	end,
-	-- Dark Background (Dim the rest of the screen)
-	Def.Quad {
-		InitCommand = function(self) self:zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,0.85")) end,
-		BeginCommand = function(self)
-			SCREENMAN:GetTopScreen():AddInputCallback(function(event)
-				if self:GetParent() and self:GetParent():GetVisible() and event.type == "InputEventType_FirstPress" then
-					if IsMouseLeftClick(event.DeviceInput.button) and not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-						MESSAGEMAN:Broadcast("ToggleProfileOverlay")
-					elseif event.DeviceInput.button == "DeviceButton_left" then
-						MESSAGEMAN:Broadcast("PrevScorePage")
-					elseif event.DeviceInput.button == "DeviceButton_right" then
-						MESSAGEMAN:Broadcast("NextScorePage")
-					end
-				end
-			end)
-		end
-	},
-	-- Main Panel
-	Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(bgCard):diffusealpha(0.95) end },
-	-- Header
-	LoadFont("Zpix Normal") .. {
-		InitCommand = function(self) self:y(-overlayH / 2 + 30):zoom(0.8):diffuse(brightText):settext("PLAYER PROFILE") end
-	},
-	-- Close Hint
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:y(overlayH / 2 - 20):zoom(0.3):diffuse(dimText):settext("Click outside or Avatar to close · Use Left/Right for pages") end
-	},
-
-	-- Columns
-	skillsetCol,
-	topScoresCol,
-	recentScoresCol,
-
-	-- Commands
-	ToggleProfileOverlayMessageCommand = function(self)
-		if not self then return end
-		local isVisible = self:GetVisible()
-		self:visible(not isVisible)
-		if not isVisible then 
-			self:playcommand("UpdateAllScores") 
-		end
-	end,
-
-	UpdateAllScoresCommand = function(self)
-		if not self or not self.GetChild then return end
-		
-		local topScores, recentScores = {}, {}
-		if DLMAN:IsLoggedIn() then
-			local okTop, resTop = pcall(function() return DLMAN:GetTopScores() end)
-			if okTop then topScores = resTop or {} end
-			local okRec, resRec = pcall(function() return DLMAN:GetRecentScores() end)
-			if okRec then recentScores = resRec or {} end
-		end
-
-		local function UpdateList(colName, scores, page, prefix)
-			local col = self:GetChild(colName)
-			if not col or not col.GetChild then return end
-			local p = page or 1
-			local start = (p - 1) * scorePageSize
-			for i = 1, scorePageSize do
-				local row = col:GetChild(prefix .. i)
-				if row then
-					local score = scores[start + i]
-					if score then
-						row:visible(true)
-						local songTitle = (score.GetSongTitle and score:GetSongTitle()) or "Unknown Song"
-						local diff = (score.GetDifficulty and ToEnumShortString(score:GetDifficulty())) or "Unknown"
-						local rate = (score.GetMusicRate and score:GetMusicRate()) or 1.0
-						local date = (score.GetDate and score:GetDate()) or "N/A"
-						local wife = (score.GetWifeScore and score:GetWifeScore()) or 0
-						
-						local titleChild = row:GetChild("Title")
-						local detailsChild = row:GetChild("Details")
-						local scoreChild = row:GetChild("Score")
-						if titleChild then titleChild:settext(songTitle) end
-						if detailsChild then detailsChild:settext(string.format("%s · %.2f · %s", diff, rate, date)) end
-						if scoreChild then scoreChild:settext(string.format("%.2f%%", wife * 100)) end
-					else row:visible(false) end
-				end
-			end
-		end
-		UpdateList("TopScoresColumn", topScores, self.topPage, "Top")
-		UpdateList("RecentScoresColumn", recentScores, self.recentPage, "Recent")
-		
-		-- Propagate update to skillset rows via local message to avoid tree walking
-		MESSAGEMAN:Broadcast("UpdateOverlaySkillsets")
-	end,
-
-	NextScorePageMessageCommand = function(self)
-		self.topPage = self.topPage + 1
-		self.recentPage = self.recentPage + 1
-		self:playcommand("UpdateAllScores")
-	end,
-
-	PrevScorePageMessageCommand = function(self)
-		self.topPage = math.max(1, self.topPage - 1)
-		self.recentPage = math.max(1, self.recentPage - 1)
-		self:playcommand("UpdateAllScores")
-	end
-}
-
-t[#t + 1] = profileOverlay
+-- profileOverlay was moved to overlay/default.lua for better layering
 
 -- ============================================================
 -- MUSIC RATE DISPLAY
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "RateDisplay",
-	InitCommand = function(self) self:xy(SCREEN_WIDTH - 180, 10) end,
+	InitCommand = function(self) self:xy(panelX + 16, detailY + 52) end,
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):zoom(0.45):diffuse(mainText) end,
+		Name = "RateLabel",
+		InitCommand = function(self) self:halign(0):valign(0):zoom(0.35):diffuse(dimText):settext("RATE") end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "RateValue",
+		InitCommand = function(self) self:halign(0):valign(0):x(40):zoom(0.4):diffuse(accentColor) end,
 		SetMessageCommand = function(self)
-			local rate = getCurRateString()
-			self:settext("Rate: " .. (rate or "1.0x"))
+			local rate = getCurRateValue() or 1
+			if math.abs(rate - 1.0) < 0.005 then
+				self:settext("1.0x"):diffuse(mainText)
+			else
+				self:settext(string.format("%.2fx", rate)):diffuse(accentColor)
+			end
 		end,
 		CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
 	}
