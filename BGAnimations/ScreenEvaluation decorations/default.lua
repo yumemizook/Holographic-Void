@@ -47,14 +47,6 @@ local function getClearType(pss)
 	return "ALL MARVELOUS"
 end
 
-local function getClearColor(clearType)
-	if clearType == "ALL MARVELOUS" then return color("#FFD700") end
-	if clearType == "ALL PERFECT" then return color("#E0E0A0") end
-	if clearType == "FULL COMBO" then return color("#A0E0A0") end
-	if clearType == "CLEAR" then return accentColor end
-	return color("#E0A0A0") -- FAILED
-end
-
 -- ============================================================
 -- HEADER: Song Info + Clear Type
 -- ============================================================
@@ -116,7 +108,7 @@ t[#t + 1] = Def.ActorFrame {
 			if pss then
 				local ct = getClearType(pss)
 				self:settext(ct)
-				self:diffuse(getClearColor(ct))
+				self:diffuse(HVColor.GetClearTypeColor(ct))
 			end
 		end
 	},
@@ -226,6 +218,7 @@ t[#t + 1] = Def.ActorFrame {
 				local grade = pss:GetGrade()
 				local gradeStr = ToEnumShortString(grade)
 				self:settext(gradeStr)
+				self:diffuse(HVColor.GetGradeColor(gradeStr))
 			end
 		end
 	},

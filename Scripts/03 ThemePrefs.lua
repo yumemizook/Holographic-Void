@@ -38,6 +38,13 @@ local HVPrefs = {
 
 	-- Gameplay: Judge difficulty display (4-9 or Justice)
 	HV_DefaultJudge = { Default = "4" },
+
+	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
+	HV_MSDColorScale = { Default = "HolographicVoid" },
+
+	-- Auth: Saved EtternaOnline username and login token
+	HV_Username = { Default = "" },
+	HV_PasswordToken = { Default = "" },
 }
 
 -- Register with the _Fallback ThemePrefs system.

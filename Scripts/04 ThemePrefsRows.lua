@@ -81,6 +81,13 @@ local HVPrefRows = {
 		Choices = {"J4", "J5", "J6", "J7", "J8", "Justice"},
 		Values  = {"4", "5", "6", "7", "8", "9"},
 	},
+
+	-- MSD Color Scale
+	HV_MSDColorScale = {
+		Default = "HolographicVoid",
+		Choices = {"Holographic Void", "Til Death"},
+		Values  = {"HolographicVoid", "TilDeath"},
+	},
 }
 
 -- Register the rows with the _Fallback ThemePrefsRows system

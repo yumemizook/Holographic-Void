@@ -70,16 +70,145 @@ HVColor.Judgment = {
 	Miss = color("#E0A0A0"),    -- Miss: pale red
 }
 
--- Grade colors
-HVColor.Grade = {
-	AAAA = color("#FFFFFF"),
-	AAA  = color("#E8E8E8"),
-	AA   = color("#D0D0D0"),
-	A    = color("#B8B8B8"),
-	B    = color("#A0A0A0"),
-	C    = color("#888888"),
-	D    = color("#707070"),
-	F    = color("#585858"),
+-- MSD rating color scale (smooth gradient)
+local msdTable = {
+	{0, color("#80C0CF")},  -- Muted Cyan
+	{10, color("#A0CFAB")}, -- Green
+	{15, color("#CFD198")}, -- Yellow
+	{20, color("#E0B080")}, -- Muted Orange
+	{25, color("#CF9898")}, -- Muted Red
+	{30, color("#CF98B8")}, -- Muted Pink
+	{35, color("#B898CF")}, -- Muted Purple
+	{40, color("#5C4B7A")}, -- Dark Purple
 }
+
+--- Get a color for a numeric MSD value based on theme preferences.
+-- @param msd Number (0-40+)
+-- @return Color
+function HVColor.GetMSDRatingColor(msd)
+	if not msd or msd < 0 then return msdTable[1][2] end
+
+	local scale = "HolographicVoid"
+	if ThemePrefs and ThemePrefs.Get then
+		scale = ThemePrefs.Get("HV_MSDColorScale") or "HolographicVoid"
+	end
+
+	if scale == "TilDeath" then
+		-- Classic Til Death hue shift logic
+		return HSV(math.max(95 - (msd / 40) * 150, -50), 0.9, 0.9)
+	end
+
+	-- Holographic Void: smooth interpolation between muted thresholds
+	for i = 1, #msdTable - 1 do
+		local lower = msdTable[i]
+		local upper = msdTable[i+1]
+		if msd >= lower[1] and msd <= upper[1] then
+			local p = (msd - lower[1]) / (upper[1] - lower[1])
+			return lerp_color(p, lower[2], upper[2])
+		end
+	end
+
+	if msd > 40 then return msdTable[#msdTable][2] end
+	return msdTable[1][2]
+end
+
+-- Clear Type colors (muted variants of classic schemes)
+HVColor.ClearType = {
+	MFC     = color("#FFFFFF"), -- Pure White (Marvelous Full Combo)
+	WF      = color("#E0E0E0"), -- Muted White (White Flag - 1xW2 FC)
+	SDP     = color("#CFD198"), -- Muted Yellow (Single Digit Perfects)
+	PFC     = color("#CFD198"), -- Muted Yellow (Perfect Full Combo)
+	BF      = color("#98B8CF"), -- Muted Blue-Gray (Black Flag - 1xW3 FC)
+	SDG     = color("#A0CFAB"), -- Muted Green (Single Digit Greats)
+	FC      = color("#A0CFAB"), -- Muted Green (Full Combo)
+	MF      = color("#CF9898"), -- Muted Red (Miss Flag - 1xMiss)
+	SDCB    = color("#80C0CF"), -- Muted Cyan (Single Digit Combo Breakers)
+	EXHC    = color("#E0B080"), -- Muted Orange (Extra Hard Clear)
+	HClear  = color("#CF9898"), -- Muted Red (Hard Clear)
+	Clear   = color("#5ABAFF"), -- Accent Blue
+	EClear  = color("#A0CFAB"), -- Muted Green (Easy Clear)
+	AClear  = color("#B898CF"), -- Muted Purple (Assist Clear)
+	Failed  = color("#CF9898"), -- Muted Red
+	Invalid = color("#454545"), -- Dim Gray
+	NoPlay  = color("#252525"), -- Darkest Gray
+}
+
+--- Get a color for a Clear Type string.
+function HVColor.GetClearTypeColor(ct)
+	if not ct then return HVColor.ClearType.Clear end
+	ct = ct:upper():gsub(" ", ""):gsub("CLEARTYPE_", "")
+	
+	if HVColor.ClearType[ct] then return HVColor.ClearType[ct] end
+	
+	-- Fallback patterns
+	if ct:find("MARVELOUS") then return HVColor.ClearType.MFC end
+	if ct:find("PERFECT")   then return HVColor.ClearType.PFC end
+	if ct:find("COMBO")     then return HVColor.ClearType.FC end
+	if ct:find("FAILED")    then return HVColor.ClearType.Failed end
+	return HVColor.ClearType.Clear
+end
+
+-- Song Length colors
+HVColor.SongLength = {
+	Normal   = color("#D9D9D9"), -- Standard text
+	Long     = color("#E0B080"), -- Muted Orange (>= 2:30)
+	Marathon = color("#CF9898"), -- Muted Red (>= 5:00)
+}
+
+--- Get a color for song duration in seconds.
+function HVColor.GetSongLengthColor(seconds)
+	if not seconds then return HVColor.SongLength.Normal end
+	if seconds >= 300 then return HVColor.SongLength.Marathon end
+	if seconds >= 150 then return HVColor.SongLength.Long end
+	return HVColor.SongLength.Normal
+end
+
+-- Grade colors (muted, matching the theme aesthetic)
+HVColor.Grade = {
+	AAAAA = color("#FFFFFF"),    -- Pure White
+	AAAA  = color("#80C0CF"),    -- Muted Cyan
+	AAA   = color("#CFD198"),    -- Muted Yellow
+	AA    = color("#A0CFAB"),    -- Muted Green
+	A     = color("#CF9898"),    -- Muted Red
+	B     = color("#98B8CF"),    -- Muted Blue-Gray
+	C     = color("#B898CF"),    -- Muted Purple
+	D     = color("#CF98B8"),    -- Muted Pink
+	F     = color("#606060"),    -- Dim Gray
+	None  = color("#454545"),    -- Dim Gray
+}
+
+--- Get a color for a Grade string or enum.
+function HVColor.GetGradeColor(grade)
+	if not grade then return HVColor.Grade.None end
+	local s = tostring(grade):upper():gsub("GRADE_", "")
+	
+	-- Handle Tier specific matches first (Etterna Tiers)
+	-- Tier 1 = AAAAA
+	-- Tier 2-4 = AAAA variants
+	-- Tier 5-7 = AAA variants
+	-- Tier 8-10 = AA variants
+	-- Tier 11-13 = A variants
+	if s:find("TIER01") then return HVColor.Grade.AAAAA end
+	if s:find("TIER02") or s:find("TIER03") or s:find("TIER04") then return HVColor.Grade.AAAA end
+	if s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
+	if s:find("TIER08") or s:find("TIER09") or s:find("TIER10") then return HVColor.Grade.AA end
+	if s:find("TIER11") or s:find("TIER12") or s:find("TIER13") then return HVColor.Grade.A end
+	if s:find("TIER14") then return HVColor.Grade.B end
+	if s:find("TIER15") then return HVColor.Grade.C end
+	if s:find("TIER16") then return HVColor.Grade.D end
+	if s:find("TIER17") or s:find("FAILED") then return HVColor.Grade.F end
+	
+	-- Fallback text matches (e.g. "AAA:", "AAA.", "AAA")
+	if s:find("AAAAA") then return HVColor.Grade.AAAAA end
+	if s:find("AAAA")  then return HVColor.Grade.AAAA end
+	if s:find("AAA")   then return HVColor.Grade.AAA  end
+	if s:find("AA")    then return HVColor.Grade.AA   end
+	if s:find("A")     then return HVColor.Grade.A    end
+	if s:find("B")     then return HVColor.Grade.B    end
+	if s:find("C")     then return HVColor.Grade.C    end
+	if s:find("D")     then return HVColor.Grade.D    end
+	
+	return HVColor.Grade.None
+end
 
 Trace("Holographic Void: 02 Colors.lua loaded.")
