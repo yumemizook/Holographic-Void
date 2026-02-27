@@ -88,6 +88,13 @@ local HVPrefRows = {
 		Choices = {"Holographic Void", "Til Death"},
 		Values  = {"HolographicVoid", "TilDeath"},
 	},
+
+	-- Show Measure Lines
+	HV_ShowMeasureLines = {
+		Default = "false",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
 }
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -98,7 +105,8 @@ ThemePrefsRows.Init(HVPrefRows)
 function HVThemeOptionsLines()
 	return "HV_AccentColor,HV_UIOpacity,HV_EnableGlow,HV_BGAnimIntensity,"
 		.. "HV_WheelOffsetX,HV_WheelOffsetY,HV_EvalGraphScale,"
-		.. "HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_DefaultJudge"
+		.. "HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_DefaultJudge,"
+		.. "HV_ShowMeasureLines"
 end
 
 -- Listen for pref changes and refresh accent color

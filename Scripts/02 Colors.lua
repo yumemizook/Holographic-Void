@@ -60,6 +60,13 @@ if GameColor and GameColor.Difficulty then
 	end
 end
 
+--- Get a color for a difficulty short name (e.g. "Hard", "Challenge", "Edit").
+function HVColor.GetDifficultyColor(diff)
+	if not diff then return HVColor.Difficulty.Edit end
+	local s = diff:gsub("Difficulty_", "")
+	return HVColor.Difficulty[s] or HVColor.Difficulty.Edit
+end
+
 -- Judgment colors (kept distinct but desaturated to fit the theme)
 HVColor.Judgment = {
 	W1   = color("#FFFFFF"),    -- Marvelous: pure white
@@ -185,15 +192,9 @@ function HVColor.GetGradeColor(grade)
 	-- Tier 5-7 = AAA variants
 	-- Tier 8-10 = AA variants
 	-- Tier 11-13 = A variants
-	-- Tier 1-3 = AAAA/AAAAA (Top family)
-	-- Tier 4-7 = AAA family
-	-- Tier 8-10 = AA family
-	-- Tier 11-13 = A family
-	-- Tier 14 = B
-	-- Tier 15 = C
-	-- Tier 16 = D
-	if s:find("TIER01") or s:find("TIER02") or s:find("TIER03") then return HVColor.Grade.AAAA end
-	if s:find("TIER04") or s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
+	if s:find("TIER01") then return HVColor.Grade.AAAAA end
+	if s:find("TIER02") or s:find("TIER03") or s:find("TIER04") then return HVColor.Grade.AAAA end
+	if s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
 	if s:find("TIER08") or s:find("TIER09") or s:find("TIER10") then return HVColor.Grade.AA end
 	if s:find("TIER11") or s:find("TIER12") or s:find("TIER13") then return HVColor.Grade.A end
 	if s:find("TIER14") then return HVColor.Grade.B end

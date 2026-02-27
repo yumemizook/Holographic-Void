@@ -30,9 +30,9 @@ local t = Def.ActorFrame {
 			-- Title Menu Hover
 			local hovered = nil
 			for i = 1, 4 do
-				local iy = (SCREEN_CENTER_Y + 40) + 40 * ((i - 1) - 1.5)
+				local static_iy = (SCREEN_CENTER_Y + 60) + 50 * (i - 1)
 				if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-				   and virtualY >= iy-18 and virtualY <= iy+18 then
+				   and virtualY >= static_iy-25 and virtualY <= static_iy+25 then
 					hovered = i break
 				end
 			end
@@ -226,9 +226,9 @@ t[#t + 1] = Def.ActorFrame {
 				-- Menu Click
 				local hovered = nil
 				for i = 1, 4 do
-					local iy = (SCREEN_CENTER_Y + 40) + 40 * ((i - 1) - 1.5)
+					local iy = (SCREEN_CENTER_Y + 60) + 50 * (i - 1)
 					if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-					   and virtualY >= iy-18 and virtualY <= iy+18 then
+					   and virtualY >= iy-25 and virtualY <= iy+25 then
 						hovered = i break
 					end
 				end

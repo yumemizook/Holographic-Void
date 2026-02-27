@@ -8,7 +8,7 @@ local screenName = Var("LoadingScreen") or ...
 local function UpdateLoop()
 	local mouseX = INPUTFILTER:GetMouseX()
 	local mouseY = INPUTFILTER:GetMouseY()
-	TOOLTIP:SetPosition(mouseX, mouseY)
+	pcall(function() TOOLTIP:SetPosition(mouseX, mouseY) end)
 	return false
 end
 

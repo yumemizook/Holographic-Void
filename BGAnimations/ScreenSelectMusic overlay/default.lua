@@ -19,6 +19,7 @@ local dimText = color("0.45,0.45,0.45,1")
 local bgCard = color("0.06,0.06,0.06,0.9")
 
 local profileOverlayActor = nil
+local previewActive = false
 
 local t = Def.ActorFrame {
 	InitCommand = function(self)
@@ -40,6 +41,11 @@ local t = Def.ActorFrame {
 				end
 			end
 		end)
+	end,
+	BeginCommand = function(self)
+		-- Store ScreenSelectMusic reference globally for chart preview to use
+		HV = HV or {}
+		HV.SSM = SCREENMAN:GetTopScreen()
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
@@ -202,6 +208,15 @@ t[#t + 1] = Def.ActorFrame {
 				local avOver = virtualX >= avX and virtualX <= avX + avW
 				           and virtualY >= avY and virtualY <= avY + avH
 				if avOver then
+					SCREENMAN:SetNewScreen("ScreenAssetSettings")
+					return true
+				end
+
+				-- Check Name/Rating Click (right of avatar)
+				local nmX, nmY, nmW, nmH = avX + avW + 10, avY, 200, 40
+				local nmOver = virtualX >= nmX and virtualX <= nmX + nmW
+				           and virtualY >= nmY and virtualY <= nmY + nmH
+				if nmOver then
 					MESSAGEMAN:Broadcast("ToggleProfileOverlay")
 					return true
 				end
@@ -209,6 +224,7 @@ t[#t + 1] = Def.ActorFrame {
 		end)
 	end
 }
+
 
 -- ============================================================
 -- PROFILE OVERLAY
@@ -285,8 +301,17 @@ local profileOverlay = Def.ActorFrame {
 							end
 							return true
 						end
+
+						-- Avatar Click inside overlay
+						local overlayAvX = SCREEN_CENTER_X - overlayW/2 + sidebarW/2
+						local overlayAvY = SCREEN_CENTER_Y - overlayH/2 + 50
+						if IsMouseOverCentered(overlayAvX, overlayAvY, 60, 60) then
+							SCREENMAN:SetNewScreen("ScreenAssetSettings")
+							return true
+						end
 						
 						-- Skillset Tabs
+
 						local tabsYStart = SCREEN_CENTER_Y - overlayH/2 + 140
 						for i, ss in ipairs(skillsets) do
 							if IsMouseOver(sidebarX + 10, tabsYStart + (i-1)*skillsetTabH - skillsetTabH/2, sidebarW - 20, skillsetTabH) then
@@ -362,9 +387,7 @@ local profileOverlay = Def.ActorFrame {
 				UpdateOverlaySkillsetsMessageCommand = function(self) self:playcommand("UpdateAvatar") end,
 				AvatarChangedMessageCommand = function(self) self:playcommand("UpdateAvatar") end,
 				UpdateAvatarCommand = function(self)
-					local path = nil
-					local prof = PROFILEMAN:GetProfile(PLAYER_1)
-					if prof and prof.GetAvatarPath then path = prof:GetAvatarPath() end
+					local path = getAvatarPath()
 					if path and path ~= "" and FILEMAN:DoesFileExist(path) then
 						self:Load(path):visible(true)
 					else
@@ -373,6 +396,7 @@ local profileOverlay = Def.ActorFrame {
 					self:scaletoclipped(54, 54)
 				end
 			},
+
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:y(40):zoom(0.4):diffuse(brightText) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self) self:settext(DLMAN:GetUsername() ~= "" and DLMAN:GetUsername() or "LOCAL PLAYER") end
@@ -786,17 +810,44 @@ t[#t + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
+		-- Store SSM reference (redundant now but kept for compatibility)
+		if HV then HV.SSM = screen end
+		
 		screen:AddInputCallback(function(event)
 			if event.type ~= "InputEventType_FirstPress" then return end
 			local btn = event.DeviceInput.button
 
 			if btn == "DeviceButton_space" then
-				-- Pause music before entering preview to avoid double audio overlap
-				local ok, _ = pcall(function() SCREENMAN:GetTopScreen():PauseSampleMusic() end)
-				SCREENMAN:AddNewScreenToTop("ScreenChartPreview")
+				if previewActive then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				else
+					previewActive = true
+					MESSAGEMAN:Broadcast("ChartPreviewOn")
+				end
+				return true
+			end
+			
+			-- Handle input when preview is active
+			if previewActive then
+				-- Close preview on Esc or Back
+				if event.button == "Back" or event.button == "Start" then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+					return true
+				end
+				
+				-- Block all other inputs while preview is active
 				return true
 			end
 		end)
+	end
+}
+
+-- Load the Chart Preview layer (initially hidden)
+t[#t + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .. {
+	InitCommand = function(self)
+		self:visible(false)
 	end
 }
 

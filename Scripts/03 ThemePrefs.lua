@@ -42,6 +42,9 @@ local HVPrefs = {
 	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
 	HV_MSDColorScale = { Default = "HolographicVoid" },
 
+	-- Gameplay: Show measure divider lines
+	HV_ShowMeasureLines = { Default = "false" },
+
 	-- Auth: Saved EtternaOnline username and login token
 	HV_Username = { Default = "" },
 	HV_PasswordToken = { Default = "" },

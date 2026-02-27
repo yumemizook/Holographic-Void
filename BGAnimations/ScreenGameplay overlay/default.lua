@@ -21,7 +21,15 @@ local judgmentColors = {
 	color("#FFFFFF"), color("#E0E0A0"), color("#A0E0A0"),
 	color("#A0C8E0"), color("#C8A0E0"), color("#E0A0A0")
 }
-local judgmentLabels = {"W1", "W2", "W3", "W4", "W5", "Miss"}
+local judgmentLabels = {
+	THEME:GetString("TapNoteScore", "W1"),
+	THEME:GetString("TapNoteScore", "W2"),
+	THEME:GetString("TapNoteScore", "W3"),
+	THEME:GetString("TapNoteScore", "W4"),
+	THEME:GetString("TapNoteScore", "W5"),
+	THEME:GetString("TapNoteScore", "Miss")
+}
+
 local judgmentTNS = {
 	"TapNoteScore_W1", "TapNoteScore_W2", "TapNoteScore_W3",
 	"TapNoteScore_W4", "TapNoteScore_W5", "TapNoteScore_Miss"
@@ -65,9 +73,14 @@ t[#t + 1] = Def.ActorFrame {
 				:zoomto(0, barH):diffuse(accentColor):diffusealpha(0.7)
 		end,
 		UpdateCommand = function(self)
-			local songPos = GAMESTATE:GetSongPercent()
-			if songPos then
-				self:zoomto(barW * songPos, barH)
+			local song = GAMESTATE:GetCurrentSong()
+			if song then
+				local len = song:MusicLengthSeconds()
+				if len > 0 then
+					local cur = GAMESTATE:GetSongPosition():GetMusicSeconds()
+					local pct = math.max(0, math.min(cur / len, 1))
+					self:zoomto(barW * pct, barH)
+				end
 			end
 		end
 	},
@@ -194,12 +207,43 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- CENTERED COMBO DISPLAY (per-note update, no animation)
+-- CENTERED SCORE % (REAL-TIME)
 -- ============================================================
+t[#t + 1] = Def.ActorFrame {
+	Name = "CenteredScore",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 40):diffusealpha(0.8)
+	end,
+
+	LoadFont("Common Normal") .. {
+		Name = "ScoreValue",
+		InitCommand = function(self)
+			self:zoom(0.45):diffuse(brightText):diffusealpha(0.7)
+			self:settext("0.00%")
+		end,
+		JudgmentMessageCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+			if pss then
+				local wifePct = pss:GetWifeScore() * 100
+				if wifePct < 0 then wifePct = 0 end
+				self:settext(string.format("%.2f%%", wifePct))
+				-- Optional: color shift based on grade
+				local grade = pss:GetGrade()
+				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade))):diffusealpha(0.7)
+			end
+		end
+	}
+}
+
+-- ============================================================
+-- CENTERED COMBO / MISS STREAK (per-note update)
+-- ============================================================
+local missStreak = 0
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.22)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 40)
 		self:visible(false)
 	end,
 
@@ -218,33 +262,48 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
-	JudgmentMessageCommand = function(self)
+	JudgmentMessageCommand = function(self, params)
 		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-		if pss then
-			local combo = pss:GetCurrentCombo()
-			if combo and combo > 0 then
-				self:visible(true)
-				self:GetChild("ComboNumber"):settext(tostring(combo))
-			else
-				self:visible(false)
-			end
+		if not pss then return end
+
+		-- Track miss streak
+		if params.TapNoteScore == "TapNoteScore_Miss" or params.TapNoteScore == "TapNoteScore_W5" then
+			missStreak = missStreak + 1
+		else
+			missStreak = 0
+		end
+
+		local combo = pss:GetCurrentCombo()
+		local numActor = self:GetChild("ComboNumber")
+		local labelActor = self:GetChild("ComboLabel")
+
+		if combo > 0 then
+			self:visible(true)
+			numActor:settext(tostring(combo)):diffuse(brightText)
+			labelActor:settext("COMBO"):diffuse(subText)
+		elseif missStreak >= 5 then
+			self:visible(true)
+			numActor:settext(tostring(missStreak)):diffuse(color("#FF5050"))
+			labelActor:settext("MISSES"):diffuse(color("#FF5050")):diffusealpha(0.8)
+		else
+			self:visible(false)
 		end
 	end
 }
 
 -- ============================================================
--- REAL-TIME ACCURACY / SCORE% (per-note, 4-digit precision)
+-- REAL-TIME ACCURACY / SCORE% (BTM LEFT - Secondary reference)
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "AccuracyDisplay",
 	InitCommand = function(self)
-		self:xy(12, SCREEN_BOTTOM - 50)
+		self:xy(12, SCREEN_BOTTOM - 50):diffusealpha(0.6) -- Dimmed as it's secondary now
 	end,
 
 	LoadFont("Common Normal") .. {
 		Name = "ScorePercent",
 		InitCommand = function(self)
-			self:halign(0):valign(1):zoom(0.6):diffuse(brightText)
+			self:halign(0):valign(1):zoom(0.5):diffuse(brightText)
 			self:settext("0.0000%")
 		end,
 		JudgmentMessageCommand = function(self)
@@ -270,6 +329,62 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end
 	}
+}
+
+-- ============================================================
+-- ERROR BAR (TIMING BAR)
+-- ============================================================
+local ebW = 240
+local ebH = 2
+local ebCenterY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15
+local maxOffset = 180 -- ms
+local dotLife = 2.0  -- seconds
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "ErrorBar",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ThemePrefs.Get("HV_ShowJudgeOffsets"))
+	end,
+
+	-- Background line
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(ebW, ebH):diffuse(color("0.1,0.1,0.1,0.5"))
+		end
+	},
+	-- Center marker
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(1, ebH + 4):diffuse(color("0.4,0.4,0.4,0.8"))
+		end
+	},
+
+	JudgmentMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		if not params.TapNoteScore then return end
+		if params.HoldNoteScore then return end -- Skip holds
+
+		local offset = params.TapNoteOffset
+		if not offset then return end
+
+		-- Clamp for visualization
+		local visualOffset = offset * 1000 -- to ms
+		if math.abs(visualOffset) > maxOffset then return end
+
+		local xPos = (visualOffset / maxOffset) * (ebW / 2)
+		local jColor = offsetToJudgeColor(visualOffset)
+
+		-- Create a new pip
+		self:AddChild(Def.Quad {
+			InitCommand = function(s)
+				s:xy(xPos, 0):zoomto(1, ebH + 6):diffuse(jColor):diffusealpha(0.8)
+					:sleep(dotLife):linear(0.5):diffusealpha(0):queuecommand("Die")
+			end,
+			DieCommand = function(s)
+				s:GetParent():RemoveChild(s)
+			end
+		})
+	end
 }
 
 -- ============================================================
@@ -391,8 +506,69 @@ t[#t + 1] = Def.ActorFrame {
 			if pss then
 				local grade = pss:GetGrade()
 				local gradeStr = ToEnumShortString(grade)
-				self:settext(gradeStr)
+				self:settext(THEME:GetString("Grade", gradeStr))
 				self:diffuse(HVColor.GetGradeColor(gradeStr))
+			end
+		end
+	}
+}
+
+-- ============================================================
+-- JUDGE RESCORING & MEAN/SD
+-- ============================================================
+t[#t + 1] = Def.ActorFrame {
+	Name = "RescoreStats",
+	InitCommand = function(self)
+		self:xy(tallyX, okngY + 80)
+	end,
+
+	-- Rescored % (J4)
+	LoadFont("Common Normal") .. {
+		Name = "RescoreLabel",
+		InitCommand = function(self)
+			self:halign(0):valign(0):zoom(0.22):diffuse(dimText)
+			self:settext("J4")
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "RescoreValue",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(100):zoom(0.26):diffuse(subText)
+			self:settext("0.00%")
+		end,
+		JudgmentMessageCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+			if pss then
+				local rs = getRescoreElements(pss, pss) -- Use pss as proxy for score
+				local j4 = getRescoredWife3Judge(1, 4, rs)
+				self:settext(string.format("%.2f%%", j4))
+			end
+		end
+	},
+
+	-- Mean / SD
+	LoadFont("Common Normal") .. {
+		Name = "MeanSDLabel",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(16):zoom(0.22):diffuse(dimText)
+			self:settext("MEAN/SD")
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "MeanSDValue",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(100):y(16):zoom(0.26):diffuse(subText)
+			self:settext("0.0 / 0.0")
+		end,
+		JudgmentMessageCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+			if pss then
+				local dvt = pss:GetOffsetVector()
+				if dvt and #dvt > 0 then
+					local mean = wifeMean(dvt) * 1000
+					local sd = wifeSd(dvt) * 1000
+					self:settext(string.format("%.1f / %.1f", mean, sd))
+				end
 			end
 		end
 	}
