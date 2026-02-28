@@ -127,7 +127,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:valign(0):scaletoclipped(panelW - 24, (panelW - 24) / 3.2)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local bnpath = song:GetBannerPath()
@@ -145,6 +145,15 @@ t[#t + 1] = Def.ActorFrame {
 		CurrentSongChangedMessageCommand = function(self)
 			self:playcommand("Set")
 		end
+	},
+
+	-- CDTitle
+	Def.Sprite {
+		Name = "CDTitle",
+		InitCommand = function(self)
+			-- Placed relative to the SongInfoFrame below instead
+			self:visible(false)
+		end,
 	}
 }
 
@@ -168,7 +177,7 @@ t[#t + 1] = Def.ActorFrame {
 				:maxwidth((panelW - 32) / 0.7)
 				:diffuse(brightText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				self:settext(song:GetDisplayMainTitle())
@@ -189,7 +198,7 @@ t[#t + 1] = Def.ActorFrame {
 				:maxwidth((panelW - 32) / 0.45)
 				:diffuse(subText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				self:settext(song:GetDisplayArtist())
@@ -207,10 +216,10 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "GroupName",
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(40):zoom(0.35)
-				:maxwidth((panelW - 32) / 0.35)
+				:maxwidth((panelW - 32 - 50) / 0.35) -- Leave space for CDTitle
 				:diffuse(dimText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				self:settext(song:GetGroupName())
@@ -223,10 +232,98 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
+	Def.ActorFrame {
+		Name = "CDTitleBox",
+		InitCommand = function(self)
+			self:xy(panelW - 32, 22) -- Align to right edge
+		end,
+		SetCommand = function(self)
+			local song = GAMESTATE:GetCurrentSong()
+			if song and song:HasCDTitle() then
+				self:visible(true)
+			else
+				self:visible(false)
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		
+		-- Real CDTitle Sprite with Hover tooltips attached natively
+		UIElements.SpriteButton(1, 1, nil) .. {
+			Name = "CDTitle",
+			InitCommand = function(self)
+				self:halign(1):valign(0)
+			end,
+			SetCommand = function(self)
+				self:finishtweening()
+				self.song = GAMESTATE:GetCurrentSong()
+				if self.song and self.song:HasCDTitle() then
+					self:visible(true)
+					self:Load(self.song:GetCDTitlePath())
+				else
+					self:visible(false)
+				end
+				
+				local maxDim = 32 -- Smaller to fit next to text
+				local w, h = self:GetWidth(), self:GetHeight()
+				if w > 0 and h > 0 then
+					local scale = math.min(maxDim / w, maxDim / h)
+					self:zoom(scale)
+				end
+				
+				if isOver(self) then
+					self:playcommand("ToolTip")
+				end
+			end,
+			CurrentSongChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			ToolTipCommand = function(self)
+				if isOver(self) then
+					if self.song and self.song:HasCDTitle() and self:GetVisible() then
+						local creditStr = "None defined"
+						
+						local steps = GAMESTATE:GetCurrentSteps(PLAYER_1)
+						if steps then
+							local ok, res = pcall(function() return steps:GetAuthorCredit() end)
+							if ok and type(res) == "string" and res ~= "" then
+								creditStr = res
+							else
+								local ok2, res2 = pcall(function() return steps:GetCredit() end)
+								if ok2 and type(res2) == "string" and res2 ~= "" then
+									creditStr = res2
+								end
+							end
+						end
+						
+						if creditStr == "None defined" and self.song then
+							local ok, res = pcall(function() return self.song:GetCredit() end)
+							if ok and type(res) == "string" and res ~= "" then
+								creditStr = res
+							end
+						end
+						
+						TOOLTIP:SetText(creditStr)
+						TOOLTIP:Show()
+					else
+						TOOLTIP:Hide()
+					end
+				end
+			end,
+			MouseOverCommand = function(self)
+				self:playcommand("ToolTip")
+			end,
+			MouseOutCommand = function(self)
+				TOOLTIP:Hide()
+			end
+		}
+	},
+
 	-- Separator line
 	Def.Quad {
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(58)
+			self:halign(0):valign(0):y(60)
 				:zoomto(panelW - 32, 1)
 				:diffuse(color("0.18,0.18,0.18,1"))
 		end
@@ -258,7 +355,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):x(40):zoom(0.4):diffuse(mainText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local bpms = song:GetDisplayBpms()
@@ -295,7 +392,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):x(panelW * 0.35 + 56):zoom(0.4):diffuse(mainText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local len = song:MusicLengthSeconds()
@@ -338,6 +435,8 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "MSDFrame",
 	InitCommand = function(self)
 		self:xy(panelX + 16, msdY)
+		local show = ThemePrefs.Get("HV_ShowMSD")
+		self:visible(show == "true" or show == true)
 	end,
 
 	LoadFont("Common Normal") .. {
@@ -353,6 +452,8 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "MSDRow_Overall",
 	InitCommand = function(self)
 		self:xy(panelX + 16, msdY + 24)
+		local show = ThemePrefs.Get("HV_ShowMSD")
+		self:visible(show == "true" or show == true)
 	end,
 
 	LoadFont("Common Large") .. {
@@ -360,7 +461,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.45):diffuse(mainText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local steps = GAMESTATE:GetCurrentSteps()
@@ -416,7 +517,7 @@ t[#t + 1] = Def.ActorFrame {
 			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
 		},
 		
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local c1 = self:GetChild("IconContainer1")
 			local c2 = self:GetChild("IconContainer2")
 			local c3 = self:GetChild("IconContainer3")
@@ -521,7 +622,7 @@ t[#t + 1] = Def.ActorFrame {
 			-- Use IsMouseOver for consistent coordinate units
 			-- Hitbox for the large Overall rating (panelX+16 to panelX+120, msdY+20 to msdY+90)
 			local isHovering = IsMouseOver(panelX + 10, msdY + 20, 110, 70)
-			if isHovering then
+			if isHovering and ThemePrefs.Get("HV_ShowMSD") == "true" then
 				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
 				-- Check visibility BEFORE setting it to trigger updates correctly
 				local wasHidden = not msdTooltipActor:GetVisible()
@@ -549,6 +650,8 @@ t[#t + 1] = Def.ActorFrame {
 		self:sleep(0.02):queuecommand("Tick")
 	end
 }
+
+
 
 -- ============================================================
 -- DIFFICULTY SELECTOR TABS (Vertical, right of sidebar)
@@ -588,7 +691,7 @@ for di, dname in ipairs(diffNames) do
 				self:halign(0):valign(0):zoomto(diffTabW, diffTabH)
 					:diffuse(color("0.08,0.08,0.08,1"))
 			end,
-			SetMessageCommand = function(self)
+			SetCommand = function(self)
 				local song = GAMESTATE:GetCurrentSong()
 				if not song then self:diffusealpha(0.3) return end
 				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
@@ -623,7 +726,7 @@ for di, dname in ipairs(diffNames) do
 					:zoom(0.26):diffuse(mainText)
 				self:settext(diffShort[di])
 			end,
-			SetMessageCommand = function(self)
+			SetCommand = function(self)
 				local song = GAMESTATE:GetCurrentSong()
 				if not song then self:diffusealpha(0.3) return end
 				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
@@ -648,26 +751,37 @@ for di, dname in ipairs(diffNames) do
 					:xy(diffTabW - 6, diffTabH / 2)
 					:zoom(0.26):diffuse(dimText)
 			end,
-			SetMessageCommand = function(self)
+			SetCommand = function(self)
 				local song = GAMESTATE:GetCurrentSong()
 				if not song then self:settext("") return end
 				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
 				if not allSteps then self:settext("") return end
+				
+				local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+				
 				for _, st in ipairs(allSteps) do
 					if ToEnumShortString(st:GetDifficulty()) == dname then
-						local msd = st:GetMSD(getCurRateValue(), 1)
-						if msd and msd > 0 then
-							self:settext(string.format("%.2f", msd))
-							self:diffuse(HVColor.GetMSDRatingColor(msd))
+						if showMSD then
+							local msd = st:GetMSD(getCurRateValue(), 1)
+							if msd and msd > 0 then
+								self:settext(string.format("%.2f", msd))
+								self:diffuse(HVColor.GetMSDRatingColor(msd))
+							else
+								self:settext("-")
+								self:diffuse(dimText)
+							end
 						else
-							self:settext("-")
-							self:diffuse(dimText)
+							-- Show chart meter if MSD is disabled
+							local meter = st:GetMeter()
+							self:settext(tostring(meter))
+							self:diffuse(mainText)
 						end
 						return
 					end
 				end
 				self:settext("")
 			end,
+
 			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
 			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
 			CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
@@ -716,6 +830,7 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "PersonalBestFrame",
 	InitCommand = function(self)
 		self:xy(panelX + 16, pbY)
+		-- Removed self:visible() logic from here; frame must remain visible for PB Score.
 	end,
 
 	Def.Quad {
@@ -739,7 +854,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(18):zoom(0.55):diffuse(brightText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			if score then
 				local wifePct = score:GetWifeScore() * 100
@@ -763,7 +878,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(36):zoom(0.26):diffuse(subText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			if score then
 				local gradeShort = ToEnumShortString(score:GetWifeGrade())
@@ -785,7 +900,13 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(52):zoom(0.26):diffuse(mainText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
+			local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+			if not showMSD then
+				self:settext("")
+				return
+			end
+			
 			local score = GetDisplayScore()
 			if score then
 				local ssr = score:GetSkillsetSSR("Overall")
@@ -804,7 +925,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(66):zoom(0.22):diffuse(subText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			if score then
 				local marv = score:GetTapNoteScore("TapNoteScore_W1")
@@ -827,14 +948,10 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(78):zoom(0.22):diffuse(subText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			local steps = GAMESTATE:GetCurrentSteps()
 			if score and steps then
-				-- We approximate CBs: a combo break occurs on a Miss or W5 (Bad)
-				-- Etterna scores do not directly store "CB count" easily without looking at replay data,
-				-- but we can at least show Good/Bad/Miss counts which imply combo breaks.
-				-- For an accurate representation of "CBs" without replay parsing, showing total combo breakers is a close approximation.
 				local bad = score:GetTapNoteScore("TapNoteScore_W5")
 				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
 				local cbs = bad + miss
@@ -852,7 +969,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			if score then
 				local gradeStr = ToEnumShortString(score:GetWifeGrade())
@@ -872,7 +989,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(1):valign(0):x(panelW - 32):y(40):zoom(0.24)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local score = GetDisplayScore()
 			if score then
 				local ct = getDetailedClearType(score)
@@ -974,6 +1091,12 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(1):valign(0):x(164):y(10):zoom(0.30)
 		end,
 		SetCommand = function(self)
+			local showProfileStats = HV.ShowProfileStats()
+			if not (showProfileStats == "true" or showProfileStats == true) then
+				self:visible(false)
+				return
+			end
+			
 			if DLMAN:IsLoggedIn() then
 				local rank = DLMAN:GetSkillsetRank("Overall")
 				local rankColor = color("#A6A6A6")
@@ -1004,6 +1127,12 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(1):x(56):y(53):zoom(0.35)
 		end,
 		SetCommand = function(self)
+			local showProfileStats = HV.ShowProfileStats()
+			if not (showProfileStats == "true" or showProfileStats == true) then
+				self:settext("")
+				return
+			end
+			
 			local rating = 0
 			if DLMAN:IsLoggedIn() then
 				rating = DLMAN:GetSkillsetRating("Overall")
@@ -1030,6 +1159,12 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(1):valign(1):x(164):y(54):zoom(0.30):diffuse(subText)
 		end,
 		SetCommand = function(self)
+			local showProfileStats = HV.ShowProfileStats()
+			if not (showProfileStats == "true" or showProfileStats == true) then
+				self:visible(false)
+				return
+			end
+			
 			local profile = PROFILEMAN:GetProfile(PLAYER_1)
 			if profile then
 				local notesHit = profile:GetTotalTapsAndHolds()
@@ -1114,7 +1249,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "RateValue",
 		InitCommand = function(self) self:halign(0):valign(0):zoom(0.4):diffuse(accentColor) end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local rate = getCurRateValue() or 1
 			if math.abs(rate - 1.0) < 0.005 then
 				self:settext("1.0x"):diffuse(mainText)
@@ -1124,6 +1259,107 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
 	}
+}
+
+-- ============================================================
+-- RADAR INTEGRATION
+-- ============================================================
+-- Add the radar component to visually track step characteristics
+t[#t + 1] = Def.ActorFrame {
+	InitCommand = function(self)
+		-- Centered directly above the profile card
+		self:xy(compactProfileX + 85, compactProfileY - 80)
+		self:zoom(1.0)
+	end,
+	LoadActor("radar.lua")
+}
+
+-- ============================================================
+-- CREDIT TOOLTIP (Mouse-following)
+-- ============================================================
+local creditTooltipActor = nil
+local creditTooltip = Def.ActorFrame {
+	Name = "CreditTooltip",
+	InitCommand = function(self)
+		creditTooltipActor = self
+		-- Use a very high Z index here
+		self:visible(false):z(9000)
+	end,
+	Def.Quad {
+		Name = "Bg",
+		InitCommand = function(self)
+			self:halign(0):valign(0):diffuse(color("0.05,0.05,0.05,0.95"))
+		end
+	},
+	Def.Quad {
+		Name = "Border",
+		InitCommand = function(self)
+			self:halign(0):valign(0):diffuse(accentColor):diffusealpha(0.5)
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "Text",
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(8, 8):zoom(0.35):diffuse(mainText)
+		end
+	}
+}
+t[#t + 1] = creditTooltip
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "CreditTooltipHandler",
+	OnCommand = function(self)
+		local function Update()
+			if not creditTooltipActor then return end
+			local song = GAMESTATE:GetCurrentSong()
+			
+			local hasCredit = false
+			local cStr = ""
+			if song then
+				local ok, res = pcall(function() return song:GetCredit() end)
+				if ok and type(res) == "string" and res ~= "" then
+					hasCredit = true
+					cStr = res
+				end
+			end
+			
+			-- Expand hover bounding box to include CDTitle placed near pack name
+			local isHovering = IsMouseOver(panelX + 16, infoY, panelW - 16, 75)
+			
+			if isHovering and hasCredit then
+				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+				local wasHidden = not creditTooltipActor:GetVisible()
+				creditTooltipActor:visible(true):xy(mx + 15, my + 15)
+				
+				if wasHidden then
+					local txt = creditTooltipActor:GetChild("Text")
+					local bg = creditTooltipActor:GetChild("Bg")
+					local border = creditTooltipActor:GetChild("Border")
+					
+					txt:settext("Credit: " .. cStr)
+					local w = txt:GetZoomedWidth() + 16
+					local h = txt:GetZoomedHeight() + 16
+					bg:zoomto(w, h)
+					border:zoomto(w, 1)
+				end
+			else
+				creditTooltipActor:visible(false)
+			end
+		end
+
+		if self.SetUpdateFunction then
+			self:SetUpdateFunction(Update)
+		elseif self.SetUpdate then
+			self:SetUpdate(Update)
+		else
+			self:queuecommand("Tick")
+		end
+		self.HV_Update = Update
+	end,
+	TickCommand = function(self)
+		if self.HV_Update then self.HV_Update() end
+		self:sleep(0.02):queuecommand("Tick")
+	end
 }
 
 return t
