@@ -7,7 +7,7 @@ local t = Def.ActorFrame {
 	Name = "HVOptionsOverlay"
 }
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")

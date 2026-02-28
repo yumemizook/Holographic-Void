@@ -44,12 +44,12 @@ end
 
 -- Difficulty colors (monochromatic-friendly with subtle hue shifts)
 HVColor.Difficulty = {
-	Beginner    = color("#8C8C8C"),   -- Light gray
+	Beginner    = color("#98B8CF"),   -- Light gray
 	Easy        = color("#A0CFAB"),   -- Muted green-gray
 	Medium      = color("#CFD198"),   -- Muted gold-gray
 	Hard        = color("#CF9898"),   -- Muted red-gray
-	Challenge   = color("#98B8CF"),   -- Muted blue-gray
-	Edit        = color("#B898CF"),   -- Muted purple-gray
+	Challenge   = color("#B898CF"),   -- Muted blue-gray
+	Edit        = color("#8C8C8C"),   -- Muted purple-gray
 }
 
 -- Override GameColor.Difficulty with our monochromatic versions
@@ -213,6 +213,17 @@ function HVColor.GetGradeColor(grade)
 	if s:find("D")     then return HVColor.Grade.D    end
 	
 	return HVColor.Grade.None
+end
+
+--- Get a color for an online rank number.
+function HVColor.GetSkillsetRankColor(rank)
+	if not rank or rank <= 0 then return color("#737373") end
+	
+	if rank <= 10 then return color("#CFD198") end       -- Top 10 (Muted Gold)
+	if rank <= 50 then return color("#A0CFAB") end       -- Top 50 (Muted Green)
+	if rank <= 100 then return color("#80C0CF") end      -- Top 100 (Muted Cyan)
+	if rank <= 500 then return color("#D9D9D9") end      -- Top 500 (White-Gray)
+	return color("#A6A6A6")                              -- Fallback (Subtitle Text)
 end
 
 Trace("Holographic Void: 02 Colors.lua loaded.")

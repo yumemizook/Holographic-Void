@@ -23,7 +23,7 @@ t[#t + 1] = Def.Quad {
 -- Left accent bar (accent color for groups)
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:x(-wheelItemW/2 + 2):zoomto(4, 30):diffuse(color("#5ABAFF")):diffusealpha(0.5)
+		self:x(-wheelItemW/2 + 2):zoomto(4, 30):diffuse(HVColor.Accent):diffusealpha(0.5)
 	end
 }
 
@@ -84,6 +84,25 @@ t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:y(17):zoomto(wheelItemW, 1):diffuse(color("0.18,0.18,0.18,1"))
 	end
+}
+
+-- Engine text color override
+t[#t + 1] = Def.Actor {
+	SetMessageCommand = function(self)
+		local normalPart = self:GetParent()
+		if not normalPart then return end
+		local mwi = normalPart:GetParent()
+		if not mwi then return end
+
+		local names = {"SectionExpanded", "SectionCollapsed"}
+		for _, name in ipairs(names) do
+			local textActor = mwi:GetChild(name)
+			if textActor and textActor:GetVisible() then
+				textActor:diffuse(HVColor.Accent)
+			end
+		end
+	end,
+	ColorThemeChangedMessageCommand = function(self) self:playcommand("Set") end
 }
 
 return t

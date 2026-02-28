@@ -1,13 +1,18 @@
 --- Holographic Void: ScreenSelectMusic Overlay
 -- Restore sequential Til Death-style login flow.
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local brightText = color("1,1,1,1")
 
--- Login Button Constants
-local btnCX = 8 + (SCREEN_WIDTH * 0.36) / 2
-local btnCY = SCREEN_BOTTOM - 24
-local btnW, btnH = 180, 28
+-- Compact Profile Login Button Bounds
+local panelX = 20
+local panelW = SCREEN_WIDTH * 0.36
+local compactProfileX = panelX + panelW + 16
+local compactProfileY = SCREEN_HEIGHT - 40 - 75
+
+local btnCX = compactProfileX + 40
+local btnCY = compactProfileY - 22
+local btnW, btnH = 80, 24
 
 -- Profile Overlay Constants
 local overlayW, overlayH = SCREEN_WIDTH * 0.8, SCREEN_HEIGHT * 0.7
@@ -31,15 +36,7 @@ local t = Def.ActorFrame {
 			local over = virtualX >= btnCX - btnW/2 and virtualX <= btnCX + btnW/2
 					 and virtualY >= btnCY - btnH/2 and virtualY <= btnCY + btnH/2
 
-			local btn = af:GetChild("LoginButtonUI")
-			if btn then
-				local bg = btn:GetChild("Bg")
-				if over then
-					bg:stoptweening():linear(0.1):diffusealpha(1.0):glow(accentColor)
-				else
-					bg:stoptweening():linear(0.1):diffusealpha(0.8):glow(color("0,0,0,0"))
-				end
-			end
+			-- Removed: local overlay updating of LoginButtonUI since it was moved to decorations
 		end)
 	end,
 	BeginCommand = function(self)
@@ -60,19 +57,20 @@ local t = Def.ActorFrame {
 			ThemePrefs.Save()
 		end
 	end,
+	LoginFailedMessageCommand = function(self)
+		ms.ok("Login Failed. Please check your credentials.")
+	end,
 	LogOutMessageCommand = function(self)
-		ThemePrefs.Set("HV_Username", "")
-		ThemePrefs.Set("HV_PasswordToken", "")
-		ThemePrefs.Save()
+		-- Only clear username on manual logout to preserve auto-login token
 	end,
 	TriggerLoginFlowMessageCommand = function(self)
 		-- Sequential Til Death flow with frame delay to avoid overlaps
 		local tempEmail = ""
 		easyInputStringOKCancel(
-			"Email or Username:", 255, true,
+			"Email:", 255, true,
 			function(email)
 				if email ~= "" then
-					tempEmail = email
+					self.tempEmail = email
 					self:sleep(0.02):queuecommand("LoginStep2")
 				else
 					ms.ok("Login Canceled")
@@ -80,48 +78,25 @@ local t = Def.ActorFrame {
 			end,
 			function() ms.ok("Login Canceled") end
 		)
-
-		-- Step 2 Handler
-		self:addcommand("LoginStep2", function(self)
-			easyInputStringOKCancel(
-				"Password:", 255, true,
-				function(password)
-					if password ~= "" then
-						Trace("[HV] Attempting DLMAN:Login for " .. tempEmail)
-						DLMAN:Login(tempEmail, password)
-					else
-						ms.ok("Login Canceled")
-					end
-				end,
-				function() ms.ok("Login Canceled") end
-			)
-		end)
+	end,
+	
+	LoginStep2Command = function(self)
+		easyInputStringOKCancel(
+			"Password:", 255, true,
+			function(password)
+				if password ~= "" then
+					Trace("[HV] Attempting DLMAN:Login for " .. tostring(self.tempEmail))
+					DLMAN:Login(self.tempEmail, password)
+				else
+					ms.ok("Login Canceled")
+				end
+			end,
+			function() ms.ok("Login Canceled") end
+		)
 	end
 }
 
--- Login Button Visuals
-t[#t + 1] = Def.ActorFrame {
-	Name = "LoginButtonUI",
-	InitCommand = function(self)
-		self:xy(btnCX, btnCY)
-		self:SetUpdateFunction(function(af)
-			local loggedIn = DLMAN:IsLoggedIn()
-			local bg = af:GetChild("Bg")
-			local txt = af:GetChild("Txt")
-			if loggedIn then
-				txt:settext("LOG OUT")
-				bg:diffuse(color("0.1,0.28,0.15,0.8"))
-				txt:diffuse(color("0.65,1,0.72,1"))
-			else
-				txt:settext("LOG IN")
-				bg:diffuse(accentColor):diffusealpha(0.8)
-				txt:diffuse(brightText)
-			end
-		end)
-	end,
-	Def.Quad { Name = "Bg", InitCommand = function(self) self:zoomto(btnW, btnH) end },
-	LoadFont("Common Normal") .. { Name = "Txt", InitCommand = function(self) self:zoom(0.4) end }
-}
+-- LoginButtonUI was moved to decorations/default.lua to nest visually within the profile card.
 
 -- Rate adjustment via CodeMessage (EffectUp/EffectDown mapped in metrics.ini)
 local lastRatePresses = {0, 0}
@@ -195,6 +170,9 @@ t[#t + 1] = Def.ActorFrame {
 						 and virtualY >= btnCY - btnH/2 and virtualY <= btnCY + btnH/2
 				if loginOver then
 					if DLMAN:IsLoggedIn() then
+						ThemePrefs.Set("HV_Username", "")
+						ThemePrefs.Set("HV_PasswordToken", "")
+						ThemePrefs.Save()
 						DLMAN:Logout()
 						ms.ok("Logged Out")
 					else
@@ -203,21 +181,51 @@ t[#t + 1] = Def.ActorFrame {
 					return true
 				end
 
-				-- Check Avatar Click (x=24, y=SCREEN_HEIGHT-90, w=40, h=40)
-				local avX, avY, avW, avH = 24, SCREEN_HEIGHT - 90, 40, 40
-				local avOver = virtualX >= avX and virtualX <= avX + avW
-				           and virtualY >= avY and virtualY <= avY + avH
-				if avOver then
+				-- Check Avatar Button
+				if virtualX >= compactProfileX - 8 and virtualX <= compactProfileX + 50
+				   and virtualY >= compactProfileY - 8 and virtualY <= compactProfileY + 50 then
 					SCREENMAN:SetNewScreen("ScreenAssetSettings")
 					return true
 				end
 
-				-- Check Name/Rating Click (right of avatar)
-				local nmX, nmY, nmW, nmH = avX + avW + 10, avY, 200, 40
-				local nmOver = virtualX >= nmX and virtualX <= nmX + nmW
-				           and virtualY >= nmY and virtualY <= nmY + nmH
-				if nmOver then
-					MESSAGEMAN:Broadcast("ToggleProfileOverlay")
+				-- Check Header `< BACK` Button (0 to 80, 0 to 40)
+				if virtualX >= 0 and virtualX <= 80 and virtualY >= 0 and virtualY <= 40 then
+					SCREENMAN:GetTopScreen():Cancel()
+					return true
+				end
+
+				-- Check Header `SEARCH` Bar (Center)
+				local searchStartX = SCREEN_WIDTH / 2 - 150
+				local searchStartY = 6
+				if virtualX >= searchStartX and virtualX <= searchStartX + 300 
+				   and virtualY >= searchStartY and virtualY <= searchStartY + 28 then
+					MESSAGEMAN:Broadcast("ToggleSearchOverlay")
+					return true
+				end
+
+				-- Check Footer Tab Buttons
+				local footerY = SCREEN_HEIGHT - 40
+				local tabW = 80
+				local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
+				
+				for i, tabName in ipairs(tabs) do
+					local tx = 10 + (i - 1) * tabW
+					if virtualX >= tx and virtualX <= tx + tabW and virtualY >= footerY and virtualY <= SCREEN_HEIGHT then
+						if tabName == "PROFILE" then
+							MESSAGEMAN:Broadcast("ToggleProfileOverlay")
+						else
+							-- Placeholder for other tabs
+							MESSAGEMAN:Broadcast("Toggle" .. tabName .. "Overlay")
+						end
+						return true
+					end
+				end
+			end
+			
+			-- 3. Key Presses
+			if event.type == "InputEventType_FirstPress" then
+				if event.button == "4" and (INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")) then
+					MESSAGEMAN:Broadcast("ToggleSearchOverlay")
 					return true
 				end
 			end
@@ -399,7 +407,10 @@ local profileOverlay = Def.ActorFrame {
 
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:y(40):zoom(0.4):diffuse(brightText) end,
-				UpdateOverlaySkillsetsMessageCommand = function(self) self:settext(DLMAN:GetUsername() ~= "" and DLMAN:GetUsername() or "LOCAL PLAYER") end
+				UpdateOverlaySkillsetsMessageCommand = function(self)
+					local name = DLMAN:GetUsername() ~= "" and DLMAN:GetUsername() or (PROFILEMAN:GetProfile(PLAYER_1) and PROFILEMAN:GetProfile(PLAYER_1):GetDisplayName() or "LOCAL PLAYER")
+					self:settext(name)
+				end
 			},
 			LoadFont("Common Normal") .. {
 				Name = "Rating",
@@ -800,6 +811,138 @@ local profileOverlay = Def.ActorFrame {
 }
 
 t[#t + 1] = profileOverlay
+
+-- ============================================================
+-- TOP HEADER (Search & Back)
+-- ============================================================
+local headerH = 40
+t[#t + 1] = Def.ActorFrame {
+	Name = "HeaderBar",
+	InitCommand = function(self)
+		self:xy(0, 0)
+	end,
+	
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0)
+				:zoomto(SCREEN_WIDTH, headerH)
+				:diffuse(color("0.04,0.04,0.04,1"))
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(1)
+				:xy(0, headerH)
+				:zoomto(SCREEN_WIDTH, 2)
+				:diffuse(accentColor):diffusealpha(0.5)
+		end
+	},
+	
+	-- Back Button
+	Def.ActorFrame {
+		Name = "BtnBack",
+		InitCommand = function(self) self:xy(0, 0) end,
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(80, headerH):diffuse(color("0,0,0,0"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):valign(0.5):xy(40, headerH / 2):zoom(0.4):diffuse(mainText):settext("< BACK")
+			end
+		}
+	},
+	
+	-- Search Bar Frame
+	Def.ActorFrame {
+		Name = "SearchBar",
+		InitCommand = function(self) self:xy(SCREEN_WIDTH / 2 - 150, 6) end,
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(300, 28)
+					:diffuse(color("0.1,0.1,0.1,1"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):valign(0.5):xy(150, 14):zoom(0.35):diffuse(subText):settext("Click here to Search (or Ctrl + 4)")
+			end
+		}
+	}
+}
+
+-- ============================================================
+-- BOTTOM FOOTER & TAB BUTTONS
+-- ============================================================
+local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
+local tabW = 80
+local footerH = 40
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "FooterBar",
+	InitCommand = function(self)
+		self:xy(0, SCREEN_HEIGHT - footerH)
+	end,
+	
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0)
+				:zoomto(SCREEN_WIDTH, footerH)
+				:diffuse(color("0.04,0.04,0.04,1"))
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0)
+				:zoomto(SCREEN_WIDTH, 2)
+				:diffuse(accentColor):diffusealpha(0.5)
+		end
+	},
+	
+	-- Time Display (Right aligned)
+	LoadFont("Common Normal") .. {
+		Name = "TimeDisplay",
+		InitCommand = function(self)
+			self:halign(1):valign(0.5)
+				:xy(SCREEN_WIDTH - 20, footerH / 2)
+				:zoom(0.35)
+				:settext(os.date("%H:%M"))
+		end,
+		UpdateCommand = function(self)
+			self:settext(os.date("%H:%M"))
+		end
+	}
+}
+
+-- Create Tab Buttons on Footer
+for i, tabName in ipairs(tabs) do
+	t[#t + 1] = Def.ActorFrame {
+		Name = "FooterTab_" .. tabName,
+		InitCommand = function(self)
+			self:xy(10 + (i - 1) * tabW, SCREEN_HEIGHT - footerH)
+		end,
+		
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:halign(0):valign(0)
+					:zoomto(tabW, footerH)
+					:diffuse(color("0,0,0,0"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):valign(0.5)
+					:xy(tabW / 2, footerH / 2)
+					:zoom(0.35):diffuse(mainText)
+					:settext(tabName)
+			end
+		}
+	}
+end
 
 -- ============================================================
 -- CHART PREVIEW TRIGGER (Space key)

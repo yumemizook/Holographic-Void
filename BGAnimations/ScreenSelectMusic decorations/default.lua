@@ -12,14 +12,15 @@
 -- ============================================================
 local panelX = 8                      -- Left panel left edge
 local panelW = SCREEN_WIDTH * 0.36   -- Panel width
-local panelY = 8                      -- Top margin
-local accentColor = color("#5ABAFF")
+local panelY = 48                     -- Top margin (pushed down for header)
+local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
 local bgCard = color("0.06,0.06,0.06,0.9")
-local profileY = SCREEN_HEIGHT - 90
+local headerH = 40
+local footerH = 40
 
 local profileOverlayActor = nil -- Local reference for the overlay
 
@@ -88,7 +89,7 @@ t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:halign(0):valign(0)
 			:xy(panelX, panelY)
-			:zoomto(panelW, SCREEN_HEIGHT - 16)
+			:zoomto(panelW, SCREEN_HEIGHT - headerH - footerH - 16)
 			:diffuse(bgCard)
 	end
 }
@@ -98,7 +99,7 @@ t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:halign(0):valign(0)
 			:xy(panelX, panelY)
-			:zoomto(2, SCREEN_HEIGHT - 16)
+			:zoomto(2, SCREEN_HEIGHT - headerH - footerH - 16)
 			:diffuse(accentColor):diffusealpha(0.3)
 	end
 }
@@ -330,7 +331,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- MSD SKILLSET RATINGS (Simplified)
 -- ============================================================
-local msdY = detailY + 30
+local msdY = detailY + 45
 local skillsets = {"Overall", "Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
 
 t[#t + 1] = Def.ActorFrame {
@@ -354,10 +355,10 @@ t[#t + 1] = Def.ActorFrame {
 		self:xy(panelX + 16, msdY + 24)
 	end,
 
-	LoadFont("Common Normal") .. {
+	LoadFont("Common Large") .. {
 		Name = "MSD_Overall",
 		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(1.0):diffuse(mainText)
+			self:halign(0):valign(0):zoom(0.45):diffuse(mainText)
 		end,
 		SetMessageCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
@@ -379,6 +380,75 @@ t[#t + 1] = Def.ActorFrame {
 			else
 				self:settext("-")
 				self:diffuse(dimText)
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+	
+	-- Top 3 Skillsets Displays
+	Def.ActorFrame {
+		Name = "TopSkillsetIcons",
+		InitCommand = function(self)
+			self:xy(120, -10) -- Raised higher and shifted right for bigger MSD
+		end,
+		
+		-- Container for Icon 1
+		Def.ActorFrame {
+			Name = "IconContainer1",
+			InitCommand = function(self) self:x(0) end,
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+		},
+		-- Container for Icon 2
+		Def.ActorFrame {
+			Name = "IconContainer2",
+			InitCommand = function(self) self:x(70) end,
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+		},
+		-- Container for Icon 3
+		Def.ActorFrame {
+			Name = "IconContainer3",
+			InitCommand = function(self) self:x(140) end,
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+		},
+		
+		SetMessageCommand = function(self)
+			local c1 = self:GetChild("IconContainer1")
+			local c2 = self:GetChild("IconContainer2")
+			local c3 = self:GetChild("IconContainer3")
+			c1:GetChild("Img"):visible(false) c1:GetChild("Lbl"):visible(false)
+			c2:GetChild("Img"):visible(false) c2:GetChild("Lbl"):visible(false)
+			c3:GetChild("Img"):visible(false) c3:GetChild("Lbl"):visible(false)
+			
+			local steps = GAMESTATE:GetCurrentSteps()
+			if not steps then return end
+			local rate = getCurRateValue() or 1
+			
+			local vals = {}
+			-- Indices 2 to 8 map to the 7 specific skillsets
+			local ssNames = {"Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
+			for i, name in ipairs(ssNames) do
+				local m = steps:GetMSD(rate, i + 1)
+				if m > 0 then table.insert(vals, {name = name, val = m}) end
+			end
+			
+			table.sort(vals, function(a, b) return a.val > b.val end)
+			
+			if #vals >= 1 then 
+				c1:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[1].name) .. ".png")):visible(true)
+				c1:GetChild("Lbl"):settext(vals[1].name):visible(true)
+			end
+			if #vals >= 2 then 
+				c2:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[2].name) .. ".png")):visible(true)
+				c2:GetChild("Lbl"):settext(vals[2].name):visible(true)
+			end
+			if #vals >= 3 then 
+				c3:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[3].name) .. ".png")):visible(true)
+				c3:GetChild("Lbl"):settext(vals[3].name):visible(true)
 			end
 		end,
 		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
@@ -587,7 +657,7 @@ for di, dname in ipairs(diffNames) do
 					if ToEnumShortString(st:GetDifficulty()) == dname then
 						local msd = st:GetMSD(getCurRateValue(), 1)
 						if msd and msd > 0 then
-							self:settext(string.format("%.1f", msd))
+							self:settext(string.format("%.2f", msd))
 							self:diffuse(HVColor.GetMSDRatingColor(msd))
 						else
 							self:settext("-")
@@ -711,6 +781,73 @@ t[#t + 1] = Def.ActorFrame {
 	},
 
 	LoadFont("Common Normal") .. {
+		Name = "PBSSR",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(52):zoom(0.26):diffuse(mainText)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local ssr = score:GetSkillsetSSR("Overall")
+				self:settext(string.format("SSR: %.2f", ssr))
+				self:diffuse(HVColor.GetMSDRatingColor(ssr))
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBJudges",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(66):zoom(0.22):diffuse(subText)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			if score then
+				local marv = score:GetTapNoteScore("TapNoteScore_W1")
+				local perf = score:GetTapNoteScore("TapNoteScore_W2")
+				local gret = score:GetTapNoteScore("TapNoteScore_W3")
+				local good = score:GetTapNoteScore("TapNoteScore_W4")
+				local bad = score:GetTapNoteScore("TapNoteScore_W5")
+				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
+				self:settext(string.format("Juds: %d / %d / %d / %d / %d / %d", marv, perf, gret, good, bad, miss))
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBCBs",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(78):zoom(0.22):diffuse(subText)
+		end,
+		SetMessageCommand = function(self)
+			local score = GetDisplayScore()
+			local steps = GAMESTATE:GetCurrentSteps()
+			if score and steps then
+				-- We approximate CBs: a combo break occurs on a Miss or W5 (Bad)
+				-- Etterna scores do not directly store "CB count" easily without looking at replay data,
+				-- but we can at least show Good/Bad/Miss counts which imply combo breaks.
+				-- For an accurate representation of "CBs" without replay parsing, showing total combo breakers is a close approximation.
+				local bad = score:GetTapNoteScore("TapNoteScore_W5")
+				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
+				local cbs = bad + miss
+				self:settext(string.format("CBs/Breaks: %d", cbs))
+			else
+				self:settext("")
+			end
+		end,
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+	},
+
+	LoadFont("Common Normal") .. {
 		Name = "PBGrade",
 		InitCommand = function(self)
 			self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5)
@@ -751,21 +888,30 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- PLAYER PROFILE + AVATAR (bottom-left corner)
+-- COMPACT PROFILE + LOGIN (Right of Left Panel / Lower Half)
 -- ============================================================
+local compactProfileY = SCREEN_HEIGHT - footerH - 75
+local compactProfileX = panelX + panelW + 16
 
 t[#t + 1] = Def.ActorFrame {
-	Name = "ProfileStatsFrame",
+	Name = "SmallProfileFrame",
 	InitCommand = function(self)
-		self:xy(panelX + 16, profileY)
+		self:xy(compactProfileX, compactProfileY)
 	end,
 
-	-- Separator
+	-- Card background for profile
 	Def.Quad {
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(-14)
-				:zoomto(panelW - 32, 1)
-				:diffuse(color("0.18,0.18,0.18,1"))
+			self:halign(0):valign(0):xy(-8, -8)
+				:zoomto(180, 65)
+				:diffuse(color("0.05,0.05,0.05,0.85"))
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(-8, -8)
+				:zoomto(2, 65)
+				:diffuse(accentColor)
 		end
 	},
 
@@ -778,17 +924,14 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local profile = PROFILEMAN:GetProfile(PLAYER_1)
 			if profile then
-				local avatarPath = nil
-				if profile.GetAvatarPath and type(profile.GetAvatarPath) == "function" then 
-					avatarPath = profile:GetAvatarPath() 
-				end
+				local avatarPath = getAvatarPath(PLAYER_1)
 				if avatarPath and avatarPath ~= "" and FILEMAN:DoesFileExist(avatarPath) then
 					self:Load(avatarPath)
 				else
 					local fallback = "/Assets/Avatars/_fallback.png"
 					if FILEMAN:DoesFileExist(fallback) then self:Load(fallback) end
 				end
-				self:scaletoclipped(40, 40):visible(true)
+				self:scaletoclipped(49, 49):visible(true)
 			else
 				self:visible(false)
 			end
@@ -797,13 +940,13 @@ t[#t + 1] = Def.ActorFrame {
 		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
 	},
 
-	-- Profile name + Online Status
+	-- Profile name
 	LoadFont("Common Normal") .. {
 		Name = "ProfileName",
 		InitCommand = function(self)
-			self:halign(0):valign(0):x(48):y(0):zoom(0.4):diffuse(mainText)
+			self:halign(0):valign(0):x(56):y(0):zoom(0.40):diffuse(mainText)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			local profile = PROFILEMAN:GetProfile(PLAYER_1)
 			if profile then
 				local name = profile:GetDisplayName()
@@ -811,10 +954,8 @@ t[#t + 1] = Def.ActorFrame {
 				if DLMAN:IsLoggedIn() then
 					local onlineName = DLMAN:GetUsername()
 					if onlineName ~= "" then name = onlineName end
-					self:settext(name .. " · ONLINE"):diffuse(color("0.65,1,0.72,1"))
-				else
-					self:settext(name .. " · OFFLINE"):diffuse(dimText)
 				end
+				self:settext(name)
 			else
 				self:settext("No Profile"):diffuse(dimText)
 			end
@@ -822,89 +963,132 @@ t[#t + 1] = Def.ActorFrame {
 		LoginMessageCommand = function(self) self:playcommand("Set") end,
 		LogOutMessageCommand = function(self) self:playcommand("Set") end,
 		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
+		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
 	},
 
-	-- Online Rank/Rating
+	-- Rank (Top Right)
 	LoadFont("Common Normal") .. {
-		Name = "OnlineStats",
+		Name = "Rank",
 		InitCommand = function(self)
-			self:halign(0):valign(0):x(48):y(14):zoom(0.28):diffuse(subText)
+			self:halign(1):valign(0):x(164):y(10):zoom(0.30)
 		end,
-		SetMessageCommand = function(self)
+		SetCommand = function(self)
 			if DLMAN:IsLoggedIn() then
 				local rank = DLMAN:GetSkillsetRank("Overall")
-				local rating = DLMAN:GetSkillsetRating("Overall")
-				self:settextf("Rank: #%d (Rating: %.2f)", rank, rating):visible(true)
+				local rankColor = color("#A6A6A6")
+				if rank and rank > 0 then
+					if rank <= 10 then rankColor = color("#CFD198")
+					elseif rank <= 50 then rankColor = color("#A0CFAB")
+					elseif rank <= 100 then rankColor = color("#80C0CF")
+					elseif rank <= 500 then rankColor = color("#D9D9D9")
+					end
+				else
+					rankColor = color("#737373")
+				end
+				self:settextf("#%d", rank):diffuse(rankColor):visible(true)
+			else
+				self:settext("OFFLINE"):diffuse(dimText):visible(true)
+			end
+		end,
+		LoginMessageCommand = function(self) self:playcommand("Set") end,
+		LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
+	},
+
+	-- MSD/Rating (Bottom Left)
+	LoadFont("Common Large") .. {
+		Name = "Rating",
+		InitCommand = function(self)
+			self:halign(0):valign(1):x(56):y(53):zoom(0.35)
+		end,
+		SetCommand = function(self)
+			local rating = 0
+			if DLMAN:IsLoggedIn() then
+				rating = DLMAN:GetSkillsetRating("Overall")
+			else
+				local profile = PROFILEMAN:GetProfile(PLAYER_1)
+				if profile then rating = profile:GetPlayerRating() end
+			end
+			if rating > 0 then
+				self:settextf("%.2f", rating):diffuse(HVColor.GetMSDRatingColor(rating))
+			else
+				self:settext("-"):diffuse(dimText)
+			end
+		end,
+		LoginMessageCommand = function(self) self:playcommand("Set") end,
+		LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
+	},
+
+	-- Stats (Bottom Right)
+	LoadFont("Common Normal") .. {
+		Name = "Stats",
+		InitCommand = function(self)
+			self:halign(1):valign(1):x(164):y(54):zoom(0.30):diffuse(subText)
+		end,
+		SetCommand = function(self)
+			local profile = PROFILEMAN:GetProfile(PLAYER_1)
+			if profile then
+				local notesHit = profile:GetTotalTapsAndHolds()
+				local sessionSecs = profile:GetTotalSessionSeconds()
+				self:settextf("Notes: %d\nSession: %d:%02d", notesHit, math.floor(sessionSecs/60), sessionSecs%60):visible(true)
 			else
 				self:visible(false)
 			end
 		end,
 		LoginMessageCommand = function(self) self:playcommand("Set") end,
 		LogOutMessageCommand = function(self) self:playcommand("Set") end,
-		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
 	},
 
-	-- Total Hits
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):x(48):y(28):zoom(0.26):diffuse(dimText) end,
-		SetMessageCommand = function(self)
-			local profile = PROFILEMAN:GetProfile(PLAYER_1)
-			if profile and profile.GetTotalTapNoteScores then
-				local w1 = profile:GetTotalTapNoteScores("TapNoteScore_W1")
-				local w2 = profile:GetTotalTapNoteScores("TapNoteScore_W2")
-				local w3 = profile:GetTotalTapNoteScores("TapNoteScore_W3")
-				local w4 = profile:GetTotalTapNoteScores("TapNoteScore_W4")
-				local w5 = profile:GetTotalTapNoteScores("TapNoteScore_W5")
-				self:settextf("Total Hits: %d", w1 + w2 + w3 + w4 + w5)
-			else self:settext("") end
+	-- Integrated Login Button Area (Moved Above Profile)
+	Def.ActorFrame {
+		Name = "LoginButtonUI",
+		InitCommand = function(self)
+			self:xy(0, -22) -- Above the profile picture
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
-	},
-
-	-- Play Time
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):x(48):y(38):zoom(0.26):diffuse(dimText) end,
-		SetMessageCommand = function(self)
-			local profile = PROFILEMAN:GetProfile(PLAYER_1)
-			if profile and profile.GetTotalSecondsPlayed then
-				local secs = profile:GetTotalSecondsPlayed()
-				local hours, mins, s = math.floor(secs / 3600), math.floor((secs % 3600) / 60), math.floor(secs % 60)
-				self:settextf("Play Time: %02d:%02d:%02d", hours, mins, s)
-			else self:settext("") end
-		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
-	},
-
-	-- Overall rating (Large, right)
-	LoadFont("Common Normal") .. {
-		Name = "OverallRating",
-		InitCommand = function(self) self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5):diffuse(accentColor) end,
-		SetMessageCommand = function(self)
-			local rating = 0
-			if DLMAN:IsLoggedIn() then rating = DLMAN:GetSkillsetRating("Overall")
-			else
-				local profile = PROFILEMAN:GetProfile(PLAYER_1)
-				if profile then rating = profile:GetPlayerRating() end
+		BeginCommand = function(self)
+			if not DLMAN:IsLoggedIn() then
+				local user = ThemePrefs.Get("HV_Username")
+				local token = ThemePrefs.Get("HV_PasswordToken")
+				if user and token and user ~= "" and token ~= "" then
+					DLMAN:LoginWithToken(user, token)
+				end
 			end
-			if rating > 0 then
-				self:settext(string.format("%.2f", rating)):diffuse(HVColor.GetMSDRatingColor(rating))
-			else self:settext("--"):diffuse(accentColor) end
 		end,
-		LoginMessageCommand = function(self) self:playcommand("Set") end,
-		LogOutMessageCommand = function(self) self:playcommand("Set") end,
-		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end
-	},
-
-	-- Play count (top-right)
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(1):valign(0):x(panelW - 32):y(0):zoom(0.32):diffuse(subText) end,
-		SetMessageCommand = function(self)
-			local profile = PROFILEMAN:GetProfile(PLAYER_1)
-			if profile then self:settext(tostring(profile:GetNumTotalSongsPlayed()) .. " plays")
-			else self:settext("") end
-		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:halign(0):zoomto(80, 24):diffuse(accentColor):diffusealpha(0.8)
+			end,
+			SetMessageCommand = function(self)
+				if DLMAN:IsLoggedIn() then
+					self:diffuse(color("0.1,0.28,0.15,0.8"))
+				else
+					self:diffuse(accentColor):diffusealpha(0.8)
+				end
+			end,
+			LoginMessageCommand = function(self) self:playcommand("Set") end,
+			LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Txt",
+			InitCommand = function(self) self:halign(0.5):xy(40, 0):zoom(0.3) end,
+			SetMessageCommand = function(self)
+				if DLMAN:IsLoggedIn() then
+					self:settext("LOG OUT"):diffuse(color("0.65,1,0.72,1"))
+				else
+					self:settext("LOG IN"):diffuse(brightText)
+				end
+			end,
+			LoginMessageCommand = function(self) self:playcommand("Set") end,
+			LogOutMessageCommand = function(self) self:playcommand("Set") end,
+			OnCommand = function(self) self:playcommand("Set") end
+		}
 	}
 }
 
@@ -918,14 +1102,18 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "RateDisplay",
-	InitCommand = function(self) self:xy(panelX + 16, detailY + 52) end,
+	InitCommand = function(self) 
+		-- Right of song info, above the banner 
+		-- Banner is at panelX, panelY+12. Above banner is panelY
+		self:xy(panelX + panelW - 40, panelY + 6) 
+	end,
 	LoadFont("Common Normal") .. {
 		Name = "RateLabel",
-		InitCommand = function(self) self:halign(0):valign(0):zoom(0.35):diffuse(dimText):settext("RATE") end
+		InitCommand = function(self) self:halign(1):valign(0):x(-2):zoom(0.35):diffuse(dimText):settext("RATE") end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "RateValue",
-		InitCommand = function(self) self:halign(0):valign(0):x(40):zoom(0.4):diffuse(accentColor) end,
+		InitCommand = function(self) self:halign(0):valign(0):zoom(0.4):diffuse(accentColor) end,
 		SetMessageCommand = function(self)
 			local rate = getCurRateValue() or 1
 			if math.abs(rate - 1.0) < 0.005 then

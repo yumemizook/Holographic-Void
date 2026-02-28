@@ -1,7 +1,7 @@
 --- Holographic Void: MusicWheelItem Song OverPart (highlight overlay)
 -- Pulsing glow on the focused item.
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 
 local t = Def.ActorFrame {}
 

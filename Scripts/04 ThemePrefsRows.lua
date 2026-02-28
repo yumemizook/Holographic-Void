@@ -5,6 +5,18 @@
 -- Uses _Fallback's ThemePrefsRows.Init system.
 
 local HVPrefRows = {
+	-- Auto Login Tokens (Secret, non-visible in menu)
+	HV_Username = {
+		Default = "",
+		Choices = {""},
+		Values  = {""},
+	},
+	HV_PasswordToken = {
+		Default = "",
+		Choices = {""},
+		Values  = {""},
+	},
+
 	-- Accent Color
 	HV_AccentColor = {
 		Default = "#5ABAFF",
@@ -85,8 +97,8 @@ local HVPrefRows = {
 	-- MSD Color Scale
 	HV_MSDColorScale = {
 		Default = "HolographicVoid",
-		Choices = {"Holographic Void", "Til Death"},
-		Values  = {"HolographicVoid", "TilDeath"},
+		Choices = {"Holographic Void", "Classic"},
+		Values  = {"HolographicVoid", "TilDeath"}, -- i'm too lazy to correct this.
 	},
 
 	-- Show Measure Lines
@@ -103,7 +115,7 @@ ThemePrefsRows.Init(HVPrefRows)
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	return "HV_AccentColor,HV_UIOpacity,HV_EnableGlow,HV_BGAnimIntensity,"
+	return "HV_UIOpacity,HV_EnableGlow,HV_BGAnimIntensity,"
 		.. "HV_WheelOffsetX,HV_WheelOffsetY,HV_EvalGraphScale,"
 		.. "HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_DefaultJudge,"
 		.. "HV_ShowMeasureLines"

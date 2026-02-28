@@ -6,7 +6,7 @@
 local barH = 4
 local barY = SCREEN_BOTTOM - barH
 local textY = barY - 16
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.9,0.9,0.9,1")

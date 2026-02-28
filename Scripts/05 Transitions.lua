@@ -35,7 +35,7 @@ function HV.AccentWipeIn()
 		Name = "AccentWipe",
 		InitCommand = function(self)
 			self:Center():zoomto(SCREEN_WIDTH + 4, 3)
-				:diffuse(color("#5ABAFF")):diffusealpha(0.6)
+				:diffuse(HVColor.Accent):diffusealpha(0.6)
 		end,
 		OnCommand = function(self)
 			self:x(SCREEN_LEFT - SCREEN_WIDTH)

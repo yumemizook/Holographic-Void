@@ -9,19 +9,16 @@ local t = Def.ActorFrame {}
 
 -- Card background
 t[#t + 1] = Def.Quad {
+	Name = "BgQuad",
 	InitCommand = function(self)
 		self:zoomto(wheelItemW, 32):diffuse(color("0.08,0.08,0.08,1"))
 	end,
-	SetMessageCommand = function(self)
-		self:stoptweening():linear(0.1)
-	end,
-	GainFocusCommand = function(self)
-		self:stoptweening():linear(0.1)
-			:diffuse(color("0.14,0.14,0.14,1"))
-	end,
-	LoseFocusCommand = function(self)
-		self:stoptweening():linear(0.1)
-			:diffuse(color("0.08,0.08,0.08,1"))
+	SetMessageCommand = function(self, params)
+		if params and params.HasFocus then
+			self:stoptweening():linear(0.1):diffuse(color("0.16,0.16,0.16,1"))
+		else
+			self:stoptweening():linear(0.1):diffuse(color("0.08,0.08,0.08,1"))
+		end
 	end
 }
 
@@ -41,13 +38,7 @@ t[#t + 1] = Def.Quad {
 		self:diffuse(color("0.3,0.3,0.3,1"))
 	end,
 	CurrentStepsChangedMessageCommand = function(self)
-		local curSteps = GAMESTATE:GetCurrentSteps()
-		if curSteps then
-			local diff = ToEnumShortString(curSteps:GetDifficulty())
-			local dc = (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
-			if dc then self:diffuse(dc):diffusealpha(0.7) return end
-		end
-		self:diffuse(color("0.3,0.3,0.3,1"))
+		self:playcommand("Set")
 	end
 }
 
@@ -55,23 +46,27 @@ t[#t + 1] = Def.Quad {
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "MSDDisplay",
 	InitCommand = function(self)
-		self:halign(1):x(wheelItemW/2 - 6):y(-4)
-			:zoom(0.32):diffuse(color("0.65,0.65,0.65,1"))
+		self:halign(1):x(wheelItemW/2 - 6):y(-6)
+			:zoom(0.40):diffuse(color("0.65,0.65,0.65,1")) -- Increased from 0.32
 	end,
 	SetMessageCommand = function(self, params)
-		if params and params.Song then self.hv_song = params.Song end
-		local song = self.hv_song
-		if not song then self:settext("") return end
+		local song = (params and params.Song) or self.hv_lastSong
+		self.hv_lastSong = song
 		local curSteps = GAMESTATE:GetCurrentSteps()
-		if not curSteps then self:settext("") return end
-		local targetDiff = curSteps:GetDifficulty()
+
+		if not song or not curSteps then 
+			self:settext("") 
+			return 
+		end
+
+		local targetDiffOption = curSteps:GetDifficulty()
 		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
 		if allSteps then
 			for _, st in ipairs(allSteps) do
-				if st:GetDifficulty() == targetDiff then
+				if st:GetDifficulty() == targetDiffOption then
 					local msd = st:GetMSD(getCurRateValue(), 1)
 					if msd and msd > 0 then
-						self:settext(string.format("%.1f", msd))
+						self:settext(string.format("%.2f", msd)) -- Standardized to 2 decimal points
 						self:diffuse(HVColor.GetMSDRatingColor(msd))
 					else
 						self:settext("-")
@@ -83,8 +78,12 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		end
 		self:settext("")
 	end,
-	CurrentStepsChangedMessageCommand = function(self) if self.hv_song then self:playcommand("Set") end end,
-	CurrentRateChangedMessageCommand = function(self) if self.hv_song then self:playcommand("Set") end end
+	CurrentStepsChangedMessageCommand = function(self)
+		self:playcommand("Set", {Song = self.hv_lastSong})
+	end,
+	CurrentRateChangedMessageCommand = function(self)
+		self:playcommand("Set", {Song = self.hv_lastSong})
+	end
 }
 
 -- Grade badge (right side, below MSD) - shows grade for matching difficulty
@@ -92,18 +91,23 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "GradeDisplay",
 	InitCommand = function(self)
 		self:halign(1):x(wheelItemW/2 - 6):y(7)
-			:zoom(0.22):diffuse(color("0.45,0.45,0.45,1"))
+			:zoom(0.30):diffuse(color("0.45,0.45,0.45,1")) -- Increased from 0.22
 	end,
 	SetMessageCommand = function(self, params)
-		if params and params.Song then self.hv_song = params.Song end
-		local song = self.hv_song
+		local song = (params and params.Song) or self.hv_lastSong
+		self.hv_lastSong = song
 		local curSteps = GAMESTATE:GetCurrentSteps()
-		if not song or not curSteps then self:settext("") return end
-		local targetDiff = curSteps:GetDifficulty()
+
+		if not song or not curSteps then 
+			self:settext("") 
+			return 
+		end
+
+		local targetDiffOption = curSteps:GetDifficulty()
 		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
 		if allSteps then
 			for _, st in ipairs(allSteps) do
-				if st:GetDifficulty() == targetDiff then
+				if st:GetDifficulty() == targetDiffOption then
 					local profile = PROFILEMAN:GetProfile(PLAYER_1)
 					if profile then
 						local chartKey = st:GetChartKey()
@@ -126,7 +130,8 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 								end
 								if bestGrade and bestGrade ~= "Grade_Failed" then
 									local gs = ToEnumShortString(bestGrade)
-									self:settext(gs)
+									local displayGrade = THEME:GetString("Grade", gs) or gs -- Internal name fallback
+									self:settext(displayGrade)
 									self:diffuse(HVColor.GetGradeColor(gs))
 									return
 								end
@@ -138,7 +143,9 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		end
 		self:settext("")
 	end,
-	CurrentStepsChangedMessageCommand = function(self) if self.hv_song then self:playcommand("Set") end end
+	CurrentStepsChangedMessageCommand = function(self)
+		self:playcommand("Set", {Song = self.hv_lastSong})
+	end
 }
 
 -- Artist / Subtitle line - uses params.Song
@@ -167,6 +174,25 @@ t[#t + 1] = Def.Quad {
 		self:y(16):zoomto(wheelItemW, 1)
 			:diffuse(color("0.12,0.12,0.12,1"))
 	end
+}
+
+-- Engine text color override
+t[#t + 1] = Def.Actor {
+	SetMessageCommand = function(self)
+		local normalPart = self:GetParent()
+		if not normalPart then return end
+		local mwi = normalPart:GetParent()
+		if not mwi then return end
+
+		local names = {"SongName", "Sort", "Roulette", "Random", "Custom", "Portal", "Mode"}
+		for _, name in ipairs(names) do
+			local textActor = mwi:GetChild(name)
+			if textActor and textActor:GetVisible() then
+				textActor:diffuse(HVColor.Accent)
+			end
+		end
+	end,
+	ColorThemeChangedMessageCommand = function(self) self:playcommand("Set") end
 }
 
 return t

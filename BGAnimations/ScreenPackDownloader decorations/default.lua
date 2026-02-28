@@ -12,7 +12,7 @@ local t = Def.ActorFrame {
 	Name = "PackDownloaderUI"
 }
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local installedColor = color("0.35,0.65,0.35,1")
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")

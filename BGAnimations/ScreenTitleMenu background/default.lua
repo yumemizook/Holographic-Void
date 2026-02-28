@@ -1,15 +1,29 @@
 --- Holographic Void: ScreenTitleMenu Background
 -- Futuristic OLED black dashboard with animated grid and accent elements.
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")
 local brightText = color("1,1,1,1")
 
 -- Hitbox Constants
-local pBtnW = 110
-local pBtnCX = (SCREEN_RIGHT - 16) - pBtnW/2
-local pBtnCY = (SCREEN_TOP + 14) + 28
+local pBtnW = 240
+local pBtnH = 70
+local pBtnCX = (SCREEN_RIGHT - 10) - pBtnW/2
+local pBtnCY = 10 + pBtnH/2
+
+-- Media Player Constants
+local mpBarH = 40
+local mpBarY = SCREEN_BOTTOM - mpBarH/2
+local mpBtnSize = 24
+local mpPrevX = SCREEN_LEFT + 28
+local mpPlayX = SCREEN_LEFT + 60
+local mpNextX = SCREEN_LEFT + 92
+local mpBtnY = mpBarY
+local mpPlayPath = THEME:GetPathG("", "mp_play")
+local mpPausePath = THEME:GetPathG("", "mp_pause")
+local mpPrevPath = THEME:GetPathG("", "mp_prev")
+local mpNextPath = THEME:GetPathG("", "mp_next")
 
 local t = Def.ActorFrame {
 	InitCommand = function(self)
@@ -19,8 +33,8 @@ local t = Def.ActorFrame {
 
 			-- Profile Chip Hover
 			local overProfile = virtualX >= pBtnCX - pBtnW/2 and virtualX <= pBtnCX + pBtnW/2
-							and virtualY >= pBtnCY - 11 and virtualY <= pBtnCY + 11
-
+							and virtualY >= pBtnCY - pBtnH/2 and virtualY <= pBtnCY + pBtnH/2
+			
 			local prof = af:GetChild("ProfileChip")
 			if prof then
 				local bg = prof:GetChild("Bg")
@@ -29,10 +43,10 @@ local t = Def.ActorFrame {
 
 			-- Title Menu Hover
 			local hovered = nil
-			for i = 1, 4 do
-				local static_iy = (SCREEN_CENTER_Y + 60) + 50 * (i - 1)
+			for i = 1, 5 do
+				local static_iy = (SCREEN_CENTER_Y + 20) + 44 * (i - 3)
 				if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-				   and virtualY >= static_iy-25 and virtualY <= static_iy+25 then
+				   and virtualY >= static_iy-22 and virtualY <= static_iy+22 then
 					hovered = i break
 				end
 			end
@@ -58,6 +72,10 @@ local t = Def.ActorFrame {
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		SCREENMAN:set_input_redirected(PLAYER_2, false)
+		-- Clear song history on screen exit
+		if HV.TitleState and HV.TitleState.player then
+			HV.TitleState.player.history = {}
+		end
 	end,
 	LoginMessageCommand = function(self)
 		local user = DLMAN:GetUsername()
@@ -68,29 +86,35 @@ local t = Def.ActorFrame {
 			ThemePrefs.Save()
 		end
 	end,
+	LoginFailedMessageCommand = function(self)
+		ms.ok("Login Failed. Please check your credentials.")
+	end,
 	LogOutMessageCommand = function(self)
-		ThemePrefs.Set("HV_Username", "")
-		ThemePrefs.Set("HV_PasswordToken", "")
-		ThemePrefs.Save()
+		-- Only clear username on manual logout to preserve auto-login token
 	end,
 	TriggerLoginFlowMessageCommand = function(self)
 		Trace("[HV] TriggerLoginFlow received in Title")
 		easyInputStringOKCancel(
-			"Email or Username:", 255, false,
+			"Email:", 255, false,
 			function(email)
 				if email ~= "" then
-					easyInputStringOKCancel(
-						"Password:", 255, true,
-						function(password)
-							if password ~= "" then
-								Trace("[HV] Attempting DLMAN:Login for " .. email)
-								DLMAN:Login(email, password)
-							else
-								ms.ok("Login Canceled")
-							end
-						end,
-						function() ms.ok("Login Canceled") end
-					)
+					self.tempEmail = email
+					self:sleep(0.02):queuecommand("LoginStep2")
+				else
+					ms.ok("Login Canceled")
+				end
+			end,
+			function() ms.ok("Login Canceled") end
+		)
+	end,
+	
+	LoginStep2Command = function(self)
+		easyInputStringOKCancel(
+			"Password:", 255, true,
+			function(password)
+				if password ~= "" then
+					Trace("[HV] Attempting DLMAN:Login for " .. tostring(self.tempEmail))
+					DLMAN:Login(self.tempEmail, password)
 				else
 					ms.ok("Login Canceled")
 				end
@@ -101,9 +125,70 @@ local t = Def.ActorFrame {
 }
 
 HV.TitleState = HV.TitleState or {
-	player = { song = nil, paused = true, offset = 0, lastStart = 0 },
-	mouse = { lastHovered = nil }
+	player = { song = nil, paused = true, offset = 0, lastStart = 0, duration = 0, history = {} },
+	mouse = { lastHovered = nil },
+	selectedProfile = 0
 }
+
+-- Jukebox Helper Functions
+local function jukeboxPlaySong(song)
+	local p = HV.TitleState.player
+	if not song then return end
+	local mp = song:GetMusicPath()
+	if not mp then return end
+	p.song = song
+	p.offset = 0
+	p.duration = song:MusicLengthSeconds()
+	local start = 0
+	SOUND:PlayMusicPart(mp, start, p.duration)
+	p.lastStart = GetTimeSinceStart()
+	p.paused = false
+	MESSAGEMAN:Broadcast("PlayStatusChanged")
+end
+
+local function jukeboxPause()
+	local p = HV.TitleState.player
+	if p.paused or not p.song then return end
+	p.offset = p.offset + (GetTimeSinceStart() - p.lastStart)
+	SOUND:StopMusic()
+	p.paused = true
+	MESSAGEMAN:Broadcast("PlayStatusChanged")
+end
+
+local function jukeboxResume()
+	local p = HV.TitleState.player
+	if not p.paused or not p.song then return end
+	local mp = p.song:GetMusicPath()
+	if not mp then return end
+	local start = p.offset
+	local len = p.duration - p.offset
+	if len <= 0 then len = p.duration; p.offset = 0; start = 0 end
+	SOUND:PlayMusicPart(mp, start, len)
+	p.lastStart = GetTimeSinceStart()
+	p.paused = false
+	MESSAGEMAN:Broadcast("PlayStatusChanged")
+end
+
+local function jukeboxNext()
+	local p = HV.TitleState.player
+	-- Push current song to history
+	if p.song then
+		p.history[#p.history + 1] = p.song
+	end
+
+	local allSongs = SONGMAN:GetAllSongs()
+	if #allSongs > 0 then
+		local newSong = allSongs[math.random(#allSongs)]
+		if newSong then jukeboxPlaySong(newSong) end
+	end
+end
+
+local function jukeboxPrev()
+	local p = HV.TitleState.player
+	if #p.history == 0 then return end
+	local prevSong = table.remove(p.history)
+	if prevSong then jukeboxPlaySong(prevSong) end
+end
 
 -- Visual Elements
 t[#t + 1] = Def.Quad { InitCommand=function(self) self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,1")) end }
@@ -129,48 +214,169 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. { Name="S", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+44):halign(0):zoom(0.3):diffuse(dimText) end }
 }
 
--- Profile chip (Top right, similar to spawncamping-wallhack)
+-- Profile chip (Top right) + Inline Profile List
+local maxCompactProfiles = 4  -- max compact rows to show
+local compactRowH = 28
+local compactRowW = pBtnW
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ProfileChip",
 	InitCommand = function(self)
-		self:xy(SCREEN_RIGHT - 10, 10):halign(1):valign(0)
-		
-		-- Auto-login persistence
-		if not DLMAN:IsLoggedIn() then
-			local user = ThemePrefs.Get("HV_Username")
-			local token = ThemePrefs.Get("HV_PasswordToken")
-			if user ~= "" and token ~= "" then
-				Trace("[HV] Attempting Auto-Login for " .. user)
-				DLMAN:LoginWithToken(user, token)
-			end
-		end
+		self:xy(SCREEN_RIGHT - 10, 10 + pBtnH/2)
 		self:SetUpdateFunction(function(af)
+			if not af then return end
 			local loggedIn = DLMAN:IsLoggedIn()
+			local status = af:GetChild("Status")
+			local name = af:GetChild("Name")
+			local rating = af:GetChild("Rating")
+			local rank = af:GetChild("Rank")
+			local avatar = af:GetChild("Avatar")
 			local bg = af:GetChild("Bg")
-			local txt = af:GetChild("Txt")
+
+			-- Skip update if essential children are missing
+			if not status or not name or not rating or not rank or not avatar then return end
+
+			local numLocal = PROFILEMAN:GetNumLocalProfiles()
+			local selIdx = HV.TitleState.selectedProfile or 0
+			-- Clamp selection
+			if selIdx >= numLocal then selIdx = 0; HV.TitleState.selectedProfile = 0 end
+
 			if loggedIn then
-				local name = DLMAN:GetUsername()
-				local rank = DLMAN:GetSkillsetRank("Overall")
-				local rating = DLMAN:GetSkillsetRating("Overall")
-				txt:settextf("PROFILE · %s · #%d (%.2f)", name, rank, rating)
-				txt:diffuse(color("0.65,1,0.72,1"))
-				bg:diffuse(color("0.1,0.28,0.15,1"))
-				
-				-- Dynamically resize bg based on text width
-				local w = math.max(110, txt:GetWidth() * txt:GetZoom() + 16)
-				bg:zoomto(w, 22):x(-w/2)
-				txt:x(-w/2)
+				status:settext("ONLINE"):diffuse(color("0.65,1,0.72,1"))
+				name:settext(DLMAN:GetUsername())
+				local r = DLMAN:GetSkillsetRating("Overall")
+				rating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+				rank:settextf("#%d", DLMAN:GetSkillsetRank("Overall")):diffuse(subText)
+				if bg then bg:diffuse(color("0.1,0.28,0.15,0.85")) end
+
+				local path = getAvatarPath()
+				if path and path ~= avatar.lastPath then
+					avatar:Load(path)
+					avatar:scaletoclipped(50, 50)
+					avatar.lastPath = path
+				end
+				avatar:visible(true)
 			else
-				txt:settext("PROFILE · OFFLINE"):diffuse(dimText)
-				bg:diffuse(color("0.12,0.12,0.12,1"))
-				bg:zoomto(110, 22):x(-110/2)
-				txt:x(-110/2)
+				status:settext("OFFLINE"):diffuse(dimText)
+
+				if numLocal > 0 then
+					local profile = PROFILEMAN:GetLocalProfileFromIndex(selIdx)
+					local profileID = PROFILEMAN:GetLocalProfileIDFromIndex(selIdx)
+					if profile then
+						name:settext(profile:GetDisplayName())
+						local r = profile:GetPlayerRating()
+						rating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+						rank:settext(""):diffuse(dimText)
+
+						local path = getAssetPathFromProfileID("avatar", profileID)
+						if path and path ~= avatar.lastPath then
+							avatar:Load(path)
+							avatar:scaletoclipped(50, 50)
+							avatar.lastPath = path
+						end
+						avatar:visible(true)
+					else
+						name:settext("NO PROFILE")
+						rating:settext("0.00"):diffuse(dimText)
+						rank:settext(""):diffuse(dimText)
+						avatar:visible(false)
+					end
+				else
+					name:settext("GUEST PLAYER")
+					rating:settext("0.00"):diffuse(dimText)
+					rank:settext(""):diffuse(dimText)
+					avatar:visible(false)
+				end
+				if bg then bg:diffuse(color("0.12,0.12,0.12,0.85")) end
+			end
+
+			-- Update compact profile rows
+			for ci = 0, maxCompactProfiles - 1 do
+				local row = af:GetChild("CompactRow_" .. ci)
+				if row then
+					if loggedIn or numLocal <= 1 then
+						row:visible(false)
+					else
+						-- Map compact row index to profile index (skip selected)
+						local profileIdx = ci
+						if profileIdx >= selIdx then profileIdx = profileIdx + 1 end
+						if profileIdx < numLocal then
+							row:visible(true)
+							local p = PROFILEMAN:GetLocalProfileFromIndex(profileIdx)
+							local pid = PROFILEMAN:GetLocalProfileIDFromIndex(profileIdx)
+							local cName = row:GetChild("CName")
+							local cRating = row:GetChild("CRating")
+							local cAvatar = row:GetChild("CAvatar")
+							local cBg = row:GetChild("CBg")
+							if cName and p then cName:settext(p:GetDisplayName()) end
+							if cRating and p then
+								local r = p:GetPlayerRating()
+								cRating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+							end
+							if cAvatar and pid then
+								local apath = getAssetPathFromProfileID("avatar", pid)
+								if apath and apath ~= cAvatar.lastPath then
+									cAvatar:Load(apath)
+									cAvatar:scaletoclipped(22, 22)
+									cAvatar.lastPath = apath
+								end
+							end
+							-- Store the actual profile index for click handling
+							row.profileIdx = profileIdx
+						else
+							row:visible(false)
+						end
+					end
+				end
 			end
 		end)
 	end,
-	Def.Quad { Name="Bg", InitCommand=function(self) self:xy(-pBtnW/2, 28):zoomto(pBtnW, 22) end },
-	LoadFont("Common Normal") .. { Name="Txt", InitCommand=function(self) self:xy(-pBtnW/2, 28):zoom(0.35) end }
+	Def.Quad { Name="Bg", InitCommand=function(self) self:x(-pBtnW/2):zoomto(pBtnW, pBtnH) end },
+	LoadFont("Common Normal") .. { Name="Status", InitCommand=function(self) self:xy(-pBtnW + 10, -22):halign(0):zoom(0.3) end },
+	LoadFont("Common Normal") .. { Name="Name", InitCommand=function(self) self:xy(-pBtnW + 10, -5):halign(0):zoom(0.45):diffuse(brightText) end },
+	LoadFont("Common Large") .. { Name="Rating", InitCommand=function(self) self:xy(-pBtnW + 10, 18):halign(0):zoom(0.4) end },
+	LoadFont("Common Normal") .. { Name="Rank", InitCommand=function(self) self:xy(-110, 18):halign(0):zoom(0.4) end },
+	Def.Sprite { Name="Avatar", InitCommand=function(self) self:xy(-35, 0):zoomto(50, 50) end }
 }
+
+-- Add compact profile rows below the main chip
+local chipRef = t[#t]  -- reference to ProfileChip
+for ci = 0, maxCompactProfiles - 1 do
+	local rowY = pBtnH/2 + compactRowH/2 + 4 + ci * (compactRowH + 2)
+	chipRef[#chipRef + 1] = Def.ActorFrame {
+		Name = "CompactRow_" .. ci,
+		InitCommand = function(self) self:y(rowY):visible(false) end,
+		-- Row background
+		Def.Quad {
+			Name = "CBg",
+			InitCommand = function(self)
+				self:x(-pBtnW/2):zoomto(pBtnW, compactRowH)
+					:diffuse(color("0.08,0.08,0.08,0.9"))
+			end
+		},
+		-- Compact avatar
+		Def.Sprite {
+			Name = "CAvatar",
+			InitCommand = function(self) self:xy(-pBtnW + 18, 0):zoomto(22, 22) end
+		},
+		-- Compact name
+		LoadFont("Common Normal") .. {
+			Name = "CName",
+			InitCommand = function(self)
+				self:xy(-pBtnW + 36, -4):halign(0):zoom(0.32):diffuse(subText)
+					:maxwidth((pBtnW - 90) / 0.32)
+			end
+		},
+		-- Compact rating
+		LoadFont("Common Normal") .. {
+			Name = "CRating",
+			InitCommand = function(self)
+				self:xy(-pBtnW + 36, 8):halign(0):zoom(0.26):diffuse(dimText)
+			end
+		}
+	}
+end
+
 
 -- Input Callback
 t[#t + 1] = Def.ActorFrame {
@@ -185,23 +391,14 @@ t[#t + 1] = Def.ActorFrame {
 
 			if btn == "DeviceButton_backslash" then
 				local p = HV.TitleState.player
-				if p.paused then 
-					if not p.song then p.song = SONGMAN:GetRandomSong() end
-					if p.song then
-						local mp = p.song:GetMusicPath()
-						if mp then
-							local start = p.song:GetSampleStart() + p.offset
-							local len = p.song:GetSampleLength() - p.offset
-							SOUND:PlayMusicPart(mp, start, len)
-							p.lastStart = GetTimeSinceStart()
-							p.paused = false
-							MESSAGEMAN:Broadcast("PlayStatusChanged")
-						end
+				if p.paused then
+					if not p.song then
+						jukeboxNext()
+					else
+						jukeboxResume()
 					end
 				else
-					p.offset = p.offset + (GetTimeSinceStart() - p.lastStart)
-					SOUND:StopMusic() p.paused = true
-					MESSAGEMAN:Broadcast("PlayStatusChanged")
+					jukeboxPause()
 				end
 				return true
 			end
@@ -209,12 +406,14 @@ t[#t + 1] = Def.ActorFrame {
 			if btn == "DeviceButton_left mouse button" then
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()
-				
-				-- Profile Click
+
+				-- Profile Click (main chip = login/logout)
 				if virtualX >= pBtnCX - pBtnW/2 and virtualX <= pBtnCX + pBtnW/2
-				   and virtualY >= pBtnCY - 11 and virtualY <= pBtnCY + 11 then
-					Trace("[HV] Profile chip clicked (Event-based)")
+				   and virtualY >= pBtnCY - pBtnH/2 and virtualY <= pBtnCY + pBtnH/2 then
 					if DLMAN:IsLoggedIn() then
+						ThemePrefs.Set("HV_Username", "")
+						ThemePrefs.Set("HV_PasswordToken", "")
+						ThemePrefs.Save()
 						DLMAN:Logout()
 						ms.ok("Logged Out")
 					else
@@ -223,12 +422,34 @@ t[#t + 1] = Def.ActorFrame {
 					return true
 				end
 
+				-- Compact profile row clicks (switch selected profile)
+				if not DLMAN:IsLoggedIn() then
+					local numLocal = PROFILEMAN:GetNumLocalProfiles()
+					if numLocal > 1 then
+						for ci = 0, maxCompactProfiles - 1 do
+							local rowY = pBtnCY + pBtnH/2 + compactRowH/2 + 4 + ci * (compactRowH + 2)
+							if virtualX >= pBtnCX - pBtnW/2 and virtualX <= pBtnCX + pBtnW/2
+							   and virtualY >= rowY - compactRowH/2 and virtualY <= rowY + compactRowH/2 then
+								-- Find the profile index for this compact row
+								local selIdx = HV.TitleState.selectedProfile or 0
+								local profileIdx = ci
+								if profileIdx >= selIdx then profileIdx = profileIdx + 1 end
+								if profileIdx < numLocal then
+									HV.TitleState.selectedProfile = profileIdx
+									ms.ok("Switched to " .. PROFILEMAN:GetLocalProfileFromIndex(profileIdx):GetDisplayName())
+								end
+								return true
+							end
+						end
+					end
+				end
+
 				-- Menu Click
 				local hovered = nil
-				for i = 1, 4 do
-					local iy = (SCREEN_CENTER_Y + 60) + 50 * (i - 1)
+				for i = 1, 5 do
+					local iy = (SCREEN_CENTER_Y + 20) + 44 * (i - 3)
 					if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-					   and virtualY >= iy-25 and virtualY <= iy+25 then
+					   and virtualY >= iy-22 and virtualY <= iy+22 then
 						hovered = i break
 					end
 				end
@@ -239,6 +460,153 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end)
 	end
+}
+
+-- Media Player Bar
+t[#t + 1] = Def.ActorFrame {
+	Name = "MediaPlayer",
+	InitCommand = function(self)
+		local lastPausedState = nil
+		self:SetUpdateFunction(function(af)
+			local p = HV.TitleState.player
+			-- Update song text
+			local songTxt = af:GetChild("SongText")
+			if songTxt then
+				if p.song then
+					local artist = p.song:GetDisplayArtist() or "?"
+					local title = p.song:GetDisplayMainTitle() or "?"
+					songTxt:settext(artist .. " — " .. title)
+					songTxt:diffuse(subText)
+				else
+					songTxt:settext("NO TRACK")
+					songTxt:diffuse(dimText)
+				end
+			end
+			-- Update elapsed time
+			local timeTxt = af:GetChild("ElapsedTime")
+			if timeTxt then
+				if p.song and not p.paused then
+					local elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
+					timeTxt:settext(SecondsToMSS(elapsed))
+					timeTxt:diffuse(subText)
+				elseif p.song and p.paused then
+					timeTxt:settext(SecondsToMSS(p.offset))
+					timeTxt:diffuse(dimText)
+				else
+					timeTxt:settext("—:——")
+					timeTxt:diffuse(dimText)
+				end
+			end
+			-- Update progress bar
+			local bar = af:GetChild("ProgressBar")
+			if bar then
+				if p.song and p.duration > 0 then
+					local elapsed = p.offset
+					if not p.paused then
+						elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
+					end
+					local percent = math.max(0, math.min(1, elapsed / p.duration))
+					bar:zoomto(SCREEN_WIDTH * percent, 2)
+				else
+					bar:zoomto(0, 2)
+				end
+			end
+
+			-- Swap play/pause icon only when state changes
+			if lastPausedState ~= p.paused then
+				lastPausedState = p.paused
+				local playBtn = af:GetChild("PlayBtn")
+				if playBtn then
+					if p.paused then
+						playBtn:Load(mpPlayPath)
+					else
+						playBtn:Load(mpPausePath)
+					end
+					playBtn:zoomto(mpBtnSize, mpBtnSize)
+				end
+			end
+		end)
+	end,
+	-- Bar background
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(SCREEN_CENTER_X, mpBarY):zoomto(SCREEN_WIDTH, mpBarH)
+			self:diffuse(color("0.06,0.06,0.06,0.92"))
+		end
+	},
+	-- Top edge accent line (Progress Bar)
+	Def.Quad {
+		Name = "ProgressBar",
+		InitCommand = function(self)
+			self:xy(SCREEN_LEFT, mpBarY - mpBarH/2):halign(0):zoomto(0, 2)
+			self:diffuse(accentColor):diffusealpha(0.6)
+		end
+	},
+	-- Prev button
+	UIElements.SpriteButton(1, 1, mpPrevPath) .. {
+		Name = "PrevBtn",
+		InitCommand = function(self)
+			self:xy(mpPrevX, mpBtnY):zoomto(mpBtnSize, mpBtnSize):diffusealpha(0.5)
+		end,
+		MouseOverCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(1) end,
+		MouseOutCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(0.5) end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				jukeboxPrev()
+			end
+		end
+	},
+	-- Play/Pause button
+	UIElements.SpriteButton(1, 1, mpPlayPath) .. {
+		Name = "PlayBtn",
+		InitCommand = function(self)
+			self:xy(mpPlayX, mpBtnY):zoomto(mpBtnSize, mpBtnSize):diffusealpha(0.7)
+		end,
+		MouseOverCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(1) end,
+		MouseOutCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(0.7) end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				local p = HV.TitleState.player
+				if p.paused then
+					if not p.song then jukeboxNext() else jukeboxResume() end
+				else
+					jukeboxPause()
+				end
+			end
+		end
+	},
+	-- Next button
+	UIElements.SpriteButton(1, 1, mpNextPath) .. {
+		Name = "NextBtn",
+		InitCommand = function(self)
+			self:xy(mpNextX, mpBtnY):zoomto(mpBtnSize, mpBtnSize):diffusealpha(0.5)
+		end,
+		MouseOverCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(1) end,
+		MouseOutCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(0.5) end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				jukeboxNext()
+			end
+		end
+	},
+	-- Song text
+	LoadFont("Common Normal") .. {
+		Name = "SongText",
+		Text = "NO TRACK",
+		InitCommand = function(self)
+			self:xy(SCREEN_LEFT + 120, mpBtnY):halign(0):zoom(0.35)
+			self:diffuse(dimText):maxwidth((SCREEN_WIDTH - 200) / 0.35)
+		end
+	},
+	-- Elapsed time
+	LoadFont("Common Normal") .. {
+		Name = "ElapsedTime",
+		Text = "—:——",
+		InitCommand = function(self)
+			self:xy(SCREEN_RIGHT - 16, mpBtnY):halign(1):zoom(0.3)
+			self:diffuse(dimText)
+		end
+	}
 }
 
 t[#t + 1] = Def.ActorFrame { Name="CB", OnCommand=function(self) self:diffusealpha(0.2) end,

@@ -1,14 +1,17 @@
 --- Holographic Void: Custom Mouse Cursor
 -- Adapted from Til Death's _cursor.lua pattern.
 -- Should be loaded from screen overlays via LoadActor("_cursor").
--- Uses the _fallback TOOLTIP system for positioning + tooltip text.
+-- Integrates with the _fallback BUTTON system for UIElements click support.
 
 local screenName = Var("LoadingScreen") or ...
+local topScreen
+BUTTON:ResetButtonTable(screenName)
 
 local function UpdateLoop()
 	local mouseX = INPUTFILTER:GetMouseX()
 	local mouseY = INPUTFILTER:GetMouseY()
 	pcall(function() TOOLTIP:SetPosition(mouseX, mouseY) end)
+	BUTTON:UpdateMouseState()
 	return false
 end
 
@@ -30,9 +33,14 @@ local t = Def.ActorFrame {
 		if refreshRate and refreshRate > 0 then
 			self:SetUpdateFunctionInterval(1 / refreshRate)
 		end
+		topScreen = SCREENMAN:GetTopScreen()
+		if topScreen then
+			topScreen:AddInputCallback(BUTTON.InputCallback)
+		end
 		cursorCheck()
 	end,
 	OffCommand = function(self)
+		BUTTON:ResetButtonTable(screenName)
 		TOOLTIP:Hide()
 	end,
 	CancelCommand = function(self)

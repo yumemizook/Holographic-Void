@@ -1,7 +1,7 @@
 --- Holographic Void: ScreenTextEntry Underlay
 -- Provides the themed background and "Censor" toggle for native prompts.
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local bgCard = color("0.06,0.06,0.06,0.95")
 local dimText = color("0.45,0.45,0.45,1")
 local brightText = color("1,1,1,1")
@@ -22,18 +22,28 @@ return Def.ActorFrame {
 		-- Capture right-click to cancel (like Til Death)
 		screen:AddInputCallback(function(event)
 			if event.DeviceInput.button == "DeviceButton_right mouse button" then
-				SCREENMAN:GetTopScreen():End(true) -- true = cancelled
+				if event.type == "InputEventType_FirstPress" then
+					local top = SCREENMAN:GetTopScreen()
+					if top then
+						top:Cancel()
+					end
+				end
 			end
 		end)
 
-		-- Limit widths and ensure visibility of native elements
-		local question = self:GetParent():GetChild("Question")
-		local answer = self:GetParent():GetChild("Answer")
-		if question then 
-			question:maxwidth(boxWidth - 40):diffusealpha(1):DrawOrder(100)
-		end
-		if answer then 
-			answer:maxwidth(boxWidth - 40):diffusealpha(1):DrawOrder(100)
+		self:queuecommand("ResizeLoop")
+	end,
+	ResizeLoopCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen then return end
+		local q = screen:GetChild("Question")
+		local a = screen:GetChild("Answer")
+		
+		if q and a then
+			q:maxwidth((boxWidth - 40) / q:GetZoom()):diffusealpha(1):draworder(100)
+			a:maxwidth((boxWidth - 40) / a:GetZoom()):diffusealpha(1):draworder(100)
+		else
+			self:sleep(0.05):queuecommand("ResizeLoop")
 		end
 	end,
 
@@ -69,20 +79,12 @@ return Def.ActorFrame {
 				local screen = SCREENMAN:GetTopScreen()
 				if screen and not screen:IsInputHidden() then self:visible(false) end
 				
-				-- Handle manual mouse detection for the toggle
 				screen:AddInputCallback(function(event)
-					if event.DeviceInput.button ~= "DeviceButton_left mouse button" then return end
-					
-					local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-					local ax, ay = self:GetTrueX(), self:GetTrueY()
-					-- Use a more generous hitbox for the button
-					local over = mx >= ax-60 and mx <= ax+60 and my >= ay-20 and my <= ay+20
-
-					if event.type == "InputEventType_FirstPress" then
-						if over then
-							SCREENMAN:GetTopScreen():ToggleInputHidden()
-							self:playcommand("Update")
-							MESSAGEMAN:Broadcast("UpdateUnhideText")
+					if event.DeviceInput.button == "DeviceButton_left mouse button" then
+						if event.type == "InputEventType_FirstPress" then
+							self:playcommand("PressMouse")
+						elseif event.type == "InputEventType_Release" then
+							self:playcommand("ReleaseMouse")
 						end
 					end
 				end)
@@ -92,17 +94,50 @@ return Def.ActorFrame {
 			end,
 			UpdateUnhideTextMessageCommand = function(self) self:playcommand("Update") end,
 			UpdateCommand = function(self)
+				self:queuecommand("CheckVisibility")
+			end,
+			CheckVisibilityCommand = function(self)
 				local screen = SCREENMAN:GetTopScreen()
 				if screen then
-					self:visible(true) -- Always show the button once we are in a text entry screen that supports it
-					-- If the screen doesn't support input hiding, the engine might not reveal anything, 
-					-- but for Login it definitely does.
+					local q = screen:GetChild("Question")
+					if q then
+						local txt = q:GetText()
+						if txt and txt ~= "" then
+							local ltxt = string.lower(txt)
+							if ltxt:match("password") or ltxt:match("email") or ltxt:match("username") then
+								self:visible(true)
+							else
+								self:visible(false)
+							end
+							return -- Found it, stop looping
+						end
+					end
 				end
+				-- If we reach here, keep looping until text appears
+				self:sleep(0.05):queuecommand("CheckVisibility")
 			end,
 			
 			Def.Quad {
+				Name = "UnhideHitbox",
 				InitCommand = function(self) self:zoomto(100, 24):diffuse(color("1,1,1,0.05")) end,
-				UpdateCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(self:GetParent().isHeld and 0.4 or 0.1) end
+				UpdateCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(self:GetParent().isHeld and 0.4 or 0.1) end,
+				PressMouseCommand = function(self)
+					if self:GetParent():GetVisible() and isOver(self) then
+						if self:GetParent().isHeld then return end
+						self:GetParent().isHeld = true
+						SCREENMAN:GetTopScreen():ToggleInputHidden()
+						self:GetParent():playcommand("Update")
+						MESSAGEMAN:Broadcast("UpdateUnhideText")
+					end
+				end,
+				ReleaseMouseCommand = function(self)
+					if self:GetParent().isHeld then
+						self:GetParent().isHeld = false
+						SCREENMAN:GetTopScreen():ToggleInputHidden()
+						self:GetParent():playcommand("Update")
+						MESSAGEMAN:Broadcast("UpdateUnhideText")
+					end
+				end
 			},
 			-- Outer Border for button
 			Def.Quad {

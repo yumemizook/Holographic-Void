@@ -20,7 +20,7 @@ t[#t + 1] = Def.Quad {
 		self:Center():zoomto(0, 1)
 	end,
 	OnCommand = function(self)
-		self:diffuse(color("#5ABAFF")):diffusealpha(0.8)
+		self:diffuse(HVColor.Accent):diffusealpha(0.8)
 			:linear(0.6):zoomto(SCREEN_WIDTH * 0.4, 1)
 			:sleep(1.2)
 			:linear(0.4):diffusealpha(0)

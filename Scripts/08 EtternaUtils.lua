@@ -679,18 +679,8 @@ function getCommonBPM(bpmsAndTimes, lastBeat)
 	return commonBPM
 end
 
-------------------------------------------------------------
--- AVATAR PATH
-------------------------------------------------------------
-function getAvatarPath(pn)
-	local profile = PROFILEMAN:GetProfile(pn)
-	if profile then
-		local path = profile:GetDisplayName()
-		-- Try to find avatar in profile directory
-		-- Fallback to default
-	end
-	return THEME:GetPathG("", "avatar_default")
-end
+-- NOTE: getAvatarPath() is provided by _fallback/Scripts/12 AssetsUtils.lua
+-- Do NOT override it here. It uses the assetsConfig system (per-GUID).
 
 ------------------------------------------------------------
 -- MISC ACTOR HELPERS

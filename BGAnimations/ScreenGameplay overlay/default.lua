@@ -11,7 +11,7 @@ local t = Def.ActorFrame {
 	Name = "GameplayOverlay"
 }
 
-local accentColor = color("#5ABAFF")
+local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.85,0.85,0.85,1")
