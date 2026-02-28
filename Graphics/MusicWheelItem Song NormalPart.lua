@@ -11,7 +11,7 @@ local t = Def.ActorFrame {}
 t[#t + 1] = Def.Quad {
 	Name = "BgQuad",
 	InitCommand = function(self)
-		self:zoomto(wheelItemW, 32):diffuse(color("0.08,0.08,0.08,1"))
+		self:zoomto(wheelItemW, 38):diffuse(color("0.08,0.08,0.08,1"))
 	end,
 	SetMessageCommand = function(self, params)
 		if params and params.HasFocus then
@@ -61,16 +61,26 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 
 		local targetDiffOption = curSteps:GetDifficulty()
 		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+		
+		local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+		
 		if allSteps then
 			for _, st in ipairs(allSteps) do
 				if st:GetDifficulty() == targetDiffOption then
-					local msd = st:GetMSD(getCurRateValue(), 1)
-					if msd and msd > 0 then
-						self:settext(string.format("%.2f", msd)) -- Standardized to 2 decimal points
-						self:diffuse(HVColor.GetMSDRatingColor(msd))
+					if showMSD then
+						local msd = st:GetMSD(getCurRateValue(), 1)
+						if msd and msd > 0 then
+							self:settext(string.format("%.2f", msd)) -- Standardized to 2 decimal points
+							self:diffuse(HVColor.GetMSDRatingColor(msd))
+						else
+							self:settext("-")
+							self:diffuse(color("0.45,0.45,0.45,1"))
+						end
 					else
-						self:settext("-")
-						self:diffuse(color("0.45,0.45,0.45,1"))
+						-- Show chart meter if MSD is disabled
+						local meter = st:GetMeter()
+						self:settext(tostring(meter))
+						self:diffuse(color("0.65,0.65,0.65,1")) -- Neutral text color
 					end
 					return
 				end
@@ -171,7 +181,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 -- Bottom border line
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:y(16):zoomto(wheelItemW, 1)
+		self:y(19):zoomto(wheelItemW, 1)
 			:diffuse(color("0.12,0.12,0.12,1"))
 	end
 }

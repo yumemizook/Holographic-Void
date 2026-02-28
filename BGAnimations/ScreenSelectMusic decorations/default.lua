@@ -30,7 +30,6 @@ local t = Def.ActorFrame {
 
 -- ClickDebug was moved to overlay/default.lua for better visibility
 
-HV = HV or {}
 HV.LoginState = HV.LoginState or {
 	visible = false,
 	focused = "email",
@@ -39,6 +38,20 @@ HV.LoginState = HV.LoginState or {
 	status = "Tab / Enter to switch fields"
 }
 local loginState = HV.LoginState
+
+-- Centralized Data Cache
+HV.CurrentSongData = {
+	song = nil,
+	steps = nil,
+	rate = 1.0,
+	allSteps = {},
+	diffAvailability = {}, -- {Beginner = true, ...}
+	diffMeters = {},       -- {Beginner = 10, ...}
+	diffMSDs = {},         -- {Beginner = 25.4, ...}
+	skillsetMSDs = {},     -- {1=Overall, 2=Stream, ...}
+	pbScore = nil,
+	pbSSR = 0,
+}
 
 local loginBtnW = 180
 local loginBtnH = 28
@@ -105,6 +118,95 @@ t[#t + 1] = Def.Quad {
 }
 
 -- ============================================================
+-- SELECTION MANAGER (Centralized Logic)
+-- ============================================================
+t[#t + 1] = Def.Actor {
+	Name = "SelectionManager",
+	InitCommand = function(self)
+		self:playcommand("UpdateData")
+	end,
+	UpdateDataCommand = function(self)
+		local data = HV.CurrentSongData
+		data.song = GAMESTATE:GetCurrentSong()
+		data.steps = GAMESTATE:GetCurrentSteps()
+		data.rate = getCurRateValue() or 1.0
+	end,
+	
+	UpdateHeavyDataCommand = function(self)
+		local data = HV.CurrentSongData
+		if data.song then
+			data.allSteps = (data.song.GetChartsOfCurrentGameType and data.song:GetChartsOfCurrentGameType()) 
+				or (data.song.GetStepsByStepsType and data.song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType())) 
+				or {}
+			
+			-- Diff availability and meters (O(N) once per song)
+			data.diffAvailability = {}
+			data.diffMeters = {}
+			data.diffMSDs = {}
+			for _, st in ipairs(data.allSteps) do
+				local diff = ToEnumShortString(st:GetDifficulty())
+				data.diffAvailability[diff] = true
+				data.diffMeters[diff] = st:GetMeter()
+				data.diffMSDs[diff] = st:GetMSD(data.rate, 1) or 0
+			end
+			
+			-- Current Steps MSDs
+			if data.steps then
+				data.skillsetMSDs = {}
+				for i = 1, 8 do
+					data.skillsetMSDs[i] = data.steps:GetMSD(data.rate, i) or 0
+				end
+				data.pbScore = GetDisplayScore()
+				if data.pbScore then
+					data.pbSSR = data.pbScore:GetSkillsetSSR("Overall")
+				else
+					data.pbSSR = 0
+				end
+			else
+				data.skillsetMSDs = {}
+				data.pbScore = nil
+				data.pbSSR = 0
+			end
+		else
+			data.allSteps = {}
+			data.diffAvailability = {}
+			data.diffMeters = {}
+			data.diffMSDs = {}
+			data.skillsetMSDs = {}
+			data.pbScore = nil
+			data.pbSSR = 0
+		end
+	end,
+	
+	CurrentSongChangedMessageCommand = function(self)
+		self:playcommand("UpdateData")
+		-- Throttle InstantChartUpdate to avoid CPU spikes during fast scrolling
+		-- 0.04s is roughly 1-2 frames at high refresh rates, enough to skip redundant zips
+		self:stoptweening():sleep(0.04):queuecommand("TriggerInstantUpdate")
+		
+		-- Deferred update for heavy elements
+		self:sleep(0.25):queuecommand("TriggerDelayedUpdate")
+	end,
+	CurrentStepsChangedMessageCommand = function(self)
+		self:playcommand("UpdateData")
+		self:stoptweening():sleep(0.04):queuecommand("TriggerInstantUpdate")
+		self:sleep(0.15):queuecommand("TriggerDelayedUpdate")
+	end,
+	CurrentRateChangedMessageCommand = function(self)
+		self:playcommand("UpdateData")
+		self:stoptweening():sleep(0.04):queuecommand("TriggerInstantUpdate")
+		self:sleep(0.15):queuecommand("TriggerDelayedUpdate")
+	end,
+	TriggerInstantUpdateCommand = function(self)
+		MESSAGEMAN:Broadcast("InstantChartUpdate")
+	end,
+	TriggerDelayedUpdateCommand = function(self)
+		self:playcommand("UpdateHeavyData")
+		MESSAGEMAN:Broadcast("DelayedChartUpdate")
+	end
+}
+
+-- ============================================================
 -- BANNER AREA
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
@@ -126,13 +228,17 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "Banner",
 		InitCommand = function(self)
 			self:valign(0):scaletoclipped(panelW - 24, (panelW - 24) / 3.2)
+			self.lastPath = ""
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				local bnpath = song:GetBannerPath()
-				if bnpath then
-					self:Load(bnpath)
+				if bnpath and bnpath ~= "" then
+					if bnpath ~= self.lastPath then
+						self:Load(bnpath)
+						self.lastPath = bnpath
+					end
 					self:scaletoclipped(panelW - 24, (panelW - 24) / 3.2)
 					self:visible(true)
 				else
@@ -142,7 +248,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:visible(false)
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		DelayedChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -178,14 +284,14 @@ t[#t + 1] = Def.ActorFrame {
 				:diffuse(brightText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				self:settext(song:GetDisplayMainTitle())
 			else
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		InstantChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -199,14 +305,14 @@ t[#t + 1] = Def.ActorFrame {
 				:diffuse(subText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				self:settext(song:GetDisplayArtist())
 			else
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		InstantChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -220,14 +326,14 @@ t[#t + 1] = Def.ActorFrame {
 				:diffuse(dimText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				self:settext(song:GetGroupName())
 			else
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		InstantChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end
 	},
@@ -238,14 +344,14 @@ t[#t + 1] = Def.ActorFrame {
 			self:xy(panelW - 32, 22) -- Align to right edge
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song and song:HasCDTitle() then
 				self:visible(true)
 			else
 				self:visible(false)
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		DelayedChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end,
 		
@@ -257,10 +363,18 @@ t[#t + 1] = Def.ActorFrame {
 			end,
 			SetCommand = function(self)
 				self:finishtweening()
-				self.song = GAMESTATE:GetCurrentSong()
+				self.song = HV.CurrentSongData.song
 				if self.song and self.song:HasCDTitle() then
-					self:visible(true)
-					self:Load(self.song:GetCDTitlePath())
+					local path = self.song:GetCDTitlePath()
+					if path and path ~= "" then
+						if path ~= self.lastPath then
+							self:Load(path)
+							self.lastPath = path
+						end
+						self:visible(true)
+					else
+						self:visible(false)
+					end
 				else
 					self:visible(false)
 				end
@@ -271,12 +385,8 @@ t[#t + 1] = Def.ActorFrame {
 					local scale = math.min(maxDim / w, maxDim / h)
 					self:zoom(scale)
 				end
-				
-				if isOver(self) then
-					self:playcommand("ToolTip")
-				end
 			end,
-			CurrentSongChangedMessageCommand = function(self)
+			DelayedChartUpdateMessageCommand = function(self)
 				self:playcommand("Set")
 			end,
 			ToolTipCommand = function(self)
@@ -356,10 +466,10 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):x(40):zoom(0.4):diffuse(mainText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				local bpms = song:GetDisplayBpms()
-				local rate = getCurRateValue() or 1
+				local rate = HV.CurrentSongData.rate
 				local b1 = bpms[1] * rate
 				local b2 = bpms[2] * rate
 				if math.abs(b1 - b2) < 1 then
@@ -371,11 +481,11 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("---")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		InstantChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end,
 		CurrentRateChangedMessageCommand = function(self)
-			self:playcommand("Set")
+			-- SelectionManager handles this now
 		end
 	},
 
@@ -393,10 +503,10 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):x(panelW * 0.35 + 56):zoom(0.4):diffuse(mainText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
+			local song = HV.CurrentSongData.song
 			if song then
 				local len = song:MusicLengthSeconds()
-				local rate = getCurRateValue() or 1
+				local rate = HV.CurrentSongData.rate
 				if rate > 0 then len = len / rate end
 				local mins = math.floor(len / 60)
 				local secs = math.floor(len % 60)
@@ -407,11 +517,11 @@ t[#t + 1] = Def.ActorFrame {
 				self:diffuse(mainText)
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self)
+		InstantChartUpdateMessageCommand = function(self)
 			self:playcommand("Set")
 		end,
 		CurrentRateChangedMessageCommand = function(self)
-			self:playcommand("Set")
+			-- SelectionManager handles this now
 		end
 	},
 
@@ -462,30 +572,17 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):zoom(0.45):diffuse(mainText)
 		end,
 		SetCommand = function(self)
-			local song = GAMESTATE:GetCurrentSong()
-			if song then
-				local steps = GAMESTATE:GetCurrentSteps()
-				if steps then
-					local msd = steps:GetMSD(getCurRateValue(), 1) -- 1 is Overall
-					if msd and msd > 0 then
-						self:settext(string.format("%.2f", msd))
-						self:diffuse(HVColor.GetMSDRatingColor(msd))
-					else
-						self:settext("-")
-						self:diffuse(dimText)
-					end
-				else
-					self:settext("-")
-					self:diffuse(dimText)
-				end
+			local data = HV.CurrentSongData
+			local msd = data.skillsetMSDs[1] -- Overall
+			if msd and msd > 0 then
+				self:settext(string.format("%.2f", msd))
+				self:diffuse(HVColor.GetMSDRatingColor(msd))
 			else
 				self:settext("-")
 				self:diffuse(dimText)
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 	
 	-- Top 3 Skillsets Displays
@@ -525,36 +622,36 @@ t[#t + 1] = Def.ActorFrame {
 			c2:GetChild("Img"):visible(false) c2:GetChild("Lbl"):visible(false)
 			c3:GetChild("Img"):visible(false) c3:GetChild("Lbl"):visible(false)
 			
-			local steps = GAMESTATE:GetCurrentSteps()
-			if not steps then return end
-			local rate = getCurRateValue() or 1
+			local data = HV.CurrentSongData
+			if not data.song or not data.steps then return end
 			
 			local vals = {}
-			-- Indices 2 to 8 map to the 7 specific skillsets
 			local ssNames = {"Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
 			for i, name in ipairs(ssNames) do
-				local m = steps:GetMSD(rate, i + 1)
-				if m > 0 then table.insert(vals, {name = name, val = m}) end
+				local m = data.skillsetMSDs[i + 1]
+				if m and m > 0 then table.insert(vals, {name = name, val = m}) end
 			end
 			
 			table.sort(vals, function(a, b) return a.val > b.val end)
 			
 			if #vals >= 1 then 
-				c1:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[1].name) .. ".png")):visible(true)
-				c1:GetChild("Lbl"):settext(vals[1].name):visible(true)
+				self:GetParent():playcommand("LoadSkillsetIcon", {container = c1, name = vals[1].name})
 			end
 			if #vals >= 2 then 
-				c2:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[2].name) .. ".png")):visible(true)
-				c2:GetChild("Lbl"):settext(vals[2].name):visible(true)
+				self:GetParent():playcommand("LoadSkillsetIcon", {container = c2, name = vals[2].name})
 			end
 			if #vals >= 3 then 
-				c3:GetChild("Img"):Load(THEME:GetPathG("", "skillsets/" .. string.lower(vals[3].name) .. ".png")):visible(true)
-				c3:GetChild("Lbl"):settext(vals[3].name):visible(true)
+				self:GetParent():playcommand("LoadSkillsetIcon", {container = c3, name = vals[3].name})
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
+		LoadSkillsetIconCommand = function(self, params)
+			local c = params.container
+			local name = params.name
+			local path = THEME:GetPathG("", "skillsets/" .. string.lower(name) .. ".png")
+			c:GetChild("Img"):Load(path):visible(true)
+			c:GetChild("Lbl"):settext(name):visible(true)
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	}
 }
 
@@ -692,21 +789,14 @@ for di, dname in ipairs(diffNames) do
 					:diffuse(color("0.08,0.08,0.08,1"))
 			end,
 			SetCommand = function(self)
-				local song = GAMESTATE:GetCurrentSong()
-				if not song then self:diffusealpha(0.3) return end
-				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-				if not allSteps then self:diffusealpha(0.3) return end
-				local found = false
-				for _, st in ipairs(allSteps) do
-					if ToEnumShortString(st:GetDifficulty()) == dname then
-						found = true
-						break
-					end
-				end
+				local data = HV.CurrentSongData
+				if not data.song then self:diffusealpha(0.3) return end
+				
+				local found = data.diffAvailability[dname]
 				if not found then
 					self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(0.15)
 				else
-					local curSteps = GAMESTATE:GetCurrentSteps()
+					local curSteps = data.steps
 					if curSteps and ToEnumShortString(curSteps:GetDifficulty()) == dname then
 						self:diffuse(HVColor.Difficulty[dname] or accentColor):diffusealpha(0.4)
 					else
@@ -714,8 +804,7 @@ for di, dname in ipairs(diffNames) do
 					end
 				end
 			end,
-			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		},
 
 		LoadFont("Common Normal") .. {
@@ -727,21 +816,12 @@ for di, dname in ipairs(diffNames) do
 				self:settext(diffShort[di])
 			end,
 			SetCommand = function(self)
-				local song = GAMESTATE:GetCurrentSong()
-				if not song then self:diffusealpha(0.3) return end
-				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-				if not allSteps then self:diffusealpha(0.3) return end
-				local found = false
-				for _, st in ipairs(allSteps) do
-					if ToEnumShortString(st:GetDifficulty()) == dname then
-						found = true
-						break
-					end
-				end
+				local data = HV.CurrentSongData
+				if not data.song then self:diffusealpha(0.3) return end
+				local found = data.diffAvailability[dname]
 				self:diffusealpha(found and 1 or 0.2)
 			end,
-			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		},
 
 		LoadFont("Common Normal") .. {
@@ -752,39 +832,31 @@ for di, dname in ipairs(diffNames) do
 					:zoom(0.26):diffuse(dimText)
 			end,
 			SetCommand = function(self)
-				local song = GAMESTATE:GetCurrentSong()
-				if not song then self:settext("") return end
-				local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-				if not allSteps then self:settext("") return end
+				local data = HV.CurrentSongData
+				if not data.song then self:settext("") return end
 				
+				local found = data.diffAvailability[dname]
+				if not found then self:settext("") return end
+
 				local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
 				
-				for _, st in ipairs(allSteps) do
-					if ToEnumShortString(st:GetDifficulty()) == dname then
-						if showMSD then
-							local msd = st:GetMSD(getCurRateValue(), 1)
-							if msd and msd > 0 then
-								self:settext(string.format("%.2f", msd))
-								self:diffuse(HVColor.GetMSDRatingColor(msd))
-							else
-								self:settext("-")
-								self:diffuse(dimText)
-							end
-						else
-							-- Show chart meter if MSD is disabled
-							local meter = st:GetMeter()
-							self:settext(tostring(meter))
-							self:diffuse(mainText)
-						end
-						return
+				if showMSD then
+					local msd = data.diffMSDs[dname]
+					if msd and msd > 0 then
+						self:settext(string.format("%.2f", msd))
+						self:diffuse(HVColor.GetMSDRatingColor(msd))
+					else
+						self:settext("-")
+						self:diffuse(dimText)
 					end
+				else
+					-- Show chart meter if MSD is disabled
+					local meter = data.diffMeters[dname] or 0
+					self:settext(tostring(meter))
+					self:diffuse(mainText)
 				end
-				self:settext("")
 			end,
-
-			CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-			CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end,
-			CurrentRateChangedMessageCommand = function(self) self:playcommand("Set") end
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		}
 	}
 end
@@ -796,6 +868,7 @@ t[#t + 1] = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
 		screen:AddInputCallback(function(event)
+			if not event.DeviceInput then return false end
 			if event.type ~= "InputEventType_FirstPress" then return end
 			local btn = event.DeviceInput.button
 			if btn ~= "DeviceButton_left mouse button" then return end
@@ -855,7 +928,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):y(18):zoom(0.55):diffuse(brightText)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
+			local score = HV.CurrentSongData.pbScore
 			if score then
 				local wifePct = score:GetWifeScore() * 100
 				if wifePct >= 99 then
@@ -869,8 +942,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:diffuse(dimText)
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	LoadFont("Common Normal") .. {
@@ -879,7 +951,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):y(36):zoom(0.26):diffuse(subText)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
+			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeShort = ToEnumShortString(score:GetWifeGrade())
 				local grade = THEME:GetString("Grade", gradeShort)
@@ -891,8 +963,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	LoadFont("Common Normal") .. {
@@ -907,17 +978,15 @@ t[#t + 1] = Def.ActorFrame {
 				return
 			end
 			
-			local score = GetDisplayScore()
-			if score then
-				local ssr = score:GetSkillsetSSR("Overall")
+			local ssr = HV.CurrentSongData.pbSSR
+			if ssr and ssr > 0 then
 				self:settext(string.format("SSR: %.2f", ssr))
 				self:diffuse(HVColor.GetMSDRatingColor(ssr))
 			else
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	LoadFont("Common Normal") .. {
@@ -926,7 +995,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):y(66):zoom(0.22):diffuse(subText)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
+			local score = HV.CurrentSongData.pbScore
 			if score then
 				local marv = score:GetTapNoteScore("TapNoteScore_W1")
 				local perf = score:GetTapNoteScore("TapNoteScore_W2")
@@ -939,8 +1008,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	LoadFont("Common Normal") .. {
@@ -949,19 +1017,16 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):y(78):zoom(0.22):diffuse(subText)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
-			local steps = GAMESTATE:GetCurrentSteps()
-			if score and steps then
+			local score = HV.CurrentSongData.pbScore
+			if score then
 				local bad = score:GetTapNoteScore("TapNoteScore_W5")
 				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
-				local cbs = bad + miss
-				self:settext(string.format("CBs/Breaks: %d", cbs))
+				self:settext(string.format("CBs/Breaks: %d", bad + miss))
 			else
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	LoadFont("Common Normal") .. {
@@ -970,7 +1035,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
+			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeStr = ToEnumShortString(score:GetWifeGrade())
 				self:settext(THEME:GetString("Grade", gradeStr))
@@ -979,8 +1044,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
 	-- Clear Type Lamp
@@ -990,7 +1054,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(1):valign(0):x(panelW - 32):y(40):zoom(0.24)
 		end,
 		SetCommand = function(self)
-			local score = GetDisplayScore()
+			local score = HV.CurrentSongData.pbScore
 			if score then
 				local ct = getDetailedClearType(score)
 				self:settext(THEME:GetString("ClearTypes", ct))
@@ -999,8 +1063,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("")
 			end
 		end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentStepsChangedMessageCommand = function(self) self:playcommand("Set") end
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	}
 }
 
@@ -1054,7 +1117,7 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end,
 		OnCommand = function(self) self:playcommand("Set") end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end
+		-- Removed CurrentSongChanged trigger to avoid redundant reloads
 	},
 
 	-- Profile name
@@ -1308,57 +1371,46 @@ t[#t + 1] = creditTooltip
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "CreditTooltipHandler",
-	OnCommand = function(self)
-		local function Update()
-			if not creditTooltipActor then return end
-			local song = GAMESTATE:GetCurrentSong()
-			
-			local hasCredit = false
-			local cStr = ""
-			if song then
-				local ok, res = pcall(function() return song:GetCredit() end)
-				if ok and type(res) == "string" and res ~= "" then
-					hasCredit = true
-					cStr = res
-				end
-			end
-			
-			-- Expand hover bounding box to include CDTitle placed near pack name
-			local isHovering = IsMouseOver(panelX + 16, infoY, panelW - 16, 75)
-			
-			if isHovering and hasCredit then
-				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-				local wasHidden = not creditTooltipActor:GetVisible()
-				creditTooltipActor:visible(true):xy(mx + 15, my + 15)
-				
-				if wasHidden then
-					local txt = creditTooltipActor:GetChild("Text")
-					local bg = creditTooltipActor:GetChild("Bg")
-					local border = creditTooltipActor:GetChild("Border")
-					
-					txt:settext("Credit: " .. cStr)
-					local w = txt:GetZoomedWidth() + 16
-					local h = txt:GetZoomedHeight() + 16
-					bg:zoomto(w, h)
-					border:zoomto(w, 1)
-				end
-			else
-				creditTooltipActor:visible(false)
-			end
-		end
-
-		if self.SetUpdateFunction then
-			self:SetUpdateFunction(Update)
-		elseif self.SetUpdate then
-			self:SetUpdate(Update)
-		else
-			self:queuecommand("Tick")
-		end
-		self.HV_Update = Update
+	InitCommand = function(self)
+		-- Removed redundant input callback to improve performance
 	end,
-	TickCommand = function(self)
-		if self.HV_Update then self.HV_Update() end
-		self:sleep(0.02):queuecommand("Tick")
+	UpdateHoverCommand = function(self)
+		if not creditTooltipActor then return end
+		local song = HV.CurrentSongData.song
+		if not song then creditTooltipActor:visible(false) return end
+		
+		-- Use a slightly looser hover check to avoid constant recalculation
+		local isHovering = IsMouseOver(panelX + 16, infoY, panelW - 16, 75)
+		
+		if isHovering then
+			local ok, cStr = pcall(function() return song:GetCredit() end)
+			if not ok or not cStr or cStr == "" then
+				creditTooltipActor:visible(false)
+				return
+			end
+
+			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+			local wasHidden = not creditTooltipActor:GetVisible()
+			creditTooltipActor:visible(true):xy(mx + 15, my + 15)
+			
+			if wasHidden or creditTooltipActor._lastCredit ~= cStr then
+				local txt = creditTooltipActor:GetChild("Text")
+				local bg = creditTooltipActor:GetChild("Bg")
+				local border = creditTooltipActor:GetChild("Border")
+				
+				txt:settext("Credit: " .. cStr)
+				local w = txt:GetZoomedWidth() + 16
+				local h = txt:GetZoomedHeight() + 16
+				bg:zoomto(w, h)
+				border:zoomto(w, 1)
+				creditTooltipActor._lastCredit = cStr
+			end
+		else
+			creditTooltipActor:visible(false)
+		end
+	end,
+	InstantChartUpdateMessageCommand = function(self)
+		self:playcommand("UpdateHover")
 	end
 }
 

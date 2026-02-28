@@ -8,7 +8,26 @@
 --   - Toasty animation preserved
 
 local t = Def.ActorFrame {
-	Name = "GameplayOverlay"
+	Name = "GameplayOverlay",
+	InitCommand = function(self)
+		-- Apply Mini mod (Receptor Size)
+		local miniValue = tonumber(ThemePrefs.Get("HV_Mini")) or 100
+		-- Etterna's 'Mini' mod is 100% at mini=1.0, 0% at mini=0.0 (normal size).
+		-- We use a simpler direct % conversion:
+		local miniPct = 100 - miniValue
+		local modStr = miniPct .. "% mini"
+		
+		-- Apply Measure Lines (Beat Bars) mod
+		local showMeasure = ThemePrefs.Get("HV_ShowMeasureLines") == "true"
+		local beatBarMod = showMeasure and "beatbars" or "nobeatbars"
+		
+		for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
+			local ps = GAMESTATE:GetPlayerState(pn)
+			local po = ps:GetPlayerOptions("ModsLevel_Preferred")
+			po:FromString(modStr)
+			po:FromString(beatBarMod)
+		end
+	end
 }
 
 local accentColor = HVColor.Accent
@@ -297,8 +316,26 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "AccuracyDisplay",
 	InitCommand = function(self)
-		self:xy(12, SCREEN_BOTTOM - 50):diffusealpha(0.6) -- Dimmed as it's secondary now
+		self:xy(12, SCREEN_BOTTOM - 50):diffusealpha(0.6)
 	end,
+
+	-- NPS Display
+	LoadFont("Common Normal") .. {
+		Name = "NPSDisplay",
+		InitCommand = function(self)
+			self:halign(0):valign(1):y(-40):zoom(0.35):diffuse(accentColor)
+			self:settext("0 NPS")
+			self:visible(ThemePrefs.Get("HV_ShowNPS") == "true")
+		end,
+		UpdateCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+			if pss then
+				-- GetActualCurrentNotesPerSecond() is not standard Etterna.
+				-- We omit this for now to avoid the nil error.
+				-- self:settext("NPS")
+			end
+		end
+	},
 
 	LoadFont("Common Normal") .. {
 		Name = "ScorePercent",
@@ -374,17 +411,31 @@ t[#t + 1] = Def.ActorFrame {
 		local xPos = (visualOffset / maxOffset) * (ebW / 2)
 		local jColor = offsetToJudgeColor(visualOffset)
 
-		-- Create a new pip
-		self:AddChild(Def.Quad {
-			InitCommand = function(s)
-				s:xy(xPos, 0):zoomto(1, ebH + 6):diffuse(jColor):diffusealpha(0.8)
-					:sleep(dotLife):linear(0.5):diffusealpha(0):queuecommand("Die")
-			end,
-			DieCommand = function(s)
-				s:GetParent():RemoveChild(s)
+		-- Pooling system: Cycle through child actors
+		local pool = self:GetChild("Pool")
+		if pool then
+			self.poolIdx = (self.poolIdx or 0) % 50 + 1
+			local dot = pool:GetChild("Dot"..self.poolIdx)
+			if dot then
+				dot:stoptweening():visible(true):x(xPos):diffuse(jColor):diffusealpha(0.8)
+					:sleep(dotLife):linear(0.5):diffusealpha(0)
 			end
-		})
-	end
+		end
+	end,
+
+	Def.ActorFrame {
+		Name = "Pool",
+		InitCommand = function(self)
+			for i=1, 50 do
+				self:AddChild(Def.Quad {
+					Name = "Dot"..i,
+					InitCommand = function(s)
+						s:zoomto(1, ebH + 6):visible(false)
+					end
+				})
+			end
+		end
+	}
 }
 
 -- ============================================================
@@ -680,5 +731,28 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	end
 }
+
+-- ============================================================
+-- LANE COVER
+-- ============================================================
+local laneCoverPct = tonumber(ThemePrefs.Get("HV_LaneCover")) or 0
+if laneCoverPct > 0 then
+	t[#t + 1] = Def.ActorFrame {
+		Name = "LaneCoverLayer",
+		InitCommand = function(self)
+			self:Center()
+		end,
+
+		-- Top Cover (Sudden)
+		Def.Quad {
+			InitCommand = function(self)
+				local h = SCREEN_HEIGHT * (laneCoverPct / 100)
+				self:valign(0):y(-SCREEN_HEIGHT / 2)
+					:zoomto(SCREEN_WIDTH, h)
+					:diffuse(color("0,0,0,1"))
+			end
+		}
+	}
+end
 
 return t

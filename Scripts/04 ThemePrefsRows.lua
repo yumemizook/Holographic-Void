@@ -17,26 +17,6 @@ local HVPrefRows = {
 		Values  = {""},
 	},
 
-	-- Accent Color
-	HV_AccentColor = {
-		Default = "#5ABAFF",
-		Choices = {"Ice Blue", "White", "Warm Gold", "Soft Red", "Mint", "Violet", "Pure Gray"},
-		Values  = {"#5ABAFF", "#FFFFFF", "#FFD080", "#FF8080", "#80FFB0", "#B080FF", "#808080"},
-	},
-
-	-- UI Opacity
-	HV_UIOpacity = {
-		Default = "1.0",
-		Choices = {"25%", "50%", "75%", "100%"},
-		Values  = {"0.25", "0.5", "0.75", "1.0"},
-	},
-
-	-- Glow Effects
-	HV_EnableGlow = {
-		Default = "true",
-		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
-	},
 
 	-- Background Animation Intensity
 	HV_BGAnimIntensity = {
@@ -45,26 +25,6 @@ local HVPrefRows = {
 		Values  = {"0", "1", "2"},
 	},
 
-	-- Music Wheel Offset X
-	HV_WheelOffsetX = {
-		Default = "0",
-		Choices = {"-100", "-50", "0", "+50", "+100"},
-		Values  = {"-100", "-50", "0", "50", "100"},
-	},
-
-	-- Music Wheel Offset Y
-	HV_WheelOffsetY = {
-		Default = "0",
-		Choices = {"-50", "-25", "0", "+25", "+50"},
-		Values  = {"-50", "-25", "0", "25", "50"},
-	},
-
-	-- Eval Graph Scale
-	HV_EvalGraphScale = {
-		Default = "1.0",
-		Choices = {"50%", "75%", "100%", "125%", "150%", "200%"},
-		Values  = {"0.5", "0.75", "1.0", "1.25", "1.5", "2.0"},
-	},
 
 	-- Show MSD Ratings
 	HV_ShowMSD = {
@@ -87,18 +47,12 @@ local HVPrefRows = {
 		Values  = {"false", "true"},
 	},
 
-	-- Default Judge Difficulty
-	HV_DefaultJudge = {
-		Default = "4",
-		Choices = {"J4", "J5", "J6", "J7", "J8", "Justice"},
-		Values  = {"4", "5", "6", "7", "8", "9"},
-	},
 
 	-- MSD Color Scale
-	HV_MSDColorScale = {
-		Default = "HolographicVoid",
-		Choices = {"Holographic Void", "Classic"},
-		Values  = {"HolographicVoid", "TilDeath"}, -- i'm too lazy to correct this.
+	HV_MSDColorScaleV3 = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic", "None", "Monochrome"},
+		Values  = {"Holographic", "Classic", "None", "Monochrome"},
 	},
 
 	-- Show Measure Lines
@@ -107,18 +61,101 @@ local HVPrefRows = {
 		Choices = {"Off", "On"},
 		Values  = {"false", "true"},
 	},
-}
+
+	-- Screen Filter
+	HV_ScreenFilter = {
+		Default = "0.0",
+		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
+		Values  = {"0.0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"},
+	},
+
+	-- Lane Cover
+	HV_LaneCover = {
+		Default = "0",
+		Choices = {"Off", "10%", "25%", "40%", "50%", "60%", "75%"},
+		Values  = {"0", "10", "25", "40", "50", "60", "75"},
+	},
+
+	-- Glow Effects
+	HV_EnableGlow = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+
+	-- Show NPS
+	HV_ShowNPS = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+
+	-- Show Particles
+	HV_Particles = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+	
+	-- Accent Color
+	HV_AccentColor = {
+		Default = "#5ABAFF",
+		Choices = {"Blue", "Pink", "Mint", "Orange", "Purple", "White"},
+		Values  = {"#5ABAFF", "#FF5ABB", "#5AFFBA", "#FFBA5A", "#BA5AFF", "#D9D9D9"},
+	},
+} -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
 ThemePrefsRows.Init(HVPrefRows)
 
+-- Helper for 1% - 250% choices
+local RSChoices = {}
+for i = 1, 250 do
+	RSChoices[i] = tostring(i) .. "%"
+end
+
+-- ReceptorSize OptionRow (Til' Death style)
+function OptionRowMini()
+	return {
+		Name = "Mini",
+		LayoutType = "ShowAllInRow",
+		SelectType = "SelectOne",
+		OneChoiceForAllPlayers = true,
+		ExportOnChange = false,
+		ExportOnCancel = true,
+		Choices = RSChoices,
+		LoadSelections = function(self, list, pn)
+			local prefs = tonumber(ThemePrefs.Get("HV_Mini")) or 100
+			-- Ensure index is within range [1, 250]
+			local idx = math.max(1, math.min(math.floor(prefs), 250))
+			list[idx] = true
+		end,
+		SaveSelections = function(self, list, pn)
+			for i = 1, #list do
+				if list[i] then
+					ThemePrefs.Set("HV_Mini", i)
+					ThemePrefs.Save()
+					break
+				end
+			end
+		end
+	}
+end
+
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	return "HV_UIOpacity,HV_EnableGlow,HV_BGAnimIntensity,"
-		.. "HV_WheelOffsetX,HV_WheelOffsetY,HV_EvalGraphScale,"
-		.. "HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_DefaultJudge,"
-		.. "HV_ShowMeasureLines"
+	local l = "HV_BGAnimIntensity,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_Particles,HV_EnableGlow"
+	return l
+end
+
+-- ScreenPlayerOptions Helpers
+function OptionRowScreenFilter()
+	return ThemePrefRow("HV_ScreenFilter", "Screen Filter")
+end
+
+function OptionRowLaneCover()
+	return ThemePrefRow("HV_LaneCover", "Lane Cover")
 end
 
 -- Listen for pref changes and refresh accent color

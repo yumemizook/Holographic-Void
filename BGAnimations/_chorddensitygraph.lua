@@ -108,11 +108,6 @@ local t = Def.ActorFrame {
 	DelayedChartUpdateMessageCommand = function(self)
 		self:playcommand("GraphUpdate")
 	end,
-	CurrentRateChangedMessageCommand = function(self)
-		if self:IsVisible() then
-			self:queuecommand("GraphUpdate")
-		end
-	end,
 	ChartPreviewOnMessageCommand = function(self)
 		self:queuecommand("GraphUpdate")
 	end,

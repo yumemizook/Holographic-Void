@@ -38,7 +38,11 @@ local t = Def.ActorFrame {
 			local prof = af:GetChild("ProfileChip")
 			if prof then
 				local bg = prof:GetChild("Bg")
-				if overProfile then bg:glow(accentColor) else bg:glow(color("0,0,0,0")) end
+				if overProfile and ThemePrefs.Get("HV_EnableGlow") == "true" then
+					bg:glow(accentColor)
+				else
+					bg:glow(color("0,0,0,0"))
+				end
 			end
 
 			-- Title Menu Hover
@@ -191,11 +195,19 @@ local function jukeboxPrev()
 end
 
 -- Visual Elements
-t[#t + 1] = Def.Quad { InitCommand=function(self) self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,1")) end }
-for i = 1, 8 do t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy(SCREEN_CENTER_X, (SCREEN_HEIGHT / 9) * i):zoomto(SCREEN_WIDTH, 1):diffuse(color("1,1,1,0.03")) end } end
-for i = 1, 15 do t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy((SCREEN_WIDTH / 16) * i, SCREEN_CENTER_Y):zoomto(1, SCREEN_HEIGHT):diffuse(color("1,1,1,0.03")) end } end
-t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP+2):zoomto(SCREEN_WIDTH*0.6, 2):diffuse(accentColor):diffusealpha(0.6) end }
+-- Grid Lines (Controlled by BGAnimIntensity)
+local gridAlpha = 0.03
+local intensity = ThemePrefs.Get("HV_BGAnimIntensity")
+if intensity == "Off" then gridAlpha = 0 
+elseif intensity == "Full" then gridAlpha = 0.08 end
+
+for i = 1, 8 do t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy(SCREEN_CENTER_X, (SCREEN_HEIGHT / 9) * i):zoomto(SCREEN_WIDTH, 1):diffuse(color("1,1,1,"..gridAlpha)) end } end
+for i = 1, 15 do t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy((SCREEN_WIDTH / 16) * i, SCREEN_CENTER_Y):zoomto(1, SCREEN_HEIGHT):diffuse(color("1,1,1,"..gridAlpha)) end } end
+t[#t + 1] = Def.Quad { InitCommand=function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP+2):zoomto(SCREEN_WIDTH*0.6, 2):diffuse(accentColor):diffusealpha(gridAlpha * 20) end }
 t[#t + 1] = LoadFont("Common Large") .. { Text="HOLOGRAPHIC VOID", InitCommand=function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP+50):zoom(0.75):diffuse(brightText) end }
+
+-- Load Shared Background Particles
+t[#t + 1] = LoadActor("../_particles.lua")
 
 t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self) self:SetUpdateFunction(function(af)
@@ -245,8 +257,9 @@ t[#t + 1] = Def.ActorFrame {
 				status:settext("ONLINE"):diffuse(color("0.65,1,0.72,1"))
 				name:settext(DLMAN:GetUsername())
 				local r = DLMAN:GetSkillsetRating("Overall")
-				rating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
-				rank:settextf("#%d", DLMAN:GetSkillsetRank("Overall")):diffuse(subText)
+				local showStats = HV.ShowProfileStats()
+				rating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+				rank:visible(showStats):settextf("#%d", DLMAN:GetSkillsetRank("Overall")):diffuse(subText)
 				if bg then bg:diffuse(color("0.1,0.28,0.15,0.85")) end
 
 				local path = getAvatarPath()
@@ -265,8 +278,9 @@ t[#t + 1] = Def.ActorFrame {
 					if profile then
 						name:settext(profile:GetDisplayName())
 						local r = profile:GetPlayerRating()
-						rating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
-						rank:settext(""):diffuse(dimText)
+						local showStats = HV.ShowProfileStats()
+						rating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+						rank:visible(false)
 
 						local path = getAssetPathFromProfileID("avatar", profileID)
 						if path and path ~= avatar.lastPath then
@@ -277,14 +291,14 @@ t[#t + 1] = Def.ActorFrame {
 						avatar:visible(true)
 					else
 						name:settext("NO PROFILE")
-						rating:settext("0.00"):diffuse(dimText)
-						rank:settext(""):diffuse(dimText)
+						rating:visible(false)
+						rank:visible(false)
 						avatar:visible(false)
 					end
 				else
 					name:settext("GUEST PLAYER")
-					rating:settext("0.00"):diffuse(dimText)
-					rank:settext(""):diffuse(dimText)
+					rating:visible(false)
+					rank:visible(false)
 					avatar:visible(false)
 				end
 				if bg then bg:diffuse(color("0.12,0.12,0.12,0.85")) end
@@ -311,7 +325,8 @@ t[#t + 1] = Def.ActorFrame {
 							if cName and p then cName:settext(p:GetDisplayName()) end
 							if cRating and p then
 								local r = p:GetPlayerRating()
-								cRating:settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+								local showStats = HV.ShowProfileStats()
+								cRating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
 							end
 							if cAvatar and pid then
 								local apath = getAssetPathFromProfileID("avatar", pid)

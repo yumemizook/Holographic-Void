@@ -234,13 +234,15 @@ local function topRow()
 		Def.Sprite {
 			Name = "Banner",
 			ReloadCommand = function(self)
+				if not song then self:visible(false); return end
 				local bnpath = song:GetBannerPath() or THEME:GetPathG("Common", "fallback banner")
-				self:LoadBackground(bnpath):scaletoclipped(140, 40):x(-fw/2 + 5):halign(0)
+				self:visible(true):LoadBackground(bnpath):scaletoclipped(140, 40):x(-fw/2 + 5):halign(0)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "SongTitle",
 			ReloadCommand = function(self)
+				if not song then self:settext(""); return end
 				self:settext(song:GetMainTitle()):xy(-fw/2 + 155, -14):zoom(0.5):halign(0):diffuse(brightText)
 			end
 		},
@@ -260,6 +262,7 @@ local function topRow()
 		LoadFont("Common Normal") .. {
 			Name = "Duration",
 			ReloadCommand = function(self)
+				if not song then self:settext(""); return end
 				local length = song:GetStepsSeconds()/getCurRateValue()
 				self:xy(fw/2 - 220, -14):settext(SecondsToMSS(length)):zoom(0.4):halign(1):diffuse(getSongLengthColor(length))
 			end
@@ -271,6 +274,7 @@ local function topRow()
 			LoadFont("Common Normal") .. {
 				Name = "FullInfo",
 				ReloadCommand = function(self)
+					if not steps then self:settext(""); return end
 					self:xy(0, -12):zoom(0.35):halign(1):diffuse(subText)
 					local stype = steps:GetStepsType()
 					local diff = steps:GetDifficulty()
@@ -280,6 +284,7 @@ local function topRow()
 			LoadFont("Common Normal") .. {
 				Name = "LargeMSD",
 				ReloadCommand = function(self)
+					if not steps then self:settext(""); return end
 					local msd = steps:GetMSD(getCurRateValue(), 1)
 					if msd > 0 then
 						self:settextf("%.2f", msd):xy(0, 10):zoom(0.8):halign(1):diffuse(getMSDColor(msd))

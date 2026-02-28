@@ -364,6 +364,21 @@ end
 ------------------------------------------------------------
 -- SCORE RETRIEVAL & COMPARISON
 ------------------------------------------------------------
+function GetDisplayScore()
+	local pn = PLAYER_1
+	local steps = GAMESTATE:GetCurrentSteps()
+	if not steps then return nil end
+	
+	-- Get scores for the current rate
+	local rate = getCurRateString()
+	local scores = getScoreTable(pn, rate, steps)
+	
+	if scores and #scores > 0 then
+		-- Return the highest wife score
+		return scores[1]
+	end
+	return nil
+end
 
 function getScoreGrade(score)
 	if score ~= nil then return score:GetWifeGrade()

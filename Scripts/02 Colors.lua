@@ -95,14 +95,28 @@ local msdTable = {
 function HVColor.GetMSDRatingColor(msd)
 	if not msd or msd < 0 then return msdTable[1][2] end
 
-	local scale = "HolographicVoid"
+	local scale = "Holographic"
 	if ThemePrefs and ThemePrefs.Get then
-		scale = ThemePrefs.Get("HV_MSDColorScale") or "HolographicVoid"
+		local prefValue = ThemePrefs.Get("HV_MSDColorScaleV3")
+		-- Robust fallback: if preference is empty, nil, or explicitly "None" (which was causing issues), 
+		-- default to our premium "Holographic" scale.
+		if prefValue and prefValue ~= "" and prefValue ~= "None" then
+			scale = prefValue
+		end
 	end
 
-	if scale == "TilDeath" then
+	-- Normalize case for robustness
+	local s = scale:lower()
+	if s == "classic" then
 		-- Classic Til Death hue shift logic
 		return HSV(math.max(95 - (msd / 40) * 150, -50), 0.9, 0.9)
+	elseif s == "none" then
+		-- Static White
+		return color("#FFFFFF")
+	elseif s == "monochrome" then
+		-- Asymptotically darker (White -> Dark Gray)
+		local v = 1.0 / (1.0 + (msd * 0.04))
+		return color(v..","..v..","..v..",1")
 	end
 
 	-- Holographic Void: smooth interpolation between muted thresholds
@@ -111,7 +125,7 @@ function HVColor.GetMSDRatingColor(msd)
 		local upper = msdTable[i+1]
 		if msd >= lower[1] and msd <= upper[1] then
 			local p = (msd - lower[1]) / (upper[1] - lower[1])
-			return lerp_color(p, lower[2], upper[2])
+			return HV.LerpColor(p, lower[2], upper[2])
 		end
 	end
 
@@ -224,6 +238,16 @@ function HVColor.GetSkillsetRankColor(rank)
 	if rank <= 100 then return color("#80C0CF") end      -- Top 100 (Muted Cyan)
 	if rank <= 500 then return color("#D9D9D9") end      -- Top 500 (White-Gray)
 	return color("#A6A6A6")                              -- Fallback (Subtitle Text)
+end
+
+-- Global helper expected by some fallback or legacy scripts
+function getMainColor(type)
+	if not type or type == "" then return HVColor.Accent end
+	if type == "highlight" then return HVColor.Accent end
+	if type == "positive" then return color("#A0CFAB") end
+	if type == "negative" then return color("#CF9898") end
+	-- Fallback for any other requested type
+	return HVColor.Accent
 end
 
 Trace("Holographic Void: 02 Colors.lua loaded.")

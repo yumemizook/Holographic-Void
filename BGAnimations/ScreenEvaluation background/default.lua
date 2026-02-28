@@ -19,4 +19,7 @@ for i = 1, 8 do
 	}
 end
 
+-- Load Shared Background Particles
+t[#t + 1] = LoadActor("../_particles.lua")
+
 return t

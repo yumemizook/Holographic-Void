@@ -35,7 +35,11 @@ local t = Def.ActorFrame {
 		end
 		topScreen = SCREENMAN:GetTopScreen()
 		if topScreen then
-			topScreen:AddInputCallback(BUTTON.InputCallback)
+			topScreen:AddInputCallback(function(event)
+				if BUTTON and type(BUTTON.InputCallback) == "function" then
+					BUTTON.InputCallback(event)
+				end
+			end)
 		end
 		cursorCheck()
 	end,

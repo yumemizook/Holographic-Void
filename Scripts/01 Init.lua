@@ -50,6 +50,25 @@ function HV.Lerp(a, b, t)
 	return a + (b - a) * HV.Clamp(t, 0, 1)
 end
 
+--- Linear interpolation between two colors.
+-- @param t Interpolation factor (0-1)
+-- @param c1 Start color {r,g,b,a}
+-- @param c2 End color {r,g,b,a}
+-- @return table Interpolated color
+function HV.LerpColor(t, c1, c2)
+	if not c1 or not c2 then return {1, 1, 1, 1} end
+	-- Support both numeric indices and named keys
+	local r1, g1, b1, a1 = c1[1] or c1.r or 1, c1[2] or c1.g or 1, c1[3] or c1.b or 1, c1[4] or c1.a or 1
+	local r2, g2, b2, a2 = c2[1] or c2.r or 1, c2[2] or c2.g or 1, c2[3] or c2.b or 1, c2[4] or c2.a or 1
+	
+	return {
+		HV.Lerp(r1, r2, t),
+		HV.Lerp(g1, g2, t),
+		HV.Lerp(b1, b2, t),
+		HV.Lerp(a1, a2, t)
+	}
+end
+
 --- Create a standard Quad with the theme's style defaults.
 -- Returns a Quad actor definition table.
 -- @param params Table with optional keys: Width, Height, Color, Alpha, X, Y

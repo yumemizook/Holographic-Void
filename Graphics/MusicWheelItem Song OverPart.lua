@@ -8,7 +8,7 @@ local t = Def.ActorFrame {}
 -- Pulsing focus highlight overlay
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:zoomto(280, 32)
+		self:zoomto(280, 38)
 			:diffuse(accentColor):diffusealpha(0)
 	end,
 	GainFocusCommand = function(self)
@@ -27,7 +27,7 @@ t[#t + 1] = Def.Quad {
 -- Left edge accent bar - pulsing on focus
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:x(-139):zoomto(2, 32)
+		self:x(-139):zoomto(2, 38)
 			:diffuse(accentColor):diffusealpha(0)
 	end,
 	GainFocusCommand = function(self)

@@ -184,7 +184,7 @@ local function calculateRadarValues(steps, song)
 	local hands  = rv:GetValue('RadarCategory_Hands')
 	local length = math.max(steps:GetLengthSeconds(), 1)
 
-	local rate       = getCurRateValue() or 1
+	local rate       = HV.CurrentSongData.rate or 1
 	local overall    = steps:GetMSD(rate, 1) or 0
 	local jumpstream = steps:GetMSD(rate, 3) or 0
 	local handstream = steps:GetMSD(rate, 4) or 0
@@ -347,8 +347,7 @@ local t = Def.ActorFrame {
 		if hoverActive then showTooltips() end
 		if currentStep < TWEEN_STEPS then self:sleep(STEP_TIME):queuecommand("AnimateStep") end
 	end,
-	CurrentStepsChangedMessageCommand = function(self) self:stoptweening():queuecommand("Set") end,
-	CurrentRateChangedMessageCommand  = function(self) self:stoptweening():queuecommand("Set") end,
+	DelayedChartUpdateMessageCommand = function(self) self:stoptweening():queuecommand("Set") end,
 	TabChangedMessageCommand          = function(self) self:stoptweening():queuecommand("Set") end,
 	NoteFieldVisibleMessageCommand    = function(self) previewVisible = true;  self:visible(false) end,
 	ChartPreviewOnMessageCommand      = function(self) previewVisible = true;  self:visible(false) end,

@@ -8,7 +8,7 @@ local t = Def.ActorFrame {}
 -- Background
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:zoomto(wheelItemW, 34):diffuse(color("0.10,0.10,0.10,1"))
+		self:zoomto(wheelItemW, 38):diffuse(color("0.10,0.10,0.10,1"))
 	end,
 	GainFocusCommand = function(self)
 		self:stoptweening():linear(0.1)
@@ -23,7 +23,7 @@ t[#t + 1] = Def.Quad {
 -- Left accent bar (accent color for groups)
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:x(-wheelItemW/2 + 2):zoomto(4, 30):diffuse(HVColor.Accent):diffusealpha(0.5)
+		self:x(-wheelItemW/2 + 2):zoomto(4, 34):diffuse(HVColor.Accent):diffusealpha(0.5)
 	end
 }
 
@@ -82,7 +82,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 -- Bottom border
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:y(17):zoomto(wheelItemW, 1):diffuse(color("0.18,0.18,0.18,1"))
+		self:y(19):zoomto(wheelItemW, 1):diffuse(color("0.18,0.18,0.18,1"))
 	end
 }
 

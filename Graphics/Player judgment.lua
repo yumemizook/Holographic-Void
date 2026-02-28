@@ -29,9 +29,7 @@ local t = Def.ActorFrame {
 			local path = getAssetPath("judgment")
 			if path and path ~= "" then
 				self:Load(path)
-				if self.stop_animating then self:stop_animating()
-				elseif self.stopanimating then self:stopanimating()
-				end
+				if self.pause then self:pause() end
 				self:setstate(0)
 			end
 		end

@@ -6,51 +6,97 @@
 -- Preference definitions: each key maps to a table with a Default value.
 -- These are registered with the _Fallback ThemePrefs.Init system.
 local HVPrefs = {
-	-- Visual: Accent color (hex string)
-	HV_AccentColor = { Default = "#5ABAFF" },
-
-	-- Visual: Global UI opacity (0.0 - 1.0)
-	HV_UIOpacity = { Default = "1.0" },
-
-	-- Visual: Enable glow/bloom effects on active elements
-	HV_EnableGlow = { Default = "true" },
-
 	-- Visual: Background animation intensity (0 = off, 1 = subtle, 2 = full)
-	HV_BGAnimIntensity = { Default = "1" },
-
-	-- Layout: Music wheel position offset X
-	HV_WheelOffsetX = { Default = "0" },
-
-	-- Layout: Music wheel position offset Y
-	HV_WheelOffsetY = { Default = "0" },
-
-	-- Layout: Evaluation graph height scale (0.5 - 2.0)
-	HV_EvalGraphScale = { Default = "1.0" },
+	HV_BGAnimIntensity = {
+		Default = "2",
+		Choices = {"Off", "Subtle", "Full"},
+		Values = {"0", "1", "2"}
+	},
 
 	-- Gameplay: Show MSD ratings on music wheel
-	HV_ShowMSD = { Default = "true" },
+	HV_ShowMSD = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
 
 	-- Gameplay: Show judge offset display on evaluation
-	HV_ShowJudgeOffsets = { Default = "true" },
+	HV_ShowJudgeOffsets = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
 
 	-- Gameplay: Show player profile stats on select music
-	HV_ShowProfileStats = { Default = "true" },
-
-	-- Gameplay: Judge difficulty display (4-9 or Justice)
-	HV_DefaultJudge = { Default = "4" },
+	HV_ShowProfileStats = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
 
 	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
-	HV_MSDColorScale = { Default = "HolographicVoid" },
+	HV_MSDColorScaleV3 = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic", "None", "Monochrome"},
+		Values = {"Holographic", "Classic", "None", "Monochrome"}
+	},
+
+	-- Visual: Enable glow/bloom effects on active elements
+	HV_EnableGlow = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
 
 	-- Gameplay: Show measure divider lines
-	HV_ShowMeasureLines = { Default = "false" },
+	HV_ShowMeasureLines = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
+
+	-- Gameplay: UI/Background Dim (0.0 - 1.0)
+	HV_ScreenFilter = {
+		Default = "0.0",
+		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
+		Values  = {"0.0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"},
+	},
+
+	-- Gameplay: Lane Cover percentage (0 = off, 1-100)
+	HV_LaneCover = {
+		Default = "0",
+		Choices = {"Off", "10%", "25%", "40%", "50%", "60%", "75%"},
+		Values  = {"0", "10", "25", "40", "50", "60", "75"},
+	},
+
+	-- Gameplay: Toggle real-time NPS display
+	HV_ShowNPS = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
+
+	-- Gameplay: Toggle target tracker comparison
+	HV_ShowTargetTracker = { Default = "false" },
+
+	-- Visual: Background/Menu particles
+	HV_Particles = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
+
+	-- Gameplay: Mini (Receptor Size)
+	HV_Mini = { Default = 100 },
+
+	-- Visual: Accent color hex
+	HV_AccentColor = { Default = "#5ABAFF" },
 
 	-- Auth: Saved EtternaOnline username and login token
 	HV_Username = { Default = "" },
 	HV_PasswordToken = { Default = "" },
 }
 
--- Register with the _Fallback ThemePrefs system.
 -- bLoadFromDisk = true on the first call to read existing prefs from file.
 ThemePrefs.Init(HVPrefs, true)
 
@@ -68,12 +114,6 @@ function HV.GetAccentColor()
 	return HVColor.Accent
 end
 
---- Get the current UI opacity as a number.
-function HV.GetUIOpacity()
-	local val = tonumber(ThemePrefs.Get("HV_UIOpacity"))
-	return val and HV.Clamp(val, 0, 1) or 1
-end
-
 --- Check if glow effects are enabled.
 function HV.IsGlowEnabled()
 	return ThemePrefs.Get("HV_EnableGlow") == "true"
@@ -87,23 +127,26 @@ end
 
 --- Check if MSD ratings should be shown.
 function HV.ShowMSD()
-	return ThemePrefs.Get("HV_ShowMSD") == "true"
+	local val = ThemePrefs.Get("HV_ShowMSD")
+	return val == "true" or val == true
 end
 
 --- Check if judge offsets should be shown on evaluation.
 function HV.ShowJudgeOffsets()
-	return ThemePrefs.Get("HV_ShowJudgeOffsets") == "true"
+	local val = ThemePrefs.Get("HV_ShowJudgeOffsets")
+	return val == "true" or val == true
 end
 
 --- Check if player profile stats should be shown.
 function HV.ShowProfileStats()
-	return ThemePrefs.Get("HV_ShowProfileStats") == "true"
+	local val = ThemePrefs.Get("HV_ShowProfileStats")
+	return val == "true" or val == true
 end
 
---- Get the eval graph vertical scale.
-function HV.GetEvalGraphScale()
-	local val = tonumber(ThemePrefs.Get("HV_EvalGraphScale"))
-	return val and HV.Clamp(val, 0.5, 2.0) or 1.0
+--- Check if measure lines should be shown.
+function HV.ShowMeasureLines()
+	local val = ThemePrefs.Get("HV_ShowMeasureLines")
+	return val == "true" or val == true
 end
 
 Trace("Holographic Void: 03 ThemePrefs.lua loaded.")

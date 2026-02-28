@@ -195,13 +195,15 @@ local function scoreBoard(pn)
 				self:halign(1):valign(0):xy(frameW - pad, pad):zoom(0.35)
 			end,
 			OnCommand = function(self)
-				if steps then
+				if steps and ThemePrefs.Get("HV_ShowMSD") == "true" then
 					local diff = ToEnumShortString(steps:GetDifficulty())
 					local stype = ToEnumShortString(steps:GetStepsType()):gsub("_", " ")
 					local meter = steps:GetMSD(getCurRateValue(), 1)
 					meter = meter == 0 and steps:GetMeter() or meter
 					self:settextf("%s %s %.1f", stype, diff, meter)
 					self:diffuse(HVColor.GetDifficultyColor(diff))
+				else
+					self:settext("")
 				end
 			end
 		},
@@ -298,10 +300,10 @@ local function scoreBoard(pn)
 			InitCommand = function(self) self:halign(0):valign(0):xy(68, 24):zoom(0.32) end,
 			OnCommand = function(self)
 				local ssr = curScore:GetSkillsetSSR("Overall")
-				if ssr > 0 then
+				if ssr > 0 and ThemePrefs.Get("HV_ShowMSD") == "true" then
 					self:settextf("SSR: %.2f", ssr):diffuse(HVColor.GetMSDRatingColor(ssr))
 				else
-					self:settext("SSR: N/A"):diffuse(dimText)
+					self:settext(""):diffuse(dimText)
 				end
 			end,
 			HighlightCommand = function(self)
@@ -620,7 +622,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- ============================================================
 	LoadActor(THEME:GetPathG("", "OffsetGraph")) .. {
 		InitCommand = function(self)
-			self:xy(10, 20)
+			self:xy(10, 20):visible(ThemePrefs.Get("HV_ShowJudgeOffsets") == "true")
 		end,
 		OnCommand = function(self)
 			self:RunCommandsOnChildren(function(child)

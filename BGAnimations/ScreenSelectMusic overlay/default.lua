@@ -25,8 +25,18 @@ local bgCard = color("0.06,0.06,0.06,0.9")
 
 local profileOverlayActor = nil
 local previewActive = false
+local inputDebugActor = nil
 
-local t = Def.ActorFrame {
+-- Mouse wheel locking to prevent double-moves
+local lastWheelMove = 0
+local wheelLockTime = 0.05
+
+-- Bottom Footer Config (Top-level for scope)
+local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
+local tabW = 80
+local footerH = 40
+
+local main_af = Def.ActorFrame {
 	InitCommand = function(self)
 		self:SetUpdateFunction(function(af)
 			-- Hover Logic
@@ -103,23 +113,29 @@ local lastRatePresses = {0, 0}
 
 local function adjustRate(delta)
 	local curRate = getCurRateValue() or 1.0
-	local newRate = math.floor((curRate + delta) * 100 + 0.5) / 100
-	newRate = math.max(0.05, math.min(3.0, newRate))
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate(newRate)
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Song"):MusicRate(newRate)
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate(newRate)
-	MESSAGEMAN:Broadcast("CurrentRateChanged")
+	local nr = math.floor((curRate + delta) * 100 + 0.5) / 100
+	nr = math.max(0.05, math.min(3.0, nr))
+	local songOpts = GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred")
+	if songOpts then
+		songOpts:MusicRate(nr)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Song"):MusicRate(nr)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate(nr)
+		MESSAGEMAN:Broadcast("CurrentRateChanged")
+	end
 end
 
 local function resetRate()
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate(1.0)
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Song"):MusicRate(1.0)
-	GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate(1.0)
-	MESSAGEMAN:Broadcast("CurrentRateChanged")
+	local songOpts = GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred")
+	if songOpts then
+		songOpts:MusicRate(1.0)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Song"):MusicRate(1.0)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate(1.0)
+		MESSAGEMAN:Broadcast("CurrentRateChanged")
+	end
 end
 
 -- Centralized Input Callback (Handles Click, Scroll, and both-EffectUp/Down reset)
-t[#t + 1] = Def.ActorFrame {
+main_af[#main_af + 1] = Def.ActorFrame {
 	-- Handle rate changes via CodeMessageCommand (fired by metrics.ini CodeNames)
 	CodeMessageCommand = function(self, params)
 		if not params or not params.Name then return end
@@ -144,28 +160,23 @@ t[#t + 1] = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
 		screen:AddInputCallback(function(event)
-			local deviceInput = event.DeviceInput or {}
+			-- Strict nil checks to prevent script crashes
+			if not event or not event.DeviceInput then return false end
+			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
-			local gameBtn = event.GameButton or ""
-
-			if event.type ~= "InputEventType_FirstPress" then return end
-
-			-- 1. Mouse Scroll
-			local scroll = 0
-			if btn == "DeviceButton_mousewheel up" then scroll = -1
-			elseif btn == "DeviceButton_mousewheel down" then scroll = 1 end
-			if scroll ~= 0 then
-				local mw = screen:GetMusicWheel()
-				if mw then mw:Move(scroll) mw:Move(0) end
-				return true
+			local evType = event.type or ""
+			
+			-- Log to the isolated debugger if it's loaded
+			if HV_DEBUG_LOG then
+				HV_DEBUG_LOG(string.format("Input: %s (%s)", tostring(btn), tostring(evType)))
 			end
 
 			-- 2. Mouse Click
-			if btn == "DeviceButton_left mouse button" then
+			if btn == "DeviceButton_left mouse button" and evType == "InputEventType_FirstPress" then
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()
 				
-				-- Check Login Button
+				-- Check Login Button logic (btnCX/btnCY defined above)
 				local loginOver = virtualX >= btnCX - btnW/2 and virtualX <= btnCX + btnW/2
 						 and virtualY >= btnCY - btnH/2 and virtualY <= btnCY + btnH/2
 				if loginOver then
@@ -190,7 +201,7 @@ t[#t + 1] = Def.ActorFrame {
 
 				-- Check Header `< BACK` Button (0 to 80, 0 to 40)
 				if virtualX >= 0 and virtualX <= 80 and virtualY >= 0 and virtualY <= 40 then
-					SCREENMAN:GetTopScreen():Cancel()
+					screen:Cancel()
 					return true
 				end
 
@@ -199,34 +210,78 @@ t[#t + 1] = Def.ActorFrame {
 				local searchStartY = 6
 				if virtualX >= searchStartX and virtualX <= searchStartX + 300 
 				   and virtualY >= searchStartY and virtualY <= searchStartY + 28 then
-					MESSAGEMAN:Broadcast("ToggleSearchOverlay")
+					if evType == "InputEventType_FirstPress" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SEARCH"})
+					end
 					return true
 				end
 
-				-- Check Footer Tab Buttons
-				local footerY = SCREEN_HEIGHT - 40
-				local tabW = 80
-				local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
-				
+				-- Check Footer Tab Buttons (Uses top-level 'tabs', 'tabW', 'footerH')
+				local footerY = SCREEN_HEIGHT - footerH
 				for i, tabName in ipairs(tabs) do
 					local tx = 10 + (i - 1) * tabW
 					if virtualX >= tx and virtualX <= tx + tabW and virtualY >= footerY and virtualY <= SCREEN_HEIGHT then
-						if tabName == "PROFILE" then
-							MESSAGEMAN:Broadcast("ToggleProfileOverlay")
-						else
-							-- Placeholder for other tabs
-							MESSAGEMAN:Broadcast("Toggle" .. tabName .. "Overlay")
-						end
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = tabName:upper()})
 						return true
+					end
+				end
+
+				-- 2.5 Music Wheel Click Selection
+				local mwX = SCREEN_WIDTH - 180
+				if virtualX >= mwX - 180 and virtualX <= SCREEN_WIDTH then
+					local mw = screen:GetMusicWheel()
+					if mw then
+						local diffY = virtualY - SCREEN_CENTER_Y
+						if math.abs(diffY) <= 20 then
+							return false -- Let center click pass to engine for Start
+						else
+							if evType == "InputEventType_FirstPress" then
+								local songName = "None"
+								if mw and mw.GetSelectedSong and mw:GetSelectedSong() then
+									songName = mw:GetSelectedSong():GetDisplayMainTitle()
+								end
+								local offset = math.floor(diffY / 40 + 0.5)
+								if offset ~= 0 then
+									if HV_DEBUG_LOG then HV_DEBUG_LOG(string.format("Wheel Click Move: %d | Song: %s", offset, songName)) end
+									mw:Move(offset)
+									mw:Move(0)
+								end
+							end
+							return true
+						end
 					end
 				end
 			end
 			
-			-- 3. Key Presses
-			if event.type == "InputEventType_FirstPress" then
-				if event.button == "4" and (INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")) then
-					MESSAGEMAN:Broadcast("ToggleSearchOverlay")
-					return true
+			-- 2.6 Mouse Wheel
+			if (btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_mousewheel down") then
+				if evType == "InputEventType_FirstPress" then
+					local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
+					if now - lastWheelMove < wheelLockTime then return true end
+					
+					local mw = screen:GetMusicWheel()
+					if mw then
+						local dir = (btn == "DeviceButton_mousewheel up") and -1 or 1
+						mw:Move(dir)
+						mw:Move(0)
+						lastWheelMove = now
+						if HV_DEBUG_LOG then HV_DEBUG_LOG(string.format("Wheel Scroll: %d", dir)) end
+					end
+				end
+				return true
+			end
+			
+			-- 3. Key Presses (Global Shortcuts)
+			if evType == "InputEventType_FirstPress" then
+				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
+				if ctrl then
+					if btn == "DeviceButton_4" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SEARCH"})
+						return true
+					elseif btn == "DeviceButton_0" then
+						MESSAGEMAN:Broadcast("ToggleInputDebugger")
+						return true
+					end
 				end
 			end
 		end)
@@ -269,7 +324,7 @@ local profileOverlay = Def.ActorFrame {
 					-- 1. Handle Closing (Click Outside)
 					if event.type == "InputEventType_FirstPress" and IsMouseLeftClick(event.DeviceInput.button) then
 						if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-							MESSAGEMAN:Broadcast("ToggleProfileOverlay")
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 							return true
 						end
 					end
@@ -679,7 +734,7 @@ local profileOverlay = Def.ActorFrame {
 								screen:GetMusicWheel():SelectSong(song)
 							end
 						end
-						MESSAGEMAN:Broadcast("ToggleProfileOverlay")
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""}) -- Close on select
 					end,
 					OverlayRowRightClickedMessageCommand = function(self, params)
 						if params.index ~= i then return end
@@ -711,12 +766,18 @@ local profileOverlay = Def.ActorFrame {
 
 	-- Core Logic Signals
 	UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateAllScores") end,
-	ToggleProfileOverlayMessageCommand = function(self)
-		local iv = self:GetVisible()
-		self:visible(not iv)
-		SCREENMAN:set_input_redirected(PLAYER_1, not iv)
-		SCREENMAN:set_input_redirected(PLAYER_2, not iv)
-		if not iv then self:playcommand("UpdateAllScores") end
+	SelectMusicTabChangedMessageCommand = function(self, params)
+		if params.Tab == "PROFILE" then
+			local iv = self:GetVisible()
+			self:visible(not iv)
+			SCREENMAN:set_input_redirected(PLAYER_1, not iv)
+			SCREENMAN:set_input_redirected(PLAYER_2, not iv)
+			if not iv then self:playcommand("UpdateAllScores") end
+		else
+			self:visible(false)
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			SCREENMAN:set_input_redirected(PLAYER_2, false)
+		end
 	end,
 
 	UpdateAllScoresCommand = function(self)
@@ -810,13 +871,13 @@ local profileOverlay = Def.ActorFrame {
 	end
 }
 
-t[#t + 1] = profileOverlay
+main_af[#main_af + 1] = profileOverlay
 
 -- ============================================================
 -- TOP HEADER (Search & Back)
 -- ============================================================
 local headerH = 40
-t[#t + 1] = Def.ActorFrame {
+main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "HeaderBar",
 	InitCommand = function(self)
 		self:xy(0, 0)
@@ -866,9 +927,15 @@ t[#t + 1] = Def.ActorFrame {
 					:diffuse(color("0.1,0.1,0.1,1"))
 			end
 		},
+		Def.Sprite {
+			Texture = THEME:GetPathG("", "search.png"),
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(8, 14):zoom(0.45):diffusealpha(0.7)
+			end
+		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):xy(150, 14):zoom(0.35):diffuse(subText):settext("Click here to Search (or Ctrl + 4)")
+				self:halign(0):valign(0.5):xy(32, 14):zoom(0.35):diffuse(subText):settext("Click here to Search (or Ctrl + 4)")
 			end
 		}
 	}
@@ -881,7 +948,7 @@ local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
 local tabW = 80
 local footerH = 40
 
-t[#t + 1] = Def.ActorFrame {
+main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "FooterBar",
 	InitCommand = function(self)
 		self:xy(0, SCREEN_HEIGHT - footerH)
@@ -919,7 +986,7 @@ t[#t + 1] = Def.ActorFrame {
 
 -- Create Tab Buttons on Footer
 for i, tabName in ipairs(tabs) do
-	t[#t + 1] = Def.ActorFrame {
+	main_af[#main_af + 1] = Def.ActorFrame {
 		Name = "FooterTab_" .. tabName,
 		InitCommand = function(self)
 			self:xy(10 + (i - 1) * tabW, SCREEN_HEIGHT - footerH)
@@ -948,15 +1015,14 @@ end
 -- CHART PREVIEW TRIGGER (Space key)
 -- Opens the dedicated ScreenChartPreview screen
 -- ============================================================
-t[#t + 1] = Def.ActorFrame {
+main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "ChartPreviewInputHandler",
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-		-- Store SSM reference (redundant now but kept for compatibility)
-		if HV then HV.SSM = screen end
 		
 		screen:AddInputCallback(function(event)
+			if not event or not event.DeviceInput then return end
 			if event.type ~= "InputEventType_FirstPress" then return end
 			local btn = event.DeviceInput.button
 
@@ -988,13 +1054,22 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- Load the Chart Preview layer (initially hidden)
-t[#t + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .. {
+main_af[#main_af + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .. {
 	InitCommand = function(self)
 		self:visible(false)
 	end
 }
 
-t[#t + 1] = LoadActor("../_cursor")
+-- Load Isolated Input Debugger (Always on top with draworder 9999)
+main_af[#main_af + 1] = LoadActor("input_debugger.lua")
 
-return t
+-- Load Decoration Overlays (Initially hidden, using standard Toggle[NAME]Overlay messages)
+local decorOverlays = {"search", "scores", "filters", "playlists", "tags", "goals"}
+for _, name in ipairs(decorOverlays) do
+	main_af[#main_af + 1] = LoadActor("../ScreenSelectMusic decorations/" .. name .. ".lua")
+end
+
+main_af[#main_af + 1] = LoadActor("../_cursor")
+
+return main_af
 

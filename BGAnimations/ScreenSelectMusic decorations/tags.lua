@@ -3,8 +3,12 @@ local t = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
 	end,
-	ToggleTAGSOverlayMessageCommand = function(self)
-		self:visible(not self:GetVisible())
+	SelectMusicTabChangedMessageCommand = function(self, params)
+		if params.Tab == "TAGS" then
+			self:visible(not self:GetVisible())
+		else
+			self:visible(false)
+		end
 	end,
 	Def.Quad {
 		InitCommand = function(self)

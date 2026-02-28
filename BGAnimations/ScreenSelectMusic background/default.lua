@@ -21,4 +21,16 @@ for i = 0, math.floor(SCREEN_HEIGHT / 6) do
 	}
 end
 
+-- Header accent line
+t[#t + 1] = Def.Quad {
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, 50)
+			:zoomto(SCREEN_WIDTH * 0.5, 1)
+			:diffuse(HVColor.Accent):diffusealpha(0.3)
+	end
+}
+
+-- Load Shared Background Particles
+t[#t + 1] = LoadActor("../_particles.lua")
+
 return t
