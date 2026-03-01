@@ -5,6 +5,7 @@
 
 -- Theme namespace
 HV = {}
+HV.ActiveTab = "" -- Tracks the currently open song select overlay (SCORES, FILTERS, etc.)
 
 -- Screen dimensions (cached for convenience)
 HV.ScreenWidth = SCREEN_WIDTH

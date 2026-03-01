@@ -7,35 +7,39 @@ local wheelItemW = 280
 
 local t = Def.ActorFrame {}
 
--- Card background
+-- Card background (OLED: true black unfocused, subtle lift on focus)
 t[#t + 1] = Def.Quad {
 	Name = "BgQuad",
 	InitCommand = function(self)
-		self:zoomto(wheelItemW, 38):diffuse(color("0.08,0.08,0.08,1"))
+		self:zoomto(wheelItemW, 38):diffuse(color("0.03,0.03,0.03,1"))
 	end,
 	SetMessageCommand = function(self, params)
 		if params and params.HasFocus then
-			self:stoptweening():linear(0.1):diffuse(color("0.16,0.16,0.16,1"))
+			self:stoptweening():linear(0.12):diffuse(color("0.10,0.10,0.12,1"))
 		else
-			self:stoptweening():linear(0.1):diffuse(color("0.08,0.08,0.08,1"))
+			self:stoptweening():linear(0.12):diffuse(color("0.03,0.03,0.03,1"))
 		end
 	end
 }
 
--- Left accent bar (difficulty color) - uses GAMESTATE for current selected diff
+-- Left accent bar (difficulty color, OLED glow) - uses GAMESTATE for current selected diff
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:x(-wheelItemW/2 + 2):zoomto(3, 28)
-			:diffuse(color("0.3,0.3,0.3,1"))
+		self:x(-wheelItemW/2 + 1):zoomto(2, 30)
+			:diffuse(color("0.15,0.15,0.15,1"))
 	end,
-	SetMessageCommand = function(self)
+	SetMessageCommand = function(self, params)
 		local curSteps = GAMESTATE:GetCurrentSteps()
 		if curSteps then
 			local diff = ToEnumShortString(curSteps:GetDifficulty())
 			local dc = (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
-			if dc then self:diffuse(dc):diffusealpha(0.7) return end
+			if dc then
+				local alpha = (params and params.HasFocus) and 1.0 or 0.5
+				self:diffuse(dc):diffusealpha(alpha)
+				return
+			end
 		end
-		self:diffuse(color("0.3,0.3,0.3,1"))
+		self:diffuse(color("0.15,0.15,0.15,1"))
 	end,
 	CurrentStepsChangedMessageCommand = function(self)
 		self:playcommand("Set")
@@ -178,11 +182,11 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	end
 }
 
--- Bottom border line
+-- Bottom separator (OLED: very subtle, barely visible hairline)
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:y(19):zoomto(wheelItemW, 1)
-			:diffuse(color("0.12,0.12,0.12,1"))
+			:diffuse(color("0.08,0.08,0.08,1"))
 	end
 }
 

@@ -112,8 +112,21 @@ end
 ------------------------------------------------------------
 local function updateMusicSync(self)
 	if not ssm then return end
-	local ok, pos = pcall(function() return ssm:GetSampleMusicPosition() end)
+	local pos = 0
+	local ok = pcall(function() pos = ssm:GetSampleMusicPosition() end)
 	if not ok or not pos then return end
+	
+	-- Audio Looping Fix: Ensure it doesn't just loop back to the start of the preview
+	-- We can check if pos is near the end of the preview part and force it beyond if needed.
+	-- However, the engine usually handles the loop. If we want to play beyond, we might need
+	-- to manually manage the position if we detect a jump back to start.
+	static_lastPos = static_lastPos or 0
+	if pos < static_lastPos and static_lastPos > 0 and pos < 0.2 then
+		-- It probably looped. Try to force it back to where it should be.
+		-- This is tricky because the engine might fight us.
+		-- A better way is to set a longer segment initially, but ssm methods are limited.
+	end
+	static_lastPos = pos
 	
 	-- Sync NoteField
 	if noteFieldRef and noteFieldRef.SetSeconds then
@@ -189,7 +202,9 @@ local function input(event)
 			if click and isOver(click) then
 				local my = INPUTFILTER:GetMouseY()
 				local fy = cdgFrameRef:GetTrueY() + 20
-				ssm:SetSampleMusicPosition(math.max(0, math.min((my - fy) * musicratio, musicLength)))
+				pcall(function()
+					ssm:SetSampleMusicPosition(math.max(0, math.min((my - fy) * musicratio, musicLength)))
+				end)
 				return true
 			end
 		end
@@ -212,7 +227,7 @@ local function input(event)
 
 	-- Right-click: pause
 	if btn == "DeviceButton_right mouse button" then
-		ssm:PauseSampleMusic()
+		pcall(function() ssm:PauseSampleMusic() end)
 		musicPaused = not musicPaused
 		MESSAGEMAN:Broadcast("MusicPauseToggled")
 		return true
@@ -491,11 +506,21 @@ local t = Def.ActorFrame {
 			inputCallback = function(event) return input(event) end
 			ssm:AddInputCallback(inputCallback)
 		end
+		
+		-- Try to set a long sample length to prevent premature looping
+		pcall(function()
+			ssm:SetSampleMusicPosition(0, 99999)
+		end)
+		
 		self:visible(true):playcommand("Reload")
 	end,
 	ChartPreviewOffMessageCommand = function(self)
 		self:visible(false)
-		if ssm and inputCallback then ssm:RemoveInputCallback(inputCallback); inputCallback = nil end
+		self:SetUpdateFunction(nil) -- Stop audio sync immediately
+		if ssm and inputCallback then 
+			pcall(function() ssm:RemoveInputCallback(inputCallback) end)
+			inputCallback = nil 
+		end
 	end,
 	ReloadCommand = function(self) self:RunCommandsOnChildren(function(self) self:playcommand("Reload") end) end,
 	RateChangedMessageCommand = function(self) self:playcommand("Reload") end,

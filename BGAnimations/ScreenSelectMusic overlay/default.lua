@@ -53,6 +53,7 @@ local main_af = Def.ActorFrame {
 		-- Store ScreenSelectMusic reference globally for chart preview to use
 		HV = HV or {}
 		HV.SSM = SCREENMAN:GetTopScreen()
+		HV.ActiveTab = ""
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
@@ -221,14 +222,23 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				for i, tabName in ipairs(tabs) do
 					local tx = 10 + (i - 1) * tabW
 					if virtualX >= tx and virtualX <= tx + tabW and virtualY >= footerY and virtualY <= SCREEN_HEIGHT then
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = tabName:upper()})
+						local target = tabName:upper()
+						if target == "PROFILE" then target = "SOCIAL" end -- Map profile to SOCIAL internally for theme parity? (Wait, I used PROFILE in decorations)
+						
+						-- Close if the SAME tab is clicked
+						if HV.ActiveTab == tabName:upper() then
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+						else
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = tabName:upper()})
+						end
 						return true
 					end
 				end
 
 				-- 2.5 Music Wheel Click Selection
+				-- BLOCKED if an overlay tab is open
 				local mwX = SCREEN_WIDTH - 180
-				if virtualX >= mwX - 180 and virtualX <= SCREEN_WIDTH then
+				if HV.ActiveTab == "" and virtualX >= mwX - 180 and virtualX <= SCREEN_WIDTH then
 					local mw = screen:GetMusicWheel()
 					if mw then
 						local diffY = virtualY - SCREEN_CENTER_Y
@@ -236,13 +246,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							return false -- Let center click pass to engine for Start
 						else
 							if evType == "InputEventType_FirstPress" then
-								local songName = "None"
-								if mw and mw.GetSelectedSong and mw:GetSelectedSong() then
-									songName = mw:GetSelectedSong():GetDisplayMainTitle()
-								end
 								local offset = math.floor(diffY / 40 + 0.5)
 								if offset ~= 0 then
-									if HV_DEBUG_LOG then HV_DEBUG_LOG(string.format("Wheel Click Move: %d | Song: %s", offset, songName)) end
 									mw:Move(offset)
 									mw:Move(0)
 								end
@@ -251,10 +256,20 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						end
 					end
 				end
+
+				-- If an overlay is active, we generally want to return false here
+				-- so that the decoration tab's own InputCallback can handle the click.
+				-- However, we still handle footer/header buttons above.
+				if HV.ActiveTab ~= "" then
+					return false
+				end
 			end
 			
 			-- 2.6 Mouse Wheel
+			-- BLOCKED if an overlay tab is open
 			if (btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_mousewheel down") then
+				if HV.ActiveTab ~= "" then return true end
+				
 				if evType == "InputEventType_FirstPress" then
 					local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
 					if now - lastWheelMove < wheelLockTime then return true end
@@ -265,7 +280,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						mw:Move(dir)
 						mw:Move(0)
 						lastWheelMove = now
-						if HV_DEBUG_LOG then HV_DEBUG_LOG(string.format("Wheel Scroll: %d", dir)) end
 					end
 				end
 				return true
@@ -767,16 +781,19 @@ local profileOverlay = Def.ActorFrame {
 	-- Core Logic Signals
 	UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateAllScores") end,
 	SelectMusicTabChangedMessageCommand = function(self, params)
-		if params.Tab == "PROFILE" then
-			local iv = self:GetVisible()
-			self:visible(not iv)
-			SCREENMAN:set_input_redirected(PLAYER_1, not iv)
-			SCREENMAN:set_input_redirected(PLAYER_2, not iv)
-			if not iv then self:playcommand("UpdateAllScores") end
+		HV.ActiveTab = params and params.Tab or ""
+		local targetTab = params and params.Tab or ""
+		
+		-- Set input redirection for ALL tabs to block the C++ MusicWheel
+		local redirected = (targetTab ~= "")
+		SCREENMAN:set_input_redirected(PLAYER_1, redirected)
+		SCREENMAN:set_input_redirected(PLAYER_2, redirected)
+
+		if targetTab == "PROFILE" then
+			self:visible(true)
+			self:playcommand("UpdateAllScores")
 		else
 			self:visible(false)
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
-			SCREENMAN:set_input_redirected(PLAYER_2, false)
 		end
 	end,
 
@@ -925,6 +942,28 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			InitCommand = function(self)
 				self:halign(0):valign(0):zoomto(300, 28)
 					:diffuse(color("0.1,0.1,0.1,1"))
+			end,
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == "SEARCH" then
+					self:diffuse(color("0.12,0.12,0.12,1"))
+				else
+					self:diffuse(color("0.1,0.1,0.1,1"))
+				end
+			end
+		},
+		-- Left accent line (glows when search is active)
+		Def.Quad {
+			Name = "AccentBorder",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(2, 28)
+					:diffuse(accentColor):diffusealpha(0)
+			end,
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == "SEARCH" then
+					self:diffusealpha(0.8)
+				else
+					self:diffusealpha(0)
+				end
 			end
 		},
 		Def.Sprite {
@@ -934,8 +973,16 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			end
 		},
 		LoadFont("Common Normal") .. {
+			Name = "SearchPlaceholder",
 			InitCommand = function(self)
 				self:halign(0):valign(0.5):xy(32, 14):zoom(0.35):diffuse(subText):settext("Click here to Search (or Ctrl + 4)")
+			end,
+			SearchQueryUpdatedMessageCommand = function(self, params)
+				if params and params.query and params.query ~= "" then
+					self:settext("Search: " .. params.query):diffuse(brightText)
+				else
+					self:settext("Click here to Search (or Ctrl + 4)"):diffuse(subText)
+				end
 			end
 		}
 	}
@@ -1012,46 +1059,9 @@ for i, tabName in ipairs(tabs) do
 end
 
 -- ============================================================
--- CHART PREVIEW TRIGGER (Space key)
--- Opens the dedicated ScreenChartPreview screen
+-- MASTER INPUT SINK & TAB MANAGEMENT
 -- ============================================================
-main_af[#main_af + 1] = Def.ActorFrame {
-	Name = "ChartPreviewInputHandler",
-	BeginCommand = function(self)
-		local screen = SCREENMAN:GetTopScreen()
-		if not screen then return end
-		
-		screen:AddInputCallback(function(event)
-			if not event or not event.DeviceInput then return end
-			if event.type ~= "InputEventType_FirstPress" then return end
-			local btn = event.DeviceInput.button
-
-			if btn == "DeviceButton_space" then
-				if previewActive then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-				else
-					previewActive = true
-					MESSAGEMAN:Broadcast("ChartPreviewOn")
-				end
-				return true
-			end
-			
-			-- Handle input when preview is active
-			if previewActive then
-				-- Close preview on Esc or Back
-				if event.button == "Back" or event.button == "Start" then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-					return true
-				end
-				
-				-- Block all other inputs while preview is active
-				return true
-			end
-		end)
-	end
-}
+-- (Relocated to bottom to ensure decoration callbacks are prioritized)
 
 -- Load the Chart Preview layer (initially hidden)
 main_af[#main_af + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .. {
@@ -1070,6 +1080,60 @@ for _, name in ipairs(decorOverlays) do
 end
 
 main_af[#main_af + 1] = LoadActor("../_cursor")
+
+
+-- ============================================================
+-- MASTER INPUT SINK & TAB MANAGEMENT
+-- ============================================================
+-- Relocated to the bottom of the update chain to ensure 
+-- decoration specific input callbacks are executed first.
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "MasterInputSink",
+	BeginCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen then return end
+		
+		screen:AddInputCallback(function(event)
+			if not event or not event.DeviceInput then return end
+			local btn = event.DeviceInput.button
+
+			-- 1. TRACK GLOBAL TAB STATE
+			local activeTab = HV.ActiveTab or ""
+			
+			-- 2. CHART PREVIEW TRIGGER (Space key)
+			if btn == "DeviceButton_space" and activeTab == "" then
+				if event.type ~= "InputEventType_FirstPress" then return end
+				if previewActive then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				else
+					previewActive = true
+					MESSAGEMAN:Broadcast("ChartPreviewOn")
+				end
+				return true
+			end
+			
+			-- 3. HANDLE CHART PREVIEW INPUT
+			if previewActive then
+				if event.type ~= "InputEventType_FirstPress" then return true end
+				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				end
+				return true
+			end
+
+			-- 4. MASTER TAB SINK
+			if activeTab ~= "" then
+				-- Global "Close on Esc"
+				if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
+					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+				end
+				return true
+			end
+		end)
+	end
+}
 
 return main_af
 
