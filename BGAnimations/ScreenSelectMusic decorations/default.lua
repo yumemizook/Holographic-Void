@@ -538,7 +538,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- MSD SKILLSET RATINGS (Simplified)
 -- ============================================================
-local msdY = detailY + 45
+local msdY = detailY + 35
 local skillsets = {"Overall", "Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
 
 t[#t + 1] = Def.ActorFrame {
@@ -561,7 +561,7 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "MSDRow_Overall",
 	InitCommand = function(self)
-		self:xy(panelX + 16, msdY + 24)
+		self:xy(panelX + 16, msdY + 18)
 		local show = ThemePrefs.Get("HV_ShowMSD")
 		self:visible(show == "true" or show == true)
 	end,
@@ -589,29 +589,29 @@ t[#t + 1] = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "TopSkillsetIcons",
 		InitCommand = function(self)
-			self:xy(120, -10) -- Raised higher and shifted right for bigger MSD
+			self:xy(105, -6) -- Moved down 4px for better vertical alignment
 		end,
 		
 		-- Container for Icon 1
 		Def.ActorFrame {
 			Name = "IconContainer1",
 			InitCommand = function(self) self:x(0) end,
-			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
-			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.5):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(30):zoom(0.28):diffuse(dimText):visible(false) end }
 		},
 		-- Container for Icon 2
 		Def.ActorFrame {
 			Name = "IconContainer2",
-			InitCommand = function(self) self:x(70) end,
-			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
-			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+			InitCommand = function(self) self:x(55) end,
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.5):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(30):zoom(0.28):diffuse(dimText):visible(false) end }
 		},
 		-- Container for Icon 3
 		Def.ActorFrame {
 			Name = "IconContainer3",
-			InitCommand = function(self) self:x(140) end,
-			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.7):visible(false) end },
-			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(34):zoom(0.25):diffuse(dimText):visible(false) end }
+			InitCommand = function(self) self:x(110) end,
+			Def.Sprite { Name = "Img", InitCommand = function(self) self:y(0):zoom(0.5):visible(false) end },
+			LoadFont("Common Normal") .. { Name = "Lbl", InitCommand = function(self) self:y(30):zoom(0.28):diffuse(dimText):visible(false) end }
 		},
 		
 		SetCommand = function(self)
@@ -897,7 +897,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- PERSONAL BEST DISPLAY (Under MSD rating in sidebar)
 -- ============================================================
-local pbY = msdY + 70
+local pbY = msdY + 60
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "PersonalBestFrame",
@@ -1001,7 +1001,7 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeStr = ToEnumShortString(score:GetWifeGrade())
-				self:settext(THEME:HasString("Grade", gradeStr) and THEME:GetString("Grade", gradeStr) or HV.GetGradeName(gradeStr))
+				self:settext(HV.GetGradeName(gradeStr))
 				self:diffuse(HVColor.GetGradeColor(gradeStr))
 			else
 				self:settext("")
@@ -1073,14 +1073,16 @@ t[#t + 1] = Def.ActorFrame {
 				{name = "Miss", label = "MIS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
 			}
 			for i, j in ipairs(judges) do
-				local bg = self:GetChild("Bg_" .. i)
-				local lbl = self:GetChild("Lbl_" .. i)
-				local valTxt = self:GetChild("Val_" .. i)
+				local block = self:GetChild("Blocks"):GetChild("Block_" .. i)
+				local bg = block:GetChild("Bg")
+				local lbl = block:GetChild("Lbl")
+				local valTxt = block:GetChild("Val")
+				
 				if bg and lbl and valTxt then
 					valTxt:settext(tostring(j.val))
 					
 					local c = HVColor.Judgment and HVColor.Judgment[j.name] or color("0.5,0.5,0.5,1")
-					bg:diffuse(color("0,0,0,0")) -- transparent quad
+					bg:diffuse(c):diffusealpha(0.2) -- translucent colored quad
 					lbl:settext(j.label):diffuse(c)
 					valTxt:diffuse(c)
 				end
@@ -1088,7 +1090,7 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		(function()
-			local blocks = Def.ActorFrame{}
+			local blocks = Def.ActorFrame{ Name = "Blocks" }
 			local numBlocks = 6
 			local panelWConst = SCREEN_WIDTH * 0.36
 			local gap = 2
@@ -1096,23 +1098,24 @@ t[#t + 1] = Def.ActorFrame {
 			
 			for i = 1, numBlocks do
 				blocks[#blocks + 1] = Def.ActorFrame {
+					Name = "Block_" .. i,
 					InitCommand = function(self)
 						self:x((i - 1) * (blockW + gap))
 					end,
 					Def.Quad {
-						Name = "Bg_" .. i,
+						Name = "Bg",
 						InitCommand = function(self)
 							self:halign(0):valign(0):zoomto(blockW, 22)
 						end
 					},
 					LoadFont("Common Normal") .. {
-						Name = "Val_" .. i,
+						Name = "Val",
 						InitCommand = function(self)
 							self:halign(0.5):valign(0):xy(blockW/2, 2):zoom(0.30)
 						end
 					},
 					LoadFont("Common Normal") .. {
-						Name = "Lbl_" .. i,
+						Name = "Lbl",
 						InitCommand = function(self)
 							self:halign(0.5):valign(0):xy(blockW/2, 13):zoom(0.20)
 						end
@@ -1126,7 +1129,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "PBCBs",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(96):zoom(0.22):diffuse(subText)
+			self:halign(1):valign(0):x(panelW - 32):y(52):zoom(0.24):diffuse(subText)
 		end,
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore

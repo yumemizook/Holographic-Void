@@ -108,6 +108,60 @@ local main_af = Def.ActorFrame {
 	end
 }
 
+-- ============================================================
+-- MASTER INPUT SINK & TAB MANAGEMENT (TOP PRIORITY)
+-- ============================================================
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "MasterInputSink",
+	BeginCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen then return end
+		
+		screen:AddInputCallback(function(event)
+			if not event or not event.DeviceInput then return end
+			local btn = event.DeviceInput.button
+
+			-- 1. TRACK GLOBAL TAB STATE
+			local activeTab = HV.ActiveTab or ""
+			
+			-- 2. CHART PREVIEW TRIGGER (Space key)
+			if btn == "DeviceButton_space" and activeTab == "" then
+				if event.type ~= "InputEventType_FirstPress" then return end
+				if previewActive then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				else
+					previewActive = true
+					MESSAGEMAN:Broadcast("ChartPreviewOn")
+				end
+				return true
+			end
+			
+			-- 3. HANDLE CHART PREVIEW INPUT
+			if previewActive then
+				-- SINK ALL INPUT while preview is active
+				-- We let the ScreenChartPreview's own input callback handle its things,
+				-- but we return true here to stop propagation to the engine.
+				if event.type ~= "InputEventType_FirstPress" then return true end
+				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				end
+				return true
+			end
+
+			-- 4. MASTER TAB SINK
+			if activeTab ~= "" then
+				-- Global "Close on Esc"
+				if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
+					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+				end
+				return true
+			end
+		end)
+	end
+}
+
 -- LoginButtonUI was moved to decorations/default.lua to nest visually within the profile card.
 
 -- Rate adjustment via CodeMessage (EffectUp/EffectDown mapped in metrics.ini)
@@ -1100,6 +1154,12 @@ main_af[#main_af + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .
 -- Load Isolated Input Debugger (Always on top with draworder 9999)
 main_af[#main_af + 1] = LoadActor("input_debugger.lua")
 
+-- Sync previewActive state from outside
+main_af[#main_af + 1] = Def.Actor {
+	ChartPreviewOnMessageCommand = function(self) previewActive = true end,
+	ChartPreviewOffMessageCommand = function(self) previewActive = false end,
+}
+
 -- Load Decoration Overlays (Initially hidden, using standard Toggle[NAME]Overlay messages)
 local decorOverlays = {"search", "scores", "filters", "playlists", "tags", "goals"}
 for _, name in ipairs(decorOverlays) do
@@ -1108,59 +1168,6 @@ end
 
 main_af[#main_af + 1] = LoadActor("../_cursor")
 
-
--- ============================================================
--- MASTER INPUT SINK & TAB MANAGEMENT
--- ============================================================
--- Relocated to the bottom of the update chain to ensure 
--- decoration specific input callbacks are executed first.
-main_af[#main_af + 1] = Def.ActorFrame {
-	Name = "MasterInputSink",
-	BeginCommand = function(self)
-		local screen = SCREENMAN:GetTopScreen()
-		if not screen then return end
-		
-		screen:AddInputCallback(function(event)
-			if not event or not event.DeviceInput then return end
-			local btn = event.DeviceInput.button
-
-			-- 1. TRACK GLOBAL TAB STATE
-			local activeTab = HV.ActiveTab or ""
-			
-			-- 2. CHART PREVIEW TRIGGER (Space key)
-			if btn == "DeviceButton_space" and activeTab == "" then
-				if event.type ~= "InputEventType_FirstPress" then return end
-				if previewActive then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-				else
-					previewActive = true
-					MESSAGEMAN:Broadcast("ChartPreviewOn")
-				end
-				return true
-			end
-			
-			-- 3. HANDLE CHART PREVIEW INPUT
-			if previewActive then
-				if event.type ~= "InputEventType_FirstPress" then return true end
-				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-				end
-				return true
-			end
-
-			-- 4. MASTER TAB SINK
-			if activeTab ~= "" then
-				-- Global "Close on Esc"
-				if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
-					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-				end
-				return true
-			end
-		end)
-	end
-}
 
 return main_af
 

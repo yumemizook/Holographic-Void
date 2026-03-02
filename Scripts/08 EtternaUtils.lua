@@ -86,9 +86,9 @@ HV.CustomGrades = {
 	Grade_Tier14 = "普",
 	Grade_Tier15 = "欠",
 	Grade_Tier16 = "堕",
-	Grade_Tier17 = "Grade_Tier17",
+	Grade_Tier17 = "Grade_Tier17.",
 	Grade_Failed = "堕",
-	Grade_None = "無"
+	Grade_None   = "無"
 }
 
 function HV.GetGradeName(grade)
@@ -774,6 +774,5 @@ function SecondsToMSS(s)
 end
 
 -- Initialize custom grades
--- (Hardcoded in HV.CustomGrades table)
 
 Trace("Holographic Void: 08 EtternaUtils.lua loaded (expanded).")

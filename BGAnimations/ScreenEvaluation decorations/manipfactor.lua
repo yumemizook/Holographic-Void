@@ -9,17 +9,9 @@ end
 
 local aspectRatio = GetScreenAspectRatio()
 
-local mfDisplayX
-local mfDisplayY
-local mfDisplayZoom = 0.25
-
-if aspectRatio < 1.6 then
-    mfDisplayX = SCREEN_RIGHT - 30
-    mfDisplayY = SCREEN_CENTER_Y + 66
-else
-    mfDisplayX = SCREEN_LEFT + 42
-    mfDisplayY = 350
-end
+local mfDisplayX = 22
+local mfDisplayY = 360
+local mfDisplayZoom = 0.28
 
 local td = {} -- chart timing data
 local dvt = {} -- offset vector
@@ -106,17 +98,14 @@ local function Percentile(sortedArray, p)
     end
 end
 
--- mf value to hsv color
+-- mf value to theme-appropriate color
 local function byMF(x)
     if x > 0.4 then
         x = 0.4
     end
-    -- Calculate the hue from 0 (green) to 0.4 (red)
-    local hue = 120 - (x * 300) -- 120 to 0 degrees
-    local saturation = 0.9 -- Full saturation
-    local brightness = 0.9 -- Full brightness
-
-    return HSV(hue, saturation, brightness)
+    local p = x / 0.4
+    -- Lerp between W3 (Muted Green) and Miss (Muted Red)
+    return HV.LerpColor(p, HVColor.Judgment.W3, HVColor.Judgment.Miss)
 end
 
 -- Generate key data
@@ -325,49 +314,35 @@ end
 
 -- Manip factor display
 t[#t + 1] = Def.ActorFrame {
-    -- First Text Element (Either "MF" or "MF:")
-    UIElements.TextToolTip(1, 1, "Common Large") .. {
+    -- First Text Element (MF label)
+    LoadFont("Common Normal") .. {
         Name = "MFText",
         InitCommand = function(self)
             self:xy(mfDisplayX, mfDisplayY)
             self:zoom(mfDisplayZoom)
-            if aspectRatio < 1.6 then
-                -- In aspect ratio less than 1.6, "number% MF"
-                self:addx(3)
-                self:halign(0)
-                self:settext("MF")
-            else
-                -- In aspect ratio greater or equal to 1.6, "MF: number%"
-                self:halign(1)
-                self:settext("MF:")
-            end
+            self:halign(0)
+            self:settext("Manipulation Factor:")
+            self:diffuse(HVColor.TextSub)
         end,
         MouseOverCommand = function(self)
             local mfd = self:GetParent():GetChild("ManipFactor")
             if aspectRatio < 1.6 then
-                mfd:GetParent():GetChild("ManipFactor"):settextf("(L: %2.1f%% R: %2.1f%%) %2.1f%%", mf[2] * 100, mf[3] * 100, mf[1] * 100)
+                mfd:settextf("(L: %2.1f%% R: %2.1f%%) %2.1f%%", mf[2] * 100, mf[3] * 100, mf[1] * 100)
             else
-                mfd:GetParent():GetChild("ManipFactor"):settextf("%2.1f%% (L: %2.1f%% R: %2.1f%%)", mf[1] * 100, mf[2] * 100, mf[3] * 100)
+                mfd:settextf("%2.1f%% (L: %2.1f%% R: %2.1f%%)", mf[1] * 100, mf[2] * 100, mf[3] * 100)
             end
         end,
         MouseOutCommand = function(self)
             self:GetParent():GetChild("ManipFactor"):settextf("%2.1f%%", mf[1] * 100)
         end
     },
-    -- Second Text Element (ManipFactor Value)
-    UIElements.TextToolTip(1, 1, "Common Large") .. {
+    -- Second Text Element (Value)
+    LoadFont("Common Normal") .. {
         Name = "ManipFactor",
         InitCommand = function(self)
-            self:xy(mfDisplayX, mfDisplayY)
+            self:xy(mfDisplayX + 115, mfDisplayY)
             self:zoom(mfDisplayZoom)
-            if aspectRatio < 1.6 then
-                -- Display "number% MF", move text more to the right
-                self:halign(1)
-            else
-                -- Display "MF: number%"
-                self:addx(3)
-                self:halign(0)
-            end
+            self:halign(0)
             self:maxwidth(480)
             self:queuecommand("Set")
         end,

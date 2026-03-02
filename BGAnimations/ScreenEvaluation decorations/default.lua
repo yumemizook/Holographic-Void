@@ -837,5 +837,6 @@ for i = 1, scoresPerPage do
 end
 
 t[#t + 1] = scoreRowsFrame
+t[#t + 1] = LoadActor("manipfactor")
 
 return t
