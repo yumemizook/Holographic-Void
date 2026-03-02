@@ -95,6 +95,28 @@ local HVPrefs = {
 	-- Auth: Saved EtternaOnline username and login token
 	HV_Username = { Default = "" },
 	HV_PasswordToken = { Default = "" },
+
+	-- Custom Grades
+	HV_UseCustomGrades = {
+		Default = "false",
+		Choices = {"Off", "On"},
+		Values = {"false", "true"}
+	},
+	
+	-- Grade Color Style
+	HV_GradeColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic"},
+		Values = {"Holographic", "Classic"}
+	},
+
+	-- Visual: Background Effect Style
+	HV_BackgroundEffect = {
+		Default = "Grid",
+		Choices = {"Grid", "Hex", "Scanlines", "Flow", "Rotating 4D Cube", "None"},
+		Values = {"Grid", "Hex", "Scanlines", "Flow", "4DCube", "None"}
+	},
+
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.

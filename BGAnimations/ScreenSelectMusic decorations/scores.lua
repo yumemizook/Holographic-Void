@@ -22,10 +22,53 @@ local VIEW_LOCAL = 1
 local VIEW_ONLINE = 2
 local currentView = VIEW_LOCAL
 
+-- Sort modes
+local SORT_SSR = 1
+local SORT_WIFE = 2
+local currentSort = SORT_SSR
+
 -- Data
 local localScores = {}
 local onlineScores = {}
+local displayedScores = {}
 local onlineLoading = false
+local filterCurrentRate = true
+
+-- ============================================================
+-- DATA HELPERS
+-- ============================================================
+
+local function GetSSR(s)
+	if not s then return 0 end
+	if s.GetSkillsetSSR then return s:GetSkillsetSSR("Overall") end
+	if s.GetSkillsetSum then return s:GetSkillsetSum() end
+	if s.GetSkillSetSum then return s:GetSkillSetSum() end
+	return 0
+end
+
+local function SortScores(scoreTable)
+	if not scoreTable or #scoreTable == 0 then return end
+	
+	table.sort(scoreTable, function(a, b)
+		-- Handle different score structures (local vs online)
+		local sA = a.score or a
+		local sB = b.score or b
+		
+		if currentSort == SORT_SSR then
+			local ssrA = GetSSR(sA)
+			local ssrB = GetSSR(sB)
+			if math.abs(ssrA - ssrB) > 0.0001 then return ssrA > ssrB end
+			return sA:GetWifeScore() > sB:GetWifeScore()
+		else
+			-- Wife% sort
+			local wA = sA:GetWifeScore()
+			local wB = sB:GetWifeScore()
+			if math.abs(wA - wB) > 0.000001 then return wA > wB end
+			-- Fallback to SSR
+			return GetSSR(sA) > GetSSR(sB)
+		end
+	end)
+end
 
 -- ============================================================
 -- DATA FETCHING
@@ -37,22 +80,26 @@ local function GetLocalScores()
 	if not steps then return end
 	local ck = steps:GetChartKey()
 	if not ck then return end
-
 	local sl = SCOREMAN:GetScoresByKey(ck)
 	if not sl then return end
 
+	local currentRate = getCurRateValue()
+
 	for rateName, scoreList in pairs(sl) do
-		local scores = scoreList:GetScores()
-		if scores then
-			for _, s in ipairs(scores) do
-				localScores[#localScores + 1] = {score = s, rate = rateName}
+		local rNum = tonumber((rateName:gsub("x", ""))) or 0
+		-- Apply rate filter if enabled (tolerate small floating point differences)
+		if not filterCurrentRate or math.abs(rNum - currentRate) < 0.001 then
+			local scores = scoreList:GetScores()
+			if scores then
+				for _, s in ipairs(scores) do
+					localScores[#localScores + 1] = {score = s, rate = rateName}
+				end
 			end
 		end
 	end
 
-	table.sort(localScores, function(a, b)
-		return a.score:GetWifeScore() > b.score:GetWifeScore()
-	end)
+	-- Sort using helper
+	SortScores(localScores)
 end
 
 local function FetchOnlineScores()
@@ -91,6 +138,8 @@ local function FetchOnlineScores()
 		function(leaderboard)
 			if leaderboard then
 				onlineScores = leaderboard
+				-- Sort using helper
+				SortScores(onlineScores)
 			else
 				onlineScores = {}
 			end
@@ -131,6 +180,13 @@ local t = Def.ActorFrame {
 			if HV.ActiveTab == "SCORES" then HV.ActiveTab = "" end
 		end
 	end,
+	TabNavigationMessageCommand = function(self, params)
+		if self:GetVisible() and params and params.dir then
+			local totalPages = math.max(1, math.ceil(#displayedScores / pageSize))
+			currentPage = math.max(1, math.min(totalPages, currentPage + params.dir))
+			self:playcommand("RefreshScores")
+		end
+	end,
 	CurrentStepsChangedMessageCommand = function(self)
 		if self:GetVisible() then
 			currentPage = 1
@@ -165,36 +221,67 @@ local t = Def.ActorFrame {
 		end
 	},
 
-	-- View toggle buttons
+	-- View toggle button (Merged LOCAL/ONLINE)
 	Def.ActorFrame {
-		InitCommand = function(self) self:xy(overlayW/2 - 90, -overlayH/2 + 18) end,
+		InitCommand = function(self) self:xy(overlayW/2 - 55, -overlayH/2 + 18) end,
 		Def.Quad {
-			Name = "LocalBtnBg",
-			InitCommand = function(self) self:zoomto(60, 18):diffuse(accentColor):diffusealpha(0.4) end,
+			Name = "ToggleViewBg",
+			InitCommand = function(self) self:zoomto(100, 18):diffuse(accentColor):diffusealpha(0.4) end,
 			RefreshScoresCommand = function(self)
-				self:diffusealpha(currentView == VIEW_LOCAL and 0.5 or 0.15)
+				if not DLMAN:IsLoggedIn() and currentView == VIEW_LOCAL then
+					self:diffuse(color("#444444"))
+				else
+					self:diffuse(accentColor)
+				end
 			end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("LOCAL") end,
+			Name = "ToggleViewText",
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
 			RefreshScoresCommand = function(self)
-				self:diffusealpha(currentView == VIEW_LOCAL and 1 or 0.5)
+				local viewName = currentView == VIEW_LOCAL and "LOCAL" or "ONLINE"
+				self:settext("VIEW: " .. viewName)
+				if currentView == VIEW_ONLINE and not DLMAN:IsLoggedIn() then
+					self:diffuse(dimText)
+				else
+					self:diffuse(brightText)
+				end
 			end,
 		},
 	},
+
+	-- Rate filter toggle button
 	Def.ActorFrame {
-		InitCommand = function(self) self:xy(overlayW/2 - 25, -overlayH/2 + 18) end,
+		InitCommand = function(self) self:xy(overlayW/2 - 145, -overlayH/2 + 18) end,
 		Def.Quad {
-			Name = "OnlineBtnBg",
-			InitCommand = function(self) self:zoomto(60, 18):diffuse(accentColor):diffusealpha(0.15) end,
+			Name = "RateBtnBg",
+			InitCommand = function(self) self:zoomto(65, 18):diffuse(accentColor):diffusealpha(0.15) end,
 			RefreshScoresCommand = function(self)
-				self:diffusealpha(currentView == VIEW_ONLINE and 0.5 or 0.15)
+				self:diffusealpha(filterCurrentRate and 0.5 or 0.15)
 			end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("ONLINE") end,
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
 			RefreshScoresCommand = function(self)
-				self:diffusealpha(currentView == VIEW_ONLINE and 1 or 0.5)
+				self:settext(filterCurrentRate and "CUR. RATE" or "ALL RATES")
+				self:diffusealpha(filterCurrentRate and 1 or 0.5)
+			end,
+		},
+	},
+
+	-- Sort toggle button
+	Def.ActorFrame {
+		InitCommand = function(self) self:xy(overlayW/2 - 215, -overlayH/2 + 18) end,
+		Def.Quad {
+			Name = "SortBtnBg",
+			InitCommand = function(self) self:zoomto(65, 18):diffuse(accentColor):diffusealpha(0.15) end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
+			RefreshScoresCommand = function(self)
+				self:settext(currentSort == SORT_SSR and "SORT: SSR" or "SORT: WIFE%")
+				local bg = self:GetParent():GetChild("SortBtnBg")
+				if bg then bg:diffusealpha(0.5) end
 			end,
 		},
 	},
@@ -213,9 +300,10 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):zoom(0.32):diffuse(dimText):settext("#") end },
 		LoadFont("Common Normal") .. { Name = "HdrName", InitCommand = function(self) self:halign(0):x(30):zoom(0.32):diffuse(dimText):settext("PLAYER") end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(190):zoom(0.32):diffuse(dimText):settext("WIFE%") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(300):zoom(0.32):diffuse(dimText):settext("GRADE") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(380):zoom(0.32):diffuse(dimText):settext("RATE") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(450):zoom(0.32):diffuse(dimText):settext("CLEAR") end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(280):zoom(0.32):diffuse(dimText):settext("SSR") end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(345):zoom(0.32):diffuse(dimText):settext("GRADE") end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(415):zoom(0.32):diffuse(dimText):settext("RATE") end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(485):zoom(0.32):diffuse(dimText):settext("CLEAR") end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(1):x(overlayW - 50):zoom(0.32):diffuse(dimText):settext("DATE") end },
 	},
 	Def.Quad {
@@ -257,15 +345,17 @@ for i = 1, pageSize do
 		Def.Quad { Name = "Bg", InitCommand = function(self) self:halign(0):valign(0):zoomto(overlayW - 50, rowH - 4):diffuse(color("0,0,0,0.2")) end },
 		LoadFont("Common Normal") .. { Name = "Rank", InitCommand = function(self) self:halign(0):valign(0.5):y(rowH/2):zoom(0.35):diffuse(dimText) end },
 		LoadFont("Common Normal") .. { Name = "Player", InitCommand = function(self) self:halign(0):valign(0.5):x(30):y(rowH/2):zoom(0.42):diffuse(mainText):maxwidth(150 / 0.42) end },
-		LoadFont("Common Normal") .. { Name = "Wife", InitCommand = function(self) self:halign(0):valign(0.5):x(190):y(rowH/2):zoom(0.45):diffuse(brightText) end },
-		LoadFont("Common Normal") .. { Name = "Grade", InitCommand = function(self) self:halign(0):valign(0.5):x(300):y(rowH/2):zoom(0.38) end },
-		LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:halign(0):valign(0.5):x(380):y(rowH/2):zoom(0.38):diffuse(mainText) end },
-		LoadFont("Common Normal") .. { Name = "Clear", InitCommand = function(self) self:halign(0):valign(0.5):x(450):y(rowH/2):zoom(0.35) end },
+		LoadFont("Common Normal") .. { Name = "Wife", InitCommand = function(self) self:halign(0):valign(0.5):x(190):y(rowH/2 - 5):zoom(0.40):diffuse(brightText) end },
+		LoadFont("Common Normal") .. { Name = "Judgments", InitCommand = function(self) self:halign(0):valign(0.5):x(190):y(rowH/2 + 8):zoom(0.22):diffuse(subText) end },
+		LoadFont("Common Normal") .. { Name = "SSR", InitCommand = function(self) self:halign(0):valign(0.5):x(280):y(rowH/2):zoom(0.40):diffuse(brightText) end },
+		LoadFont("Common Normal") .. { Name = "Grade", InitCommand = function(self) self:halign(0):valign(0.5):x(345):y(rowH/2):zoom(0.38) end },
+		LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:halign(0):valign(0.5):x(415):y(rowH/2):zoom(0.38):diffuse(mainText) end },
+		LoadFont("Common Normal") .. { Name = "Clear", InitCommand = function(self) self:halign(0):valign(0.5):x(485):y(rowH/2):zoom(0.35) end },
 		LoadFont("Common Normal") .. { Name = "Date", InitCommand = function(self) self:halign(1):valign(0.5):x(overlayW - 50):y(rowH/2):zoom(0.32):diffuse(subText) end },
 
 		RefreshScoresCommand = function(self)
 			local idx = (currentPage - 1) * pageSize + i
-			local scores = currentView == VIEW_LOCAL and localScores or onlineScores
+			local scores = displayedScores
 
 			if idx <= #scores then
 				self:visible(true)
@@ -276,16 +366,32 @@ for i = 1, pageSize do
 					local s = entry.score
 
 					self:GetChild("Player"):settext("You")
+					
+					-- Judgments
+					local w1 = s:GetTapNoteScore("TapNoteScore_W1")
+					local w2 = s:GetTapNoteScore("TapNoteScore_W2")
+					local w3 = s:GetTapNoteScore("TapNoteScore_W3")
+					local w4 = s:GetTapNoteScore("TapNoteScore_W4")
+					local w5 = s:GetTapNoteScore("TapNoteScore_W5")
+					local miss = s:GetTapNoteScore("TapNoteScore_Miss")
+					self:GetChild("Judgments"):settextf("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
 
 					local wife = s:GetWifeScore() * 100
-					if wife >= 99 then
+					if wife >= 99.7 then
 						self:GetChild("Wife"):settextf("%.4f%%", wife)
 					else
 						self:GetChild("Wife"):settextf("%.2f%%", wife)
 					end
 
+					local ssr = 0
+					if s.GetSkillsetSSR then ssr = s:GetSkillsetSSR("Overall")
+					elseif s.GetSkillsetSum then ssr = s:GetSkillsetSum()
+					elseif s.GetSkillSetSum then ssr = s:GetSkillSetSum() end
+					
+					self:GetChild("SSR"):settextf("%.2f", ssr):diffuse(HVColor.GetMSDRatingColor(ssr))
+
 					local gradeStr = ToEnumShortString(s:GetWifeGrade())
-					self:GetChild("Grade"):settext(THEME:GetString("Grade", gradeStr)):diffuse(HVColor.GetGradeColor(gradeStr))
+					self:GetChild("Grade"):settext(HV.GetGradeName(gradeStr)):diffuse(HVColor.GetGradeColor(gradeStr))
 					self:GetChild("Rate"):settextf("%.2fx", s:GetMusicRate())
 
 					local ct = getDetailedClearType(s)
@@ -294,20 +400,35 @@ for i = 1, pageSize do
 				else
 					-- Online leaderboard score
 					local s = scores[idx]
-					-- Online scores are HighScore objects too
 					pcall(function()
 						local username = s:GetDisplayName() or s:GetName() or "???"
 						self:GetChild("Player"):settext(username)
 
+						-- Online judgments if available
+						local w1 = s:GetTapNoteScore("TapNoteScore_W1") or 0
+						local w2 = s:GetTapNoteScore("TapNoteScore_W2") or 0
+						local w3 = s:GetTapNoteScore("TapNoteScore_W3") or 0
+						local w4 = s:GetTapNoteScore("TapNoteScore_W4") or 0
+						local w5 = s:GetTapNoteScore("TapNoteScore_W5") or 0
+						local miss = s:GetTapNoteScore("TapNoteScore_Miss") or 0
+						self:GetChild("Judgments"):settextf("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
+
 						local wife = s:GetWifeScore() * 100
-						if wife >= 99 then
+						if wife >= 99.7 then
 							self:GetChild("Wife"):settextf("%.4f%%", wife)
 						else
 							self:GetChild("Wife"):settextf("%.2f%%", wife)
 						end
 
+						local ssr = 0
+						if s.GetSkillsetSSR then ssr = s:GetSkillsetSSR("Overall")
+						elseif s.GetSkillsetSum then ssr = s:GetSkillsetSum()
+						elseif s.GetSkillSetSum then ssr = s:GetSkillSetSum() end
+						
+						self:GetChild("SSR"):settextf("%.2f", ssr):diffuse(HVColor.GetMSDRatingColor(ssr))
+
 						local gradeStr = ToEnumShortString(s:GetWifeGrade())
-						self:GetChild("Grade"):settext(THEME:GetString("Grade", gradeStr)):diffuse(HVColor.GetGradeColor(gradeStr))
+						self:GetChild("Grade"):settext(HV.GetGradeName(gradeStr)):diffuse(HVColor.GetGradeColor(gradeStr))
 						self:GetChild("Rate"):settextf("%.2fx", s:GetMusicRate())
 
 						local ct = getDetailedClearType(s)
@@ -322,21 +443,38 @@ for i = 1, pageSize do
 	}
 end
 
+local function UpdateDisplayedScores()
+	displayedScores = {}
+	local source = currentView == VIEW_LOCAL and localScores or onlineScores
+	
+	if currentView == VIEW_LOCAL then
+		displayedScores = source -- localScores is already filtered in GetLocalScores
+	else
+		-- Online scores need manual filtering if CUR. RATE is active
+		local currentRate = getCurRateValue()
+		for _, s in ipairs(source) do
+			local rNum = s:GetMusicRate()
+			if not filterCurrentRate or math.abs(rNum - currentRate) < 0.001 then
+				displayedScores[#displayedScores + 1] = s
+			end
+		end
+	end
+
+	-- Always sort the final displayed list if we just switched sort mode
+	SortScores(displayedScores)
+end
+
 -- RefreshScores on main frame
 t.RefreshScoresCommand = function(self)
-	local scores = currentView == VIEW_LOCAL and localScores or onlineScores
+	UpdateDisplayedScores()
+	
+	local scores = displayedScores
 	local totalPages = math.max(1, math.ceil(#scores / pageSize))
 	currentPage = math.min(currentPage, totalPages)
 
 	local pageInfo = self:GetChild("PageInfo")
 	if pageInfo then
 		pageInfo:settextf("Page %d / %d (%d scores)", currentPage, totalPages, #scores)
-	end
-
-	-- Update column header for player name
-	local hdrFrame = nil
-	for ci = 1, self:GetNumChildren() do
-		-- Headers get updated via the name check in each row
 	end
 
 	for ri = 1, pageSize do
@@ -353,19 +491,15 @@ t[#t + 1] = Def.ActorFrame {
 		screen:AddInputCallback(function(event)
 			if not scoresActor or not scoresActor:GetVisible() then return false end
 			if not event or not event.DeviceInput then return false end
-			if event.type ~= "InputEventType_FirstPress" then return false end
+			
 			local btn = event.DeviceInput.button
+			local isPress = event.type == "InputEventType_FirstPress" or event.type == "InputEventType_Repeat"
 
-			-- Pagination
-			local dir = 0
-			if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_right" or btn == "DeviceButton_down" then dir = 1 end
-			if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_left" or btn == "DeviceButton_up" then dir = -1 end
-			if dir ~= 0 then
-				local scores = currentView == VIEW_LOCAL and localScores or onlineScores
-				local totalPages = math.max(1, math.ceil(#scores / pageSize))
-				currentPage = math.max(1, math.min(totalPages, currentPage + dir))
-				scoresActor:playcommand("RefreshScores")
-				return true
+			if event.type ~= "InputEventType_FirstPress" then 
+				if btn == "DeviceButton_left mouse button" or btn == "Back" or btn == "DeviceButton_escape" then
+					return true
+				end
+				return false 
 			end
 
 			-- Click handling
@@ -378,25 +512,41 @@ t[#t + 1] = Def.ActorFrame {
 					return true
 				end
 
-				-- Local button
-				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 90, SCREEN_CENTER_Y - overlayH/2 + 18, 60, 18) then
-					if currentView ~= VIEW_LOCAL then
+				-- Toggle View button (Local/Online)
+				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 55, SCREEN_CENTER_Y - overlayH/2 + 18, 100, 18) then
+					if currentView == VIEW_LOCAL then
+						currentView = VIEW_ONLINE
+						FetchOnlineScores()
+					else
 						currentView = VIEW_LOCAL
-						currentPage = 1
 						GetLocalScores()
-						scoresActor:playcommand("RefreshScores")
 					end
+					currentPage = 1
+					scoresActor:playcommand("RefreshScores")
 					return true
 				end
 
-				-- Online button
-				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 25, SCREEN_CENTER_Y - overlayH/2 + 18, 60, 18) then
-					if currentView ~= VIEW_ONLINE then
-						currentView = VIEW_ONLINE
-						currentPage = 1
-						FetchOnlineScores()
-						scoresActor:playcommand("RefreshScores")
+				-- Rate button
+				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 145, SCREEN_CENTER_Y - overlayH/2 + 18, 65, 18) then
+					filterCurrentRate = not filterCurrentRate
+					currentPage = 1
+					if currentView == VIEW_LOCAL then
+						GetLocalScores()
 					end
+					-- No need to re-fetch online, UpdateDisplayedScores will filter cached onlineScores
+					scoresActor:playcommand("RefreshScores")
+					return true
+				end
+
+				-- Sort button
+				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 215, SCREEN_CENTER_Y - overlayH/2 + 18, 65, 18) then
+					currentSort = (currentSort == SORT_SSR) and SORT_WIFE or SORT_SSR
+					currentPage = 1
+					-- Re-sort the source tables to be safe
+					SortScores(localScores)
+					SortScores(onlineScores)
+					-- UpdateDisplayedScores will handle the final subset and re-sort displayedScores
+					scoresActor:playcommand("RefreshScores")
 					return true
 				end
 			end

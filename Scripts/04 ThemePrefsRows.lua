@@ -103,6 +103,27 @@ local HVPrefRows = {
 		Choices = {"Blue", "Pink", "Mint", "Orange", "Purple", "White"},
 		Values  = {"#5ABAFF", "#FF5ABB", "#5AFFBA", "#FFBA5A", "#BA5AFF", "#D9D9D9"},
 	},
+
+	-- Use Custom Grade Names (from grade.costom.md)
+	HV_UseCustomGrades = {
+		Default = "false",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+
+	-- Grade Color Style
+	HV_GradeColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic"},
+		Values  = {"Holographic", "Classic"},
+	},
+	
+	-- Background Effect Style
+	HV_BackgroundEffect = {
+		Default = "Grid",
+		Choices = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"},
+		Values  = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -145,7 +166,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_Particles,HV_EnableGlow"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
 	return l
 end
 

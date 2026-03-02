@@ -39,7 +39,10 @@ function getCurRate()
 end
 
 function getCurRateString()
-	return string.format("%.2f", getCurRateValue()):gsub("%.?0+$", "") .. "x"
+	local r = string.format("%.2f", getCurRateValue()):gsub("%.?0+$", "") .. "x"
+	if r == "1x" then r = "1.0x" end
+	if r == "2x" then r = "2.0x" end
+	return r
 end
 
 function getCurRateDisplayString()
@@ -64,8 +67,62 @@ function changeMusicRate(amount)
 end
 
 ------------------------------------------------------------
--- GRADE CALCULATION
+-- GRADE CALCULATION & CUSTOM NAMES
 ------------------------------------------------------------
+HV.CustomGrades = {
+	Grade_Tier01 = "神",
+	Grade_Tier02 = "秀上",
+	Grade_Tier03 = "秀中",
+	Grade_Tier04 = "秀下",
+	Grade_Tier05 = "優上",
+	Grade_Tier06 = "優中",
+	Grade_Tier07 = "優下",
+	Grade_Tier08 = "良上",
+	Grade_Tier09 = "良中",
+	Grade_Tier10 = "良下",
+	Grade_Tier11 = "佳上",
+	Grade_Tier12 = "佳中",
+	Grade_Tier13 = "佳下",
+	Grade_Tier14 = "普",
+	Grade_Tier15 = "欠",
+	Grade_Tier16 = "堕",
+	Grade_Tier17 = "Grade_Tier17",
+	Grade_Failed = "堕",
+	Grade_None = "無"
+}
+
+function HV.GetGradeName(grade)
+	if not grade then return "" end
+	local s = tostring(grade):gsub("Grade_", "")
+	
+	-- Normalize TierXX to match en.ini (Tier01, Tier02, etc.)
+	if s:lower():find("tier") then
+		local tier = tonumber(s:match("%d+"))
+		if tier then s = string.format("Tier%02d", tier) end
+	end
+
+	local key = "Grade_" .. s
+	local pref = ThemePrefs.Get("HV_UseCustomGrades")
+	if (pref == "true" or pref == true) and HV.CustomGrades[key] then
+		return HV.CustomGrades[key]
+	end
+	
+	-- Safe fallback for THEME:GetString
+	if THEME:HasString("Grade", s) then
+		return THEME:GetString("Grade", s)
+	end
+	
+	-- Manual fallback mapping if THEME:HasString is somehow unreliable or missing
+	local fallbacks = {
+		Tier01 = "AAAAA", Tier02 = "AAAA:", Tier03 = "AAAA.", Tier04 = "AAAA",
+		Tier05 = "AAA:", Tier06 = "AAA.", Tier07 = "AAA", Tier08 = "AA:",
+		Tier09 = "AA.", Tier10 = "AA", Tier11 = "A:", Tier12 = "A.",
+		Tier13 = "A", Tier14 = "B", Tier15 = "C", Tier16 = "D",
+		Failed = "Failed", None = "None"
+	}
+	return fallbacks[s] or s
+end
+
 WifeTiers = {
 	Grade_Tier01 = 0.999935, Grade_Tier02 = 0.9998, Grade_Tier03 = 0.9997,
 	Grade_Tier04 = 0.99955,  Grade_Tier05 = 0.999,  Grade_Tier06 = 0.998,
@@ -715,5 +772,8 @@ function SecondsToMSS(s)
 	if not s or s < 0 then return "0:00" end
 	return string.format("%d:%02d", math.floor(s / 60), math.floor(s % 60))
 end
+
+-- Initialize custom grades
+-- (Hardcoded in HV.CustomGrades table)
 
 Trace("Holographic Void: 08 EtternaUtils.lua loaded (expanded).")

@@ -57,7 +57,6 @@ end
 -- Activate search mode
 local function ActivateSearch()
 	searchActive = true
-	SCREENMAN:set_input_redirected(PLAYER_1, true)
 	local screen = SCREENMAN:GetTopScreen()
 	if screen and screen.GetMusicWheel then
 		whee = screen:GetMusicWheel()
@@ -68,9 +67,6 @@ end
 -- Deactivate search mode
 local function DeactivateSearch(clearFilter)
 	searchActive = false
-	SCREENMAN:set_input_redirected(PLAYER_1, false)
-	HV.ActiveTab = ""
-
 	if clearFilter then
 		searchString = ""
 		-- Clear search via C++ API
@@ -177,7 +173,7 @@ local t = Def.ActorFrame {
 
 	CloseFromInputGeneralCommand = function(self)
 		DeactivateSearch(false)
-		self:visible(false)
+		MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 	end,
 	CloseFromInputCommand = function(self)
 		self:sleep(0.02):queuecommand("CloseFromInputGeneral")
@@ -204,7 +200,6 @@ local t = Def.ActorFrame {
 		else
 			if searchActive then DeactivateSearch(false) end
 			self:visible(false)
-			if HV.ActiveTab == "SEARCH" then HV.ActiveTab = "" end
 		end
 	end,
 

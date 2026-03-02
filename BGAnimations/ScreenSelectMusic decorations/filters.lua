@@ -31,7 +31,6 @@ local function FilterInput(event)
 	if event.button == "Start" or event.button == "Back" then
 		ActiveSS = 0
 		MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		return true
 	end
 
@@ -132,13 +131,11 @@ local t = Def.ActorFrame {
 			else
 				HV.ActiveTab = ""
 				ActiveSS = 0
-				SCREENMAN:set_input_redirected(PLAYER_1, false)
 			end
 		else
 			self:visible(false)
 			if HV.ActiveTab == "FILTERS" then HV.ActiveTab = "" end
 			ActiveSS = 0
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
 		end
 	end,
 
@@ -397,7 +394,6 @@ t[#t + 1] = Def.ActorFrame {
 			if isRightClick and ActiveSS > 0 then
 				ActiveSS = 0
 				MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-				SCREENMAN:set_input_redirected(PLAYER_1, false)
 				return true
 			end
 
@@ -411,7 +407,6 @@ t[#t + 1] = Def.ActorFrame {
 						activebound = 0
 						SSQuery[1][fi] = "0"
 						MESSAGEMAN:Broadcast("HV_NumericInputActive")
-						SCREENMAN:set_input_redirected(PLAYER_1, true)
 						filtersActor:playcommand("RefreshUI")
 						return true
 					end
@@ -421,7 +416,6 @@ t[#t + 1] = Def.ActorFrame {
 						activebound = 1
 						SSQuery[2][fi] = "0"
 						MESSAGEMAN:Broadcast("HV_NumericInputActive")
-						SCREENMAN:set_input_redirected(PLAYER_1, true)
 						filtersActor:playcommand("RefreshUI")
 						return true
 					end
@@ -438,7 +432,6 @@ t[#t + 1] = Def.ActorFrame {
 						SSQuery[2][idx] = "0"
 					end
 					ActiveSS = 0
-					SCREENMAN:set_input_redirected(PLAYER_1, false)
 					MESSAGEMAN:Broadcast("HV_FilterUpdated")
 					MESSAGEMAN:Broadcast("HV_NumericInputEnded")
 					if whee then whee:SongSearch("") end

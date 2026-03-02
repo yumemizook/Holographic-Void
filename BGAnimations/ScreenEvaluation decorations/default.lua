@@ -259,13 +259,13 @@ local function scoreBoard(pn)
 			InitCommand = function(self) self:halign(0):valign(0):zoom(0.8) end,
 			OnCommand = function(self)
 				local grade = pss:GetHighScore():GetWifeGrade()
-				self:settext(THEME:GetString("Grade", ToEnumShortString(grade)))
+				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
 				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
 			end,
 			SetJudgeCommand = function(self)
 				if rescoredPercentage then
 					local g = getWifeGradeTier(rescoredPercentage)
-					self:settext(THEME:GetString("Grade", ToEnumShortString(g)))
+					self:settext(HV.GetGradeName(ToEnumShortString(g)))
 				end
 			end,
 			ResetJudgeCommand = function(self) self:playcommand("On") end
@@ -775,7 +775,7 @@ for i = 1, scoresPerPage do
 			InitCommand = function(self) self:xy(18, 6):zoom(0.26):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local grade = scoreList[params.index]:GetWifeGrade()
-				self:settext(THEME:GetString("Grade", ToEnumShortString(grade)))
+				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
 				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
 			end
 		},

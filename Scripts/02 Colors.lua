@@ -195,38 +195,50 @@ HVColor.Grade = {
 	None  = color("#454545"),    -- Dim Gray
 }
 
+-- Classic Til Death grade colors
+HVColor.GradeClassic = {
+	AAAAA = color("#FFFFFF"),    -- White
+	AAAA  = color("#00FFFF"),    -- Cyan
+	AAA   = color("#FFFF00"),    -- Yellow
+	AA    = color("#00FF00"),    -- Green
+	A     = color("#FF0000"),    -- Red
+	B     = color("#3333FF"),    -- Blue
+	C     = color("#FF00FF"),    -- Purple
+	D     = color("#FF33CC"),    -- Pink
+	F     = color("#888888"),    -- Gray
+	None  = color("#444444"),    -- Dark Gray
+}
+
 --- Get a color for a Grade string or enum.
 function HVColor.GetGradeColor(grade)
-	if not grade then return HVColor.Grade.None end
+	local style = ThemePrefs.Get("HV_GradeColorStyle") or "Holographic"
+	local palette = style == "Classic" and HVColor.GradeClassic or HVColor.Grade
+
+	if not grade then return palette.None end
 	local s = tostring(grade):upper():gsub("GRADE_", "")
 	
 	-- Handle Tier specific matches first (Etterna Tiers)
-	-- Tier 1 = AAAAA
-	-- Tier 2-4 = AAAA variants
-	-- Tier 5-7 = AAA variants
-	-- Tier 8-10 = AA variants
-	-- Tier 11-13 = A variants
-	if s:find("TIER01") then return HVColor.Grade.AAAAA end
-	if s:find("TIER02") or s:find("TIER03") or s:find("TIER04") then return HVColor.Grade.AAAA end
-	if s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return HVColor.Grade.AAA end
-	if s:find("TIER08") or s:find("TIER09") or s:find("TIER10") then return HVColor.Grade.AA end
-	if s:find("TIER11") or s:find("TIER12") or s:find("TIER13") then return HVColor.Grade.A end
-	if s:find("TIER14") then return HVColor.Grade.B end
-	if s:find("TIER15") then return HVColor.Grade.C end
-	if s:find("TIER16") then return HVColor.Grade.D end
-	if s:find("TIER17") or s:find("FAILED") then return HVColor.Grade.F end
+	if s:find("TIER01") then return palette.AAAAA end
+	if s:find("TIER02") or s:find("TIER03") or s:find("TIER04") then return palette.AAAA end
+	if s:find("TIER05") or s:find("TIER06") or s:find("TIER07") then return palette.AAA end
+	if s:find("TIER08") or s:find("TIER09") or s:find("TIER10") then return palette.AA end
+	if s:find("TIER11") or s:find("TIER12") or s:find("TIER13") then return palette.A end
+	if s:find("TIER14") then return palette.B end
+	if s:find("TIER15") then return palette.C end
+	if s:find("TIER16") then return palette.D end
+	if s:find("TIER17") or s:find("FAILED") then return palette.F end
 	
-	-- Fallback text matches (e.g. "AAA:", "AAA.", "AAA")
-	if s:find("AAAAA") then return HVColor.Grade.AAAAA end
-	if s:find("AAAA")  then return HVColor.Grade.AAAA end
-	if s:find("AAA")   then return HVColor.Grade.AAA  end
-	if s:find("AA")    then return HVColor.Grade.AA   end
-	if s:find("A")     then return HVColor.Grade.A    end
-	if s:find("B")     then return HVColor.Grade.B    end
-	if s:find("C")     then return HVColor.Grade.C    end
-	if s:find("D")     then return HVColor.Grade.D    end
+	-- Fallback text matches
+	if s:find("AAAAA") then return palette.AAAAA end
+	if s:find("AAAA")  then return palette.AAAA end
+	if s:find("AAA")   then return palette.AAA  end
+	if s:find("AA")    then return palette.AA   end
+	if s:find("A")     then return palette.A    end
+	if s:find("B")     then return palette.B    end
+	if s:find("C")     then return palette.C    end
+	if s:find("D")     then return palette.D    end
 	
-	return HVColor.Grade.None
+	return palette.None
 end
 
 --- Get a color for an online rank number.

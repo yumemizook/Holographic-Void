@@ -18,6 +18,7 @@ local btnW, btnH = 80, 24
 local overlayW, overlayH = SCREEN_WIDTH * 0.8, SCREEN_HEIGHT * 0.7
 local colW, scorePageSize = overlayW / 3, 10
 local skillsets = {"Overall", "Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
+
 local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.85,0.85,0.85,1")
 local dimText = color("0.45,0.45,0.45,1")
@@ -265,25 +266,51 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				end
 			end
 			
-			-- 2.6 Mouse Wheel
+			-- 2.6 Mouse Wheel & Keyboard Navigation
 			-- BLOCKED if an overlay tab is open
-			if (btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_mousewheel down") then
-				if HV.ActiveTab ~= "" then return true end
-				
-				if evType == "InputEventType_FirstPress" then
-					local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
-					if now - lastWheelMove < wheelLockTime then return true end
-					
-					local mw = screen:GetMusicWheel()
-					if mw then
-						local dir = (btn == "DeviceButton_mousewheel up") and -1 or 1
-						mw:Move(dir)
-						mw:Move(0)
-						lastWheelMove = now
+			local navigationBtns = {
+				["DeviceButton_mousewheel up"] = -1,
+				["DeviceButton_mousewheel down"] = 1,
+				["DeviceButton_left"] = -1,
+				["DeviceButton_right"] = 1,
+				["DeviceButton_up"] = -1,
+				["DeviceButton_down"] = 1,
+			}
+			local gameBtnDirs = {
+				["MenuLeft"] = -1,
+				["MenuRight"] = 1,
+				["MenuUp"] = -1,
+				["MenuDown"] = 1,
+			}
+			local logicalBtn = event.button or ""
+			
+			local dir = navigationBtns[btn] or gameBtnDirs[logicalBtn]
+			
+			if dir then
+				if HV.ActiveTab ~= "" then
+					if evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat" then
+						MESSAGEMAN:Broadcast("TabNavigation", {dir = dir})
 					end
+					return true 
 				end
-				return true
+				
+				if evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat" then
+					if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_mousewheel down" then
+						local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
+						if now - lastWheelMove < wheelLockTime then return true end
+						
+						local mw = screen:GetMusicWheel()
+						if mw then
+							mw:Move(dir)
+							mw:Move(0)
+							lastWheelMove = now
+						end
+						return true
+					end
+					-- Let other nav keys (left/right/up/down) fall through to the engine if no tab is open
+				end
 			end
+
 			
 			-- 3. Key Presses (Global Shortcuts)
 			if evType == "InputEventType_FirstPress" then

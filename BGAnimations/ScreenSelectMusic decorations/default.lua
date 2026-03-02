@@ -954,7 +954,7 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeShort = ToEnumShortString(score:GetWifeGrade())
-				local grade = THEME:GetString("Grade", gradeShort)
+				local grade = HV.GetGradeName(gradeShort)
 				local rate = score:GetMusicRate()
 				local date = score:GetDate()
 				self:settext(string.format("%s · %.2fx · %s", grade, rate, date))
@@ -1038,7 +1038,7 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeStr = ToEnumShortString(score:GetWifeGrade())
-				self:settext(THEME:GetString("Grade", gradeStr))
+				self:settext(HV.GetGradeName(gradeStr))
 				self:diffuse(HVColor.GetGradeColor(gradeStr))
 			else
 				self:settext("")
