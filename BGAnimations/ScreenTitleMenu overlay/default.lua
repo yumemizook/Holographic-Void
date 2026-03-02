@@ -1,6 +1,8 @@
 --- Holographic Void: ScreenTitleMenu Overlay
 -- Rebuilt to focus only on custom cursor and jukebox shortcuts.
 
+local choiceNames = {"Start", "ColorTheme", "PackDownloader", "Options", "Exit"}
+
 local t = Def.ActorFrame {}
 
 -- Cursor stays on top
@@ -22,6 +24,56 @@ t[#t+1] = Def.ActorFrame {
 			end
 			return false
 		end)
+	end
+}
+
+-- Menu Click Handler
+t[#t+1] = UIElements.QuadButton(1) .. {
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 20):zoomto(300, 220):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" then
+			local virtualX = INPUTFILTER:GetMouseX()
+			local virtualY = INPUTFILTER:GetMouseY()
+			local hovered = nil
+			for i = 1, 5 do
+				local static_iy = (SCREEN_CENTER_Y + 20) + 44 * (i - 3)
+				if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
+				   and virtualY >= static_iy-22 and virtualY <= static_iy+22 then
+					hovered = i break
+				end
+			end
+			
+			if hovered then
+				local screen = SCREENMAN:GetTopScreen()
+				if screen then
+					-- Execute the action for the choice
+					local name = choiceNames[hovered]
+					
+					-- 1. Sync scroller visual and engine selection
+					if screen:GetChild("Scroller") then
+						screen:GetChild("Scroller"):SetDestinationItem(hovered - 1)
+					end
+					
+					-- 2. Join player if they clicked Start (parity with Til' Death)
+					if name == "Start" then
+						GAMESTATE:JoinPlayer()
+					end
+					
+					-- 3. Play selection commands to trigger animations/logic
+					screen:playcommand("MadeChoicePlayer_1")
+					screen:playcommand("Choose")
+					
+					-- 4. Apply the game command defined in metrics
+					local command = THEME:GetMetric("ScreenTitleMenu", "Choice" .. name)
+					if command then
+						GAMESTATE:ApplyGameCommand(command)
+						SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
+					end
+				end
+			end
+		end
 	end
 }
 

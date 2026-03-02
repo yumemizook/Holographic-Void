@@ -120,9 +120,16 @@ local t = Def.ActorFrame {
 			if hovered ~= HV.TitleState.mouse.lastHovered then
 				HV.TitleState.mouse.lastHovered = hovered
 				local screen = SCREENMAN:GetTopScreen()
-				if screen then
-					local s = screen:GetChild("Scroller")
-					if s and hovered then s:SetDestinationItem(hovered-1) end
+				if screen and hovered then
+					-- 1. Sync scroller (visual)
+					if screen:GetChild("Scroller") then
+						screen:GetChild("Scroller"):SetDestinationItem(hovered - 1)
+					end
+					-- 2. Sync selection (engine)
+					if screen.SetCurrentChoice then
+						local choiceNames = {"Start", "ColorTheme", "PackDownloader", "Options", "Exit"}
+						screen:SetCurrentChoice(choiceNames[hovered])
+					end
 				end
 			end
 		end)

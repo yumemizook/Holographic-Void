@@ -903,7 +903,6 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "PersonalBestFrame",
 	InitCommand = function(self)
 		self:xy(panelX + 16, pbY)
-		-- Removed self:visible() logic from here; frame must remain visible for PB Score.
 	end,
 
 	Def.Quad {
@@ -921,11 +920,59 @@ t[#t + 1] = Def.ActorFrame {
 			self:settext("PERSONAL BEST")
 		end
 	},
+	
+	LoadFont("Common Normal") .. {
+		Name = "PBDate",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(panelW - 32):y(2):zoom(0.24):diffuse(subText)
+		end,
+		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			if score then
+				self:settext(score:GetDate())
+			else
+				self:settext("")
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+	},
 
 	LoadFont("Common Normal") .. {
+		Name = "PBScoringSystem",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(14):zoom(0.35):diffuse(subText)
+		end,
+		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			if score then
+				self:settext("Wife3")
+			else
+				self:settext("")
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "PBRate",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(panelW - 32):y(14):zoom(0.35):diffuse(mainText)
+		end,
+		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			if score then
+				self:settext(string.format("%.2fx", score:GetMusicRate()))
+			else
+				self:settext("")
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+	},
+
+	LoadFont("Common Large") .. {
 		Name = "PBScore",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(18):zoom(0.55):diffuse(brightText)
+			self:halign(0):valign(0):y(28):zoom(0.5):diffuse(brightText)
 		end,
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
@@ -945,20 +992,37 @@ t[#t + 1] = Def.ActorFrame {
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
-	LoadFont("Common Normal") .. {
-		Name = "PBDetails",
+	LoadFont("Common Large") .. {
+		Name = "PBGrade",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(36):zoom(0.26):diffuse(subText)
+			self:halign(0):valign(0):x(115):y(28):zoom(0.5)
 		end,
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
 			if score then
-				local gradeShort = ToEnumShortString(score:GetWifeGrade())
-				local grade = HV.GetGradeName(gradeShort)
-				local rate = score:GetMusicRate()
-				local date = score:GetDate()
-				self:settext(string.format("%s · %.2fx · %s", grade, rate, date))
-				self:diffuse(subText)
+				local gradeStr = ToEnumShortString(score:GetWifeGrade())
+				self:settext(THEME:HasString("Grade", gradeStr) and THEME:GetString("Grade", gradeStr) or HV.GetGradeName(gradeStr))
+				self:diffuse(HVColor.GetGradeColor(gradeStr))
+			else
+				self:settext("")
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+	},
+	
+	LoadFont("Common Large") .. {
+		Name = "PBClearType",
+		InitCommand = function(self)
+			self:halign(1):valign(0):x(panelW - 32):y(28):zoom(0.4)
+		end,
+		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			if score then
+				local ct = getDetailedClearType(score)
+				local ctStr = THEME:GetString("ClearTypes", ct)
+				
+				self:settext(ctStr)
+				self:diffuse(HVColor.GetClearTypeColor(ct))
 			else
 				self:settext("")
 			end
@@ -969,7 +1033,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "PBSSR",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(52):zoom(0.26):diffuse(mainText)
+			self:halign(0):valign(0):y(52):zoom(0.30):diffuse(mainText)
 		end,
 		SetCommand = function(self)
 			local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
@@ -977,10 +1041,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("")
 				return
 			end
-			
 			local ssr = HV.CurrentSongData.pbSSR
 			if ssr and ssr > 0 then
-				self:settext(string.format("SSR: %.2f", ssr))
+				self:settext(string.format("%.2f", ssr))
 				self:diffuse(HVColor.GetMSDRatingColor(ssr))
 			else
 				self:settext("")
@@ -989,76 +1052,89 @@ t[#t + 1] = Def.ActorFrame {
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
-	LoadFont("Common Normal") .. {
-		Name = "PBJudges",
+	Def.ActorFrame {
+		Name = "PBJudgesFrame",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(66):zoom(0.22):diffuse(subText)
+			self:y(68)
 		end,
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
-			if score then
-				local marv = score:GetTapNoteScore("TapNoteScore_W1")
-				local perf = score:GetTapNoteScore("TapNoteScore_W2")
-				local gret = score:GetTapNoteScore("TapNoteScore_W3")
-				local good = score:GetTapNoteScore("TapNoteScore_W4")
-				local bad = score:GetTapNoteScore("TapNoteScore_W5")
-				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
-				self:settext(string.format("Juds: %d / %d / %d / %d / %d / %d", marv, perf, gret, good, bad, miss))
-			else
-				self:settext("")
+			if not score then
+				self:visible(false)
+				return
+			end
+			self:visible(true)
+			local judges = {
+				{name = "W1", label = "MAV", val = score:GetTapNoteScore("TapNoteScore_W1")},
+				{name = "W2", label = "PER", val = score:GetTapNoteScore("TapNoteScore_W2")},
+				{name = "W3", label = "GRE", val = score:GetTapNoteScore("TapNoteScore_W3")},
+				{name = "W4", label = "GOO", val = score:GetTapNoteScore("TapNoteScore_W4")},
+				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
+				{name = "Miss", label = "MIS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
+			}
+			for i, j in ipairs(judges) do
+				local bg = self:GetChild("Bg_" .. i)
+				local lbl = self:GetChild("Lbl_" .. i)
+				local valTxt = self:GetChild("Val_" .. i)
+				if bg and lbl and valTxt then
+					valTxt:settext(tostring(j.val))
+					
+					local c = HVColor.Judgment and HVColor.Judgment[j.name] or color("0.5,0.5,0.5,1")
+					bg:diffuse(color("0,0,0,0")) -- transparent quad
+					lbl:settext(j.label):diffuse(c)
+					valTxt:diffuse(c)
+				end
 			end
 		end,
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		(function()
+			local blocks = Def.ActorFrame{}
+			local numBlocks = 6
+			local panelWConst = SCREEN_WIDTH * 0.36
+			local gap = 2
+			local blockW = (panelWConst - 32 - (gap * (numBlocks - 1))) / numBlocks
+			
+			for i = 1, numBlocks do
+				blocks[#blocks + 1] = Def.ActorFrame {
+					InitCommand = function(self)
+						self:x((i - 1) * (blockW + gap))
+					end,
+					Def.Quad {
+						Name = "Bg_" .. i,
+						InitCommand = function(self)
+							self:halign(0):valign(0):zoomto(blockW, 22)
+						end
+					},
+					LoadFont("Common Normal") .. {
+						Name = "Val_" .. i,
+						InitCommand = function(self)
+							self:halign(0.5):valign(0):xy(blockW/2, 2):zoom(0.30)
+						end
+					},
+					LoadFont("Common Normal") .. {
+						Name = "Lbl_" .. i,
+						InitCommand = function(self)
+							self:halign(0.5):valign(0):xy(blockW/2, 13):zoom(0.20)
+						end
+					}
+				}
+			end
+			return blocks
+		end)()
 	},
 
 	LoadFont("Common Normal") .. {
 		Name = "PBCBs",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(78):zoom(0.22):diffuse(subText)
+			self:halign(0):valign(0):y(96):zoom(0.22):diffuse(subText)
 		end,
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
 			if score then
+				local good = score:GetTapNoteScore("TapNoteScore_W4")
 				local bad = score:GetTapNoteScore("TapNoteScore_W5")
 				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
-				self:settext(string.format("CBs/Breaks: %d", bad + miss))
-			else
-				self:settext("")
-			end
-		end,
-		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
-	},
-
-	LoadFont("Common Normal") .. {
-		Name = "PBGrade",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(panelW - 32):y(16):zoom(0.5)
-		end,
-		SetCommand = function(self)
-			local score = HV.CurrentSongData.pbScore
-			if score then
-				local gradeStr = ToEnumShortString(score:GetWifeGrade())
-				self:settext(HV.GetGradeName(gradeStr))
-				self:diffuse(HVColor.GetGradeColor(gradeStr))
-			else
-				self:settext("")
-			end
-		end,
-		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
-	},
-
-	-- Clear Type Lamp
-	LoadFont("Common Normal") .. {
-		Name = "PBClearType",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(panelW - 32):y(40):zoom(0.24)
-		end,
-		SetCommand = function(self)
-			local score = HV.CurrentSongData.pbScore
-			if score then
-				local ct = getDetailedClearType(score)
-				self:settext(THEME:GetString("ClearTypes", ct))
-				self:diffuse(HVColor.GetClearTypeColor(ct))
+				self:settext(string.format("CBs: %d", good + bad + miss))
 			else
 				self:settext("")
 			end
