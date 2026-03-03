@@ -1,12 +1,15 @@
 --- Holographic Void: MusicWheelItem SectionExpanded NormalPart
--- Group header row: left-aligned pack name, right-aligned song count.
+-- Group header row: left-aligned pack name, right-aligned song count (engine).
+-- Scratch re-implementation of the pack progression bar.
 
 local wheelItemW = 280
+local barH = 5 -- Thicker for better visibility
 
 local t = Def.ActorFrame {}
 
 -- Background
 t[#t + 1] = Def.Quad {
+	Name = "BgQuad",
 	InitCommand = function(self)
 		self:zoomto(wheelItemW, 38):diffuse(color("0.10,0.10,0.10,1"))
 	end,
@@ -20,85 +23,161 @@ t[#t + 1] = Def.Quad {
 	end
 }
 
--- Left accent bar (accent color for groups)
+-- Left accent bar
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:x(-wheelItemW/2 + 2):zoomto(4, 34):diffuse(HVColor.Accent):diffusealpha(0.5)
 	end
 }
 
--- Song count (right-aligned, smaller)
-t[#t + 1] = LoadFont("Common Normal") .. {
-	Name = "SongCount",
-	InitCommand = function(self)
-		self:halign(1):x(wheelItemW/2 - 8):y(0)
-			:zoom(0.24):diffuse(color("0.45,0.45,0.45,1"))
-	end,
-	SetCommand = function(self)
-		local group = self:GetParent():GetParent()
-		if group and group.GetSectionName then
-			local sectionName = group:GetSectionName()
-			if sectionName and sectionName ~= "" then
-				local songs = SONGMAN:GetSongsInGroup(sectionName)
-				if songs then
-					local total = #songs
-					local cleared = 0
-					for _, song in ipairs(songs) do
-						local allSteps = song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()
-						if allSteps then
-							local hasClear = false
-							for _, st in ipairs(allSteps) do
-								local chartKey = st:GetChartKey()
-								if chartKey then
-									local scoresByRate = SCOREMAN:GetScoresByKey(chartKey)
-									if scoresByRate then
-										for _, scoresAtRate in pairs(scoresByRate) do
-											local scoreList = scoresAtRate:GetScores()
-											if scoreList and #scoreList > 0 then
-												hasClear = true
-												break
-											end
-										end
-									end
-								end
-								if hasClear then break end
-							end
-							if hasClear then cleared = cleared + 1 end
-						end
-					end
-					self:settext(tostring(cleared) .. "/" .. tostring(total))
-				else
-					self:settext("")
-				end
-			else
-				self:settext("")
-			end
-		else
-			self:settext("")
+-- Multi-stop color scale helper
+local function getCompletionColor(percent)
+	if percent <= 0 then return {0.4, 0.4, 0.4, 1} end -- 0% Gray
+	if percent >= 1 then return {1, 1, 1, 1} end     -- 100% White (Bright)
+
+	-- Elaborative Scale: Red -> Orange -> Yellow -> Green -> Cyan -> Gold
+	local stops = {
+		{0.0,  {1.0, 0.3, 0.3, 1}}, -- Clear Red
+		{0.20, {1.0, 0.6, 0.2, 1}}, -- Vibrant Orange
+		{0.40, {1.0, 1.0, 0.2, 1}}, -- Bright Yellow
+		{0.60, {0.2, 1.0, 0.2, 1}}, -- Bright Green
+		{0.80, {0.2, 1.0, 1.0, 1}}, -- Clear Cyan
+		{1.0,  {1.0, 0.9, 0.5, 1}}, -- Rich Gold
+	}
+
+	for i = 1, #stops - 1 do
+		local s1 = stops[i]
+		local s2 = stops[i+1]
+		if percent >= s1[1] and percent <= s2[1] then
+			local p = (percent - s1[1]) / (s2[1] - s1[1])
+			return HV.LerpColor(p, s1[2], s2[2])
 		end
 	end
+	return stops[#stops][2]
+end
+
+-- New Progression Bar Implementation
+local barPadding = 30
+local barW = wheelItemW - (barPadding * 2)
+local gradesToTrack = {
+	"Tier01", "Tier02", "Tier03", "Tier04", "Tier05", "Tier06", "Tier07", 
+	"Tier08", "Tier09", "Tier10", "Tier11", "Tier12", "Tier13", "Tier14", "Tier15",
 }
 
--- Bottom border
-t[#t + 1] = Def.Quad {
+local function getGradeColor(tier)
+	return HVColor.GetGradeColor("Grade_" .. tier)
+end
+
+local progressionBar = Def.ActorFrame {
+	Name = "ProgressionBar",
 	InitCommand = function(self)
-		self:y(19):zoomto(wheelItemW, 1):diffuse(color("0.18,0.18,0.18,1"))
-	end
-}
-
--- Engine text color override
-t[#t + 1] = Def.Actor {
-	SetMessageCommand = function(self)
+		self:y(14):draworder(150):ztest(false)
+	end,
+	SetCommand = function(self, params) self:playcommand("UpdateData", params) end,
+	SetMessageCommand = function(self, params) self:playcommand("UpdateData", params) end,
+	UpdateDataCommand = function(self, params)
 		local normalPart = self:GetParent()
-		if not normalPart then return end
 		local mwi = normalPart:GetParent()
 		if not mwi then return end
 
-		local names = {"SectionExpanded", "SectionCollapsed"}
-		for _, name in ipairs(names) do
-			local textActor = mwi:GetChild(name)
-			if textActor and textActor:GetVisible() then
-				textActor:diffuse(HVColor.Accent)
+		-- DEFENSIVE SECTION DETECTION
+		local sectionName = params and (params.GroupName or params.Text)
+		if not sectionName or sectionName == "" then
+			if mwi.GetSectionName then sectionName = mwi:GetSectionName() end
+		end
+		if not sectionName or sectionName == "" then
+			local sa = mwi:GetChild("SectionExpanded") or mwi:GetChild("SectionCollapsed")
+			if sa and sa.GetText then sectionName = sa:GetText() end
+		end
+
+		local songs = sectionName and sectionName ~= "" and SONGMAN:GetSongsInGroup(sectionName) or {}
+		local totalSongs = #songs
+		local gradeCounts = {}
+		for _, g in ipairs(gradesToTrack) do gradeCounts[g] = 0 end
+		local totalCleared = 0
+
+		if totalSongs > 0 then
+			for _, song in ipairs(songs) do
+				local bestGrade = song:GetHighestGrade()
+				if bestGrade and bestGrade ~= "Grade_None" and bestGrade ~= "Grade_Failed" then
+					totalCleared = totalCleared + 1
+					local tier = tostring(bestGrade):match("Tier%d+")
+					if tier and gradeCounts[tier] then
+						gradeCounts[tier] = gradeCounts[tier] + 1
+					end
+				end
+			end
+		end
+
+		local percent = totalSongs > 0 and (totalCleared / totalSongs) or 0
+		
+		-- Update Segments
+		local currentX = -barW/2
+		for _, tier in ipairs(gradesToTrack) do
+			local count = gradeCounts[tier] or 0
+			local quad = self:GetChild("Bar_" .. tier)
+			if quad then
+				local segmentW = (count / math.max(1, totalSongs)) * barW
+				quad:stoptweening():halign(0):x(currentX):zoomto(segmentW, barH):diffusealpha(1)
+				currentX = currentX + segmentW
+			end
+		end
+
+		-- Background part (Remaining)
+		local bg = self:GetChild("BarBG")
+		if bg then
+			local remainingW = barW - (currentX + barW/2)
+			bg:stoptweening():halign(0):x(currentX):zoomto(math.max(0, remainingW), barH):diffusealpha(0.4)
+		end
+
+		self.hv_stats = { cleared = totalCleared, total = totalSongs, percent = percent }
+	end
+}
+
+for _, tier in ipairs(gradesToTrack) do
+	progressionBar[#progressionBar + 1] = Def.Quad {
+		Name = "Bar_" .. tier,
+		InitCommand = function(self)
+			self:valign(1):diffuse(getGradeColor(tier))
+		end
+	}
+end
+
+progressionBar[#progressionBar + 1] = Def.Quad {
+	Name = "BarBG",
+	InitCommand = function(self)
+		self:valign(1):diffuse(color("0.3,0.3,0.3,1"))
+	end
+}
+
+t[#t + 1] = progressionBar
+
+-- Engine text color and title alignment override
+t[#t + 1] = Def.Actor {
+	SetMessageCommand = function(self)
+		local normalPart = self:GetParent()
+		local mwi = normalPart:GetParent()
+		if not mwi then return end
+
+		-- Title alignment override (Standardize to left-aligned)
+		local titles = {"SectionExpanded", "SectionCollapsed"}
+		for _, name in ipairs(titles) do
+			local a = mwi:GetChild(name)
+			if a and a:GetVisible() then
+				a:diffuse(HVColor.Accent):halign(0):x(-wheelItemW/2 + 12):y(0)
+			end
+		end
+		
+		-- Dynamic SectionCount coloring
+		local countActor = mwi:GetChild("SectionCount")
+		if countActor then
+			local bar = normalPart:GetChild("ProgressionBar")
+			if bar and bar.hv_stats then
+				local stats = bar.hv_stats
+				local c = getCompletionColor(stats.percent or 0)
+				countActor:diffuse(c[1], c[2], c[3], c[4])
+			else
+				countActor:diffuse(color("0.5,0.5,0.5,1"))
 			end
 		end
 	end,

@@ -144,7 +144,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 								end
 								if bestGrade and bestGrade ~= "Grade_Failed" then
 									local gs = ToEnumShortString(bestGrade)
-									local displayGrade = THEME:GetString("Grade", gs) or gs -- Internal name fallback
+									local displayGrade = HV.GetGradeName(bestGrade)
 									self:settext(displayGrade)
 									self:diffuse(HVColor.GetGradeColor(gs))
 									return
@@ -166,9 +166,9 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "ArtistSubtitle",
 	InitCommand = function(self)
-		self:halign(0):x(-wheelItemW/2 + 10):y(8)
-			:zoom(0.2):diffuse(color("0.5,0.5,0.5,1"))
-			:maxwidth((wheelItemW - 80) / 0.2)
+		self:halign(0.5):x(0):y(11)
+			:zoom(0.30):diffuse(color("0.5,0.5,0.5,1"))
+			:maxwidth((wheelItemW - 40) / 0.30)
 	end,
 	SetMessageCommand = function(self, params)
 		local song = params and params.Song
@@ -198,11 +198,15 @@ t[#t + 1] = Def.Actor {
 		local mwi = normalPart:GetParent()
 		if not mwi then return end
 
-		local names = {"SongName", "Sort", "Roulette", "Random", "Custom", "Portal", "Mode"}
+		local names = {"SongName", "SubTitle", "Sort", "Roulette", "Random", "Custom", "Portal", "Mode"}
 		for _, name in ipairs(names) do
 			local textActor = mwi:GetChild(name)
 			if textActor and textActor:GetVisible() then
 				textActor:diffuse(HVColor.Accent)
+				-- Apply maxwidth and centering in Lua to avoid metrics issues
+				if textActor.maxwidth then
+					textActor:maxwidth(wheelItemW * 0.8 / textActor:GetZoom())
+				end
 			end
 		end
 	end,

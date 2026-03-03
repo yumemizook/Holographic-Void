@@ -1382,7 +1382,7 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self) 
 		-- Right of song info, above the banner 
 		-- Banner is at panelX, panelY+12. Above banner is panelY
-		self:xy(panelX + panelW - 40, panelY + 6) 
+		self:xy(panelX + panelW - 40, panelY + 4) 
 	end,
 	LoadFont("Common Normal") .. {
 		Name = "RateLabel",
@@ -1390,7 +1390,7 @@ t[#t + 1] = Def.ActorFrame {
 	},
 	LoadFont("Common Normal") .. {
 		Name = "RateValue",
-		InitCommand = function(self) self:halign(0):valign(0):zoom(0.4):diffuse(accentColor) end,
+		InitCommand = function(self) self:halign(0):valign(0):zoom(0.4):diffuse(accentColor):playcommand("Set") end,
 		SetCommand = function(self)
 			local rate = getCurRateValue() or 1
 			if math.abs(rate - 1.0) < 0.005 then

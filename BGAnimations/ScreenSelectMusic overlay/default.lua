@@ -25,6 +25,7 @@ local dimText = color("0.45,0.45,0.45,1")
 local bgCard = color("0.06,0.06,0.06,0.9")
 
 local profileOverlayActor = nil
+local globalTooltipActor = nil
 local previewActive = false
 local inputDebugActor = nil
 
@@ -156,16 +157,24 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 			-- 4. MASTER TAB SINK
 			if activeTab ~= "" then
-				-- Sink prevention for input-based tabs that need to capture keys
-				if activeTab == "SEARCH" or activeTab == "FILTERS" then
-					if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+				-- Special handling for Profile Tab pagination
+				if activeTab == "PROFILE" then
+					local dir = 0
+					if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" or btn == "DeviceButton_left" then
+						dir = -1
+					elseif btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" or btn == "DeviceButton_right" then
+						dir = 1
 					end
-					-- Let the individual tab's registered callback swallow the rest
-					return false
+					
+					if dir ~= 0 and (event.type == "InputEventType_FirstPress" or event.type == "InputEventType_Repeat") then
+						if dir == -1 then MESSAGEMAN:Broadcast("PrevScorePage")
+						else MESSAGEMAN:Broadcast("NextScorePage") end
+						return true
+					end
 				end
-				
-				-- Let mouse clicks go through so tab UI works
+
+				-- Let mouse events go through so tab UI works
+				-- This prevents the sink from swallowing clicks meant for the overlay actors
 				if btn and btn:match("mouse") then return false end
 
 				-- Global "Close on Esc"
@@ -424,7 +433,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 local sidebarW = 160
 local mainPartW = overlayW - sidebarW
 local skillsetTabH = 26
-local rowH = 30
+local rowH = 26
+local rowsYStart = 60
 
 local profileOverlay = Def.ActorFrame {
 	Name = "ProfileOverlay",
@@ -437,6 +447,7 @@ local profileOverlay = Def.ActorFrame {
 		self.isOnlineMode = true
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
 	end,
+	
 	-- Dark Background (Dim the rest of the screen)
 	Def.Quad {
 		InitCommand = function(self) self:zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,0.85")) end,
@@ -511,9 +522,9 @@ local profileOverlay = Def.ActorFrame {
 						end
 						
 						-- Score Row Clicks (Left = Find Song, Right = Validate)
-						local rowsYStart = SCREEN_CENTER_Y - overlayH/2 + 65
+						local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
 						for i = 1, scorePageSize do
-							local rowTop = rowsYStart + (i-1)*rowH - rowH/2
+							local rowTop = absRowsYStart + (i-1)*rowH - rowH/2
 							if IsMouseOver(sidebarX + sidebarW + 10, rowTop, mainPartW - 20, rowH) then
 								MESSAGEMAN:Broadcast("OverlayRowClicked", {index = i})
 								return true
@@ -522,29 +533,13 @@ local profileOverlay = Def.ActorFrame {
 					end
 					
 					if event.type == "InputEventType_FirstPress" and event.DeviceInput.button == "DeviceButton_right mouse button" then
-						local rowsYStart = SCREEN_CENTER_Y - overlayH/2 + 65
+						local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
 						for i = 1, scorePageSize do
-							local rowTop = rowsYStart + (i-1)*rowH - rowH/2
+							local rowTop = absRowsYStart + (i-1)*rowH - rowH/2
 							if IsMouseOver(sidebarX + sidebarW + 10, rowTop, mainPartW - 20, rowH) then
 								MESSAGEMAN:Broadcast("OverlayRowRightClicked", {index = i})
 								return true
 							end
-						end
-					end
-					
-					-- 3. Handle Pagination (Wheel and Keys)
-					if event.type == "InputEventType_FirstPress" then
-						local dir = 0
-						if event.DeviceInput.button == "DeviceButton_left" or event.DeviceInput.button == "DeviceButton_up" or event.DeviceInput.button == "DeviceButton_mousewheel up" then
-							dir = -1
-						elseif event.DeviceInput.button == "DeviceButton_right" or event.DeviceInput.button == "DeviceButton_down" or event.DeviceInput.button == "DeviceButton_mousewheel down" then
-							dir = 1
-						end
-						
-						if dir ~= 0 then
-							if dir == -1 then MESSAGEMAN:Broadcast("PrevScorePage")
-							else MESSAGEMAN:Broadcast("NextScorePage") end
-							return true
 						end
 					end
 					
@@ -561,7 +556,19 @@ local profileOverlay = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "Sidebar",
 		InitCommand = function(self) self:x(-overlayW/2 + sidebarW/2) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(sidebarW, overlayH):diffuse(color("0.08,0.08,0.08,1")) end },
+		Def.Quad { InitCommand = function(self) self:zoomto(sidebarW, overlayH):diffuse(color("0.07,0.07,0.07,1")) end },
+		
+		-- Sidebar Separator with Glow
+		Def.Quad {
+			InitCommand = function(self) 
+				self:halign(1):x(sidebarW/2):zoomto(1, overlayH):diffuse(accentColor):diffusealpha(0.3)
+			end
+		},
+		Def.Quad {
+			InitCommand = function(self) 
+				self:halign(1):x(sidebarW/2):zoomto(4, overlayH):diffuse(accentColor):diffusealpha(0.1)
+			end
+		},
 		
 		-- Avatar / Info
 		Def.ActorFrame {
@@ -619,11 +626,22 @@ local profileOverlay = Def.ActorFrame {
 					InitCommand = function(self) self:y((i-1) * skillsetTabH) end,
 					Def.Quad {
 						Name = "Bg",
-						InitCommand = function(self) self:zoomto(sidebarW - 20, skillsetTabH - 4):halign(0):x(-sidebarW/2 + 10):diffuse(bgCard):diffusealpha(0.5) end
+						InitCommand = function(self) self:zoomto(sidebarW - 12, skillsetTabH - 4):halign(0):x(-sidebarW/2 + 6):diffuse(bgCard):diffusealpha(0.4) end
+					},
+					-- Active bar
+					Def.Quad {
+						Name = "ActiveBar",
+						InitCommand = function(self) self:halign(0):x(-sidebarW/2 + 6):zoomto(3, skillsetTabH - 4):diffuse(accentColor):visible(false) end,
+						UpdateOverlayUIActionCommand = function(self)
+							local parent = profileOverlayActor
+							if not parent then return end
+							self:visible(parent.currentSkillset == ss and not parent.isRecentMode)
+						end,
+						UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateOverlayUIAction") end
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Label",
-						InitCommand = function(self) self:halign(0):x(-sidebarW/2 + 20):zoom(0.32):diffuse(subText):settext(ss:upper()) end
+						InitCommand = function(self) self:halign(0):x(-sidebarW/2 + 16):zoom(0.30):diffuse(subText):settext(ss:upper()) end
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Val",
@@ -653,14 +671,27 @@ local profileOverlay = Def.ActorFrame {
 						         and ry >= (140 + (i-1)*skillsetTabH - skillsetTabH/2) 
 								 and ry <= (140 + (i-1)*skillsetTabH + skillsetTabH/2)
 						
-						local bg = af:GetChild("Bg")
 						local active = (parent.currentSkillset == ss) and not parent.isRecentMode
 						if active then
-							bg:diffuse(accentColor):diffusealpha(0.3)
+							bg:diffuse(accentColor):diffusealpha(0.25)
 						elseif over then
-							bg:diffuse(color("0.3,0.3,0.3,0.5"))
+							bg:diffuse(color("0.3,0.3,0.3,0.3"))
 						else
-							bg:diffuse(bgCard):diffusealpha(0.5)
+							bg:diffuse(bgCard):diffusealpha(0.4)
+						end
+						
+						-- Handle click
+						if over and INPUTFILTER:IsBeingPressed("left mouse button") then
+							if parent.currentSkillset ~= ss or parent.isRecentMode then
+								parent.currentSkillset = ss
+								parent.isRecentMode = false
+								parent.topPage = 1
+								-- Sort local scores if needed
+								if not parent.isOnlineMode then
+									SCOREMAN:SortSSRsForGame(ss)
+								end
+								MESSAGEMAN:Broadcast("UpdateOverlayUI")
+							end
 						end
 					end
 				}
@@ -698,7 +729,9 @@ local profileOverlay = Def.ActorFrame {
 				InitCommand = function(self) self:x(mainPartW/2 - 250) end,
 				Def.Quad {
 					Name = "Bg",
-					InitCommand = function(self) self:zoomto(100, 24):diffuse(accentColor):diffusealpha(0.2) end
+					InitCommand = function(self) 
+						self:zoomto(100, 24):diffuse(accentColor):diffusealpha(0.15)
+					end
 				},
 				LoadFont("Common Normal") .. {
 					Name = "Txt",
@@ -714,10 +747,12 @@ local profileOverlay = Def.ActorFrame {
 					local over = rx >= sidebarW + mainPartW - 300 and rx <= sidebarW + mainPartW - 200
 					         and ry >= 23 and ry <= 47
 					local bg = af:GetChild("Bg")
-					if over or parent.isRecentMode then
-						bg:diffusealpha(0.5)
+					if parent.isRecentMode then
+						bg:diffusealpha(0.4)
+					elseif over then
+						bg:diffusealpha(0.3)
 					else
-						bg:diffusealpha(0.2)
+						bg:diffusealpha(0.15)
 					end
 				end
 			},
@@ -727,7 +762,9 @@ local profileOverlay = Def.ActorFrame {
 				InitCommand = function(self) self:x(mainPartW/2 - 140) end,
 				Def.Quad {
 					Name = "Bg",
-					InitCommand = function(self) self:zoomto(100, 24):diffuse(accentColor):diffusealpha(0.2) end
+					InitCommand = function(self) 
+						self:zoomto(100, 24):diffuse(accentColor):diffusealpha(0.15)
+					end
 				},
 				LoadFont("Common Normal") .. {
 					Name = "Txt",
@@ -753,11 +790,11 @@ local profileOverlay = Def.ActorFrame {
 					         and ry >= 23 and ry <= 47
 					local bg = af:GetChild("Bg")
 					if parent.isRecentMode then
-						bg:diffuse(dimText):diffusealpha(0.15)
-					elseif over or (parent.isOnlineMode and DLMAN:IsLoggedIn()) then
-						bg:diffuse(accentColor):diffusealpha(0.5)
+						bg:diffuse(dimText):diffusealpha(0.1)
+					elseif (parent.isOnlineMode and DLMAN:IsLoggedIn()) or over then
+						bg:diffuse(accentColor):diffusealpha(0.4)
 					else
-						bg:diffuse(accentColor):diffusealpha(0.2)
+						bg:diffuse(accentColor):diffusealpha(0.15)
 					end
 				end
 			},
@@ -794,7 +831,7 @@ local profileOverlay = Def.ActorFrame {
 		(function()
 			local rows = Def.ActorFrame {
 				Name = "ScoreListRows",
-				InitCommand = function(self) self:y(-overlayH/2 + 65) end
+				InitCommand = function(self) self:y(-overlayH/2 + rowsYStart) end,
 			}
 			for i = 1, scorePageSize do
 				rows[#rows+1] = Def.ActorFrame {
@@ -802,7 +839,19 @@ local profileOverlay = Def.ActorFrame {
 					InitCommand = function(self) self:y((i-1) * rowH) end,
 					Def.Quad {
 						Name = "Bg",
-						InitCommand = function(self) self:zoomto(mainPartW - 40, rowH - 4):diffuse(color("0,0,0,0.3")) end
+						InitCommand = function(self) 
+							self:zoomto(mainPartW - 30, rowH - 4)
+								:diffuse(color("0,0,0,0.4"))
+								:fadeleft(0.1):faderight(0.1)
+						end
+					},
+					-- Row border accent
+					Def.Quad {
+						Name = "Border",
+						InitCommand = function(self)
+							self:zoomto(mainPartW - 30, 1):valign(1):y(rowH/2 - 2)
+								:diffuse(accentColor):diffusealpha(0.05)
+						end
 					},
 					LoadFont("Common Normal") .. {
 						Name = "SSR",
@@ -818,11 +867,11 @@ local profileOverlay = Def.ActorFrame {
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Percent",
-						InitCommand = function(self) self:halign(1):x(mainPartW/2 - 100):zoom(0.42):diffuse(accentColor) end
+						InitCommand = function(self) self:halign(1):x(mainPartW/2 - 220):zoom(0.42):diffuse(accentColor) end
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Validation",
-						InitCommand = function(self) self:halign(1):x(mainPartW/2 - 30):zoom(0.3) end
+						InitCommand = function(self) self:halign(1):x(mainPartW/2 - 30):zoom(0.28):diffuse(subText) end
 					},
 					SetUpdateFunction = function(af)
 						local parent = profileOverlayActor
@@ -831,16 +880,18 @@ local profileOverlay = Def.ActorFrame {
 						local mouseY = INPUTFILTER:GetMouseY()
 						local rx = mouseX - (SCREEN_CENTER_X - overlayW/2)
 						local ry = mouseY - (SCREEN_CENTER_Y - overlayH/2)
-						local rowTop = 65 + (i-1)*rowH - rowH/2
+						local rowTop = rowsYStart + (i-1)*rowH - rowH/2
 						local rowBottom = rowTop + rowH
 						local over = rx >= sidebarW + 10 and rx <= overlayW - 10 and ry >= rowTop and ry <= rowBottom
 						local bg = af:GetChild("Bg")
 						local score = af.currentScore
+						
 						if score and type(score) ~= "table" and not score:GetEtternaValid() then
 							bg:diffuse(color("0.5,0.2,0.2,0.3"))
 						else
 							bg:diffuse(color("0,0,0,0.3"))
 						end
+						
 						if over then
 							bg:diffusealpha(0.6)
 						end
@@ -888,6 +939,112 @@ local profileOverlay = Def.ActorFrame {
 		}
 	},
 
+	UpdateAllScoresCommand = function(self)
+		local rows = self:GetChild("MainArea"):GetChild("ScoreListRows")
+		local start = ((self.isRecentMode and self.recentPage or self.topPage) - 1) * scorePageSize
+
+		-- Safe Pagination: Instead of checking totals (which might not exist in all versions),
+		-- we'll just allow scrolling up to a reasonble limit or until we hit empty rows.
+		local maxPage = 100 -- Large enough safety net
+		
+		local maxPage = 100 -- Logic clamping below will handle real end
+		
+		if self.isRecentMode then
+			SCOREMAN:SortRecentScoresForGame()
+		elseif not self.isOnlineMode then
+			SCOREMAN:SortSSRsForGame(self.currentSkillset)
+		end
+		
+		local foundAnyOnPage = false
+		for i = 1, scorePageSize do
+			local row = rows:GetChild("Row_" .. i)
+			local idx = start + i - 1 -- Adjust to 0-based for internal APIs
+			local score = nil
+			
+			if self.isRecentMode then
+				-- Recent scores are 0-indexed
+				local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(idx) end)
+				score = (ok and res ~= nil) and res or nil
+			else
+				if self.isOnlineMode and DLMAN:IsLoggedIn() then
+					-- Online scores are 1-indexed
+					local ok, res = pcall(function() return DLMAN:GetTopSkillsetScore(idx + 1, self.currentSkillset) end)
+					score = (ok and res ~= nil) and res or nil
+				else
+					local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(idx, self.currentSkillset) end)
+					score = (ok and res ~= nil) and res or nil
+				end
+			end
+			
+			row.currentScore = score
+			if score then
+				foundAnyOnPage = true
+				row:visible(true)
+				local title, diff, rate, date, wife, ssr, metadata
+				if type(score) == "table" then
+					title = score.songName or "???"
+					diff = ToEnumShortString(score.difficulty or "Beginner")
+					rate = score.rate or 1.0
+					date = score.date or "N/A"
+					wife = score.wife or 0
+					ssr = score.ssr or 0
+					metadata = "ONLINE"
+				else
+					local ck = score:GetChartKey()
+					local thssong = SONGMAN:GetSongByChartKey(ck)
+					local thssteps = SONGMAN:GetStepsByChartKey(ck)
+					title = thssong and thssong:GetDisplayMainTitle() or "???"
+					diff = thssteps and ToEnumShortString(thssteps:GetDifficulty()) or "?"
+					rate = score:GetMusicRate()
+					date = score:GetDate()
+					wife = score:GetWifeScore()
+					ssr = score:GetSkillsetSSR(self.isRecentMode and "Overall" or self.currentSkillset)
+					
+					local ct = getDetailedClearType(score)
+					local w1 = score:GetTapNoteScore("TapNoteScore_W1")
+					local w2 = score:GetTapNoteScore("TapNoteScore_W2")
+					local w3 = score:GetTapNoteScore("TapNoteScore_W3")
+					local w4 = score:GetTapNoteScore("TapNoteScore_W4")
+					local w5 = score:GetTapNoteScore("TapNoteScore_W5")
+					local m = score:GetTapNoteScore("TapNoteScore_Miss")
+					metadata = string.format("%s  |  %d/%d/%d/%d/%d/%d", THEME:GetString("ClearTypes", ct), w1, w2, w3, w4, w5, m)
+				end
+				
+				row:GetChild("SSR"):settext(string.format("%.2f", ssr)):diffuse(HVColor.GetMSDRatingColor(ssr))
+				row:GetChild("Title"):settext(title)
+				row:GetChild("Details"):settext(string.format("%s · %.2fx · %s", diff, rate, date))
+				
+				local pLabel = row:GetChild("Percent")
+				if wife >= 0.997 then
+					pLabel:settext(string.format("%.4f%%", wife * 100))
+				else
+					pLabel:settext(string.format("%.2f%%", wife * 100))
+				end
+				
+				-- Use centralized grade colors
+				local grade = getWifeGradeTier(wife * 100)
+				pLabel:diffuse(HVColor.GetGradeColor(grade))
+				
+				row:GetChild("Validation"):settext(metadata)
+				row:GetChild("Bg"):diffuse(color("0,0,0,0.3"))
+			else
+				row:visible(false)
+			end
+		end
+
+		-- Dynamic Clamping: If page is empty and not page 1, go back
+		if not foundAnyOnPage and (self.isRecentMode and self.recentPage > 1 or self.topPage > 1) then
+			if self.isRecentMode then self.recentPage = self.recentPage - 1
+			else self.topPage = self.topPage - 1 end
+			self:playcommand("UpdateAllScores")
+			return
+		end
+		
+		self:playcommand("UpdateOverlaySkillsets")
+		self:GetChild("MainArea"):playcommand("UpdateOverlayUI")
+		self:GetChild("Sidebar"):playcommand("UpdateOverlayUI")
+	end,
+
 	-- Core Logic Signals
 	UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateAllScores") end,
 	SelectMusicTabChangedMessageCommand = function(self, params)
@@ -905,85 +1062,6 @@ local profileOverlay = Def.ActorFrame {
 		else
 			self:visible(false)
 		end
-	end,
-
-	UpdateAllScoresCommand = function(self)
-		local rows = self:GetChild("MainArea"):GetChild("ScoreListRows")
-		local start = ((self.isRecentMode and self.recentPage or self.topPage) - 1) * scorePageSize
-
-		if self.isRecentMode then
-			-- Recent scores are always local regardless of isOnlineMode
-			SCOREMAN:SortRecentScoresForGame()
-		elseif not self.isOnlineMode then
-			SCOREMAN:SortSSRsForGame(self.currentSkillset)
-		end
-		
-		for i = 1, scorePageSize do
-			local row = rows:GetChild("Row_" .. i)
-			local idx = start + i
-			local score = nil
-			
-			if self.isRecentMode then
-				-- Recent scores are always local regardless of isOnlineMode
-				local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(idx) end)
-				score = (ok and res ~= nil) and res or nil
-			else
-				if self.isOnlineMode and DLMAN:IsLoggedIn() then
-					local ok, res = pcall(function() return DLMAN:GetTopSkillsetScore(idx, self.currentSkillset) end)
-					score = (ok and res ~= nil) and res or nil
-				else
-					local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(idx, self.currentSkillset) end)
-					score = (ok and res ~= nil) and res or nil
-				end
-			end
-			
-			row.currentScore = score
-			if score then
-				row:visible(true)
-				local title, diff, rate, date, wife, ssr
-				if type(score) == "table" then
-					title = score.songName or "???"
-					diff = ToEnumShortString(score.difficulty or "Beginner")
-					rate = score.rate or 1.0
-					date = score.date or "N/A"
-					wife = score.wife or 0
-					ssr = score.ssr or 0
-				else
-					local ck = score:GetChartKey()
-					local thssong = SONGMAN:GetSongByChartKey(ck)
-					local thssteps = SONGMAN:GetStepsByChartKey(ck)
-					title = thssong and thssong:GetDisplayMainTitle() or "???"
-					diff = thssteps and ToEnumShortString(thssteps:GetDifficulty()) or "?"
-					rate = score:GetMusicRate()
-					date = score:GetDate()
-					wife = score:GetWifeScore()
-					ssr = score:GetSkillsetSSR(self.isRecentMode and "Overall" or self.currentSkillset)
-				end
-				
-				row:GetChild("SSR"):settext(string.format("%.2f", ssr)):diffuse(HVColor.GetMSDRatingColor(ssr))
-				row:GetChild("Title"):settext(title)
-				row:GetChild("Details"):settext(string.format("%s · %.2fx · %s", diff, rate, date))
-				row:GetChild("Percent"):settext(string.format("%.2f%%", wife * 100))
-				
-				local vLabel = row:GetChild("Validation")
-				if type(score) == "table" then
-					vLabel:settext("ONLINE"):diffuse(color("0.5,0.7,1,1"))
-				else
-					if score:GetEtternaValid() then
-						vLabel:settext("VALID"):diffuse(color("0.4,1,0.4,1"))
-					else
-						vLabel:settext("INVALID"):diffuse(color("1,0.4,0.4,1"))
-					end
-				end
-				row:GetChild("Bg"):diffuse(color("0,0,0,0.3"))
-			else
-				row:visible(false)
-			end
-		end
-		
-		self:playcommand("UpdateOverlaySkillsets")
-		self:GetChild("MainArea"):playcommand("UpdateOverlayUI")
-		self:GetChild("Sidebar"):playcommand("UpdateOverlayUI")
 	end,
 
 	NextScorePageMessageCommand = function(self)
@@ -1196,7 +1274,6 @@ for _, name in ipairs(decorOverlays) do
 end
 
 main_af[#main_af + 1] = LoadActor("../_cursor")
-
 
 return main_af
 

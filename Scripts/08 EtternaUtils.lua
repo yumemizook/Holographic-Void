@@ -166,7 +166,7 @@ function gradeFamilyToBetterGrade(grade)
 end
 
 function getEtternaGrade(wifePct)
-	if not wifePct or wifePct <= 0 then return "Failed" end
+	if not wifePct then return "Failed" end
 	local pct = wifePct / 100
 	if pct >= 0.999935 then return "Tier01"
 	elseif pct >= 0.9998 then return "Tier02"
@@ -183,7 +183,7 @@ function getEtternaGrade(wifePct)
 	elseif pct >= 0.8 then return "Tier13"
 	elseif pct >= 0.7 then return "Tier14"
 	elseif pct >= 0.6 then return "Tier15"
-	elseif pct >= 0.5 then return "Tier16"
+	elseif pct >= -99999 then return "Tier16" -- anything lower than C is D
 	else return "Tier17" end
 end
 
