@@ -25,7 +25,10 @@ local particleLayer = Def.ActorFrame {
 		self:visible(showParticles)
 	end,
 	ThemePrefChangedMessageCommand = function(self, params)
-		if params and (params.Name == "HV_Particles" or params.Name == "HV_BGAnimIntensity") then
+		if params and (params.Name == "HV_Particles" or params.Name == "HV_BGAnimIntensity" or params.Name == "HV_AccentColor") then
+			if params.Name == "HV_AccentColor" then
+				HVColor.RefreshAccent()
+			end
 			local showParticles = tostring(ThemePrefs.Get("HV_Particles")) == "true"
 			self:visible(showParticles)
 			self:playcommand("Refresh")

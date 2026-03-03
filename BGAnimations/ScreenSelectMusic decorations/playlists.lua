@@ -14,6 +14,7 @@ local overlayH = 400
 local rowH = 34
 local chartsPerPage = 8
 local playlistsPerPage = 8
+local rowStartY = -overlayH/2 + 85
 local playlistsActor = nil
 local whee = nil
 
@@ -24,6 +25,10 @@ local allplaylistsactive = true
 local currentPlaylistPage = 1
 local currentChartPage = 1
 
+-- Guard against double-loading logic
+HV.PlaylistsLoadedCount = (HV.PlaylistsLoadedCount or 0) + 1
+local instances = HV.PlaylistsLoadedCount
+
 -- Active playlist data
 local pl = nil
 local chartlist = {}
@@ -32,46 +37,325 @@ local function RefreshPlaylistList()
 	allplaylists = {}
 	local ok, playlists = pcall(function() return SONGMAN:GetPlaylists() end)
 	if ok and playlists then
-		for name, playlist in pairs(playlists) do
-			allplaylists[#allplaylists + 1] = {name = name, playlist = playlist}
+		for _, playlist in pairs(playlists) do
+			if type(playlist) == "userdata" then
+				table.insert(allplaylists, {name = playlist:GetName(), playlist = playlist})
+			end
 		end
-		table.sort(allplaylists, function(a, b) return a.name < b.name end)
+		table.sort(allplaylists, function(a, b) return (a.name or "") < (b.name or "") end)
 	end
 end
 
 local function RefreshChartList()
 	chartlist = {}
 	if pl then
-		pcall(function()
-			chartlist = pl:GetChartlist()
-		end)
+		local ok, list = pcall(function() return pl:GetAllSteps() end)
+		local ok2, keys = pcall(function() return pl:GetChartkeys() end)
+		if ok and list and ok2 and keys then
+			for i = 1, #list do
+				table.insert(chartlist, {chart = list[i], key = keys[i]})
+			end
+		end
 	end
+end
+
+local function GetPlaylistStats()
+	local stats = {avgMSD = 0, totalDuration = 0, count = 0}
+	if not pl or not chartlist or #chartlist == 0 then return stats end
+	
+	local totalMSD = 0
+	for _, entry in ipairs(chartlist) do
+		local steps = SONGMAN:GetStepsByChartKey(entry.key)
+		if steps then
+			totalMSD = totalMSD + steps:GetMSD(entry.chart:GetRate(), 1)
+			local song = SONGMAN:GetSongByChartKey(entry.key)
+			if song then
+				stats.totalDuration = stats.totalDuration + (song:GetStepsSeconds() / entry.chart:GetRate())
+			end
+		end
+	end
+	stats.count = #chartlist
+	stats.avgMSD = totalMSD / stats.count
+	return stats
+end
+
+local function SortChartList(mode)
+	if not pl then return end
+	if mode == "title" then
+		table.sort(chartlist, function(a, b) return (a.chart:GetSongTitle() or "") < (b.chart:GetSongTitle() or "") end)
+	elseif mode == "msd" then
+		table.sort(chartlist, function(a, b)
+			local sA = SONGMAN:GetStepsByChartKey(a.key)
+			local sB = SONGMAN:GetStepsByChartKey(b.key)
+			local msA = sA and sA:GetMSD(a.chart:GetRate(), 1) or 0
+			local msB = sB and sB:GetMSD(b.chart:GetRate(), 1) or 0
+			return msA > msB
+		end)
+	elseif mode == "rate" then
+		table.sort(chartlist, function(a, b) return a.chart:GetRate() > b.chart:GetRate() end)
+	end
+	-- Note: SONGMAN doesn't support persistent custom sorting via API easily, 
+	-- we are just sorting the local 'chartlist' for display.
+end
+
+
+-- Shared input function reference to allow removal/cleanup
+local function SharedInputHandler(event)
+	if not playlistsActor or not playlistsActor:GetVisible() then return false end
+	if not event or not event.DeviceInput then return false end
+
+	-- Screen state awareness: Only handle input if we are the top screen
+	-- This prevents blocking overlays like ScreenTextEntry (naming/login)
+	local top = SCREENMAN:GetTopScreen()
+	if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
+	
+	if event.type ~= "InputEventType_FirstPress" then return true end
+	local btn = event.DeviceInput.button
+	local dir = 0
+
+
+	if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
+	if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
+	if dir ~= 0 then
+		if singleplaylistactive then
+			local totalPages = math.max(1, math.ceil(#chartlist / chartsPerPage))
+			currentChartPage = math.max(1, math.min(totalPages, currentChartPage + dir))
+		else
+			local totalPages = math.max(1, math.ceil(#allplaylists / playlistsPerPage))
+			currentPlaylistPage = math.max(1, math.min(totalPages, currentPlaylistPage + dir))
+		end
+		playlistsActor:playcommand("RefreshUI")
+		return true
+	end
+
+	if btn == "DeviceButton_left mouse button" then
+		local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+
+		-- Header click for sorting
+		local headerY = SCREEN_CENTER_Y - overlayH/2 + 65
+		if singleplaylistactive and my >= headerY - 10 and my <= headerY + 10 then
+			local hx = mx - (SCREEN_CENTER_X - overlayW/2 + 25)
+			if hx >= 60 and hx <= 340 then SortChartList("title") end
+			if hx >= overlayW - 190 and hx <= overlayW - 150 then SortChartList("rate") end
+			if hx >= overlayW - 130 and hx <= overlayW - 90 then SortChartList("msd") end
+			playlistsActor:playcommand("RefreshUI")
+			return true
+		end
+
+		-- Close on outside click
+		if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
+			MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+			return true
+		end
+
+		-- Back button
+		if singleplaylistactive then
+			if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 50, SCREEN_CENTER_Y - overlayH/2 + 18, 60, 18) then
+				singleplaylistactive = false
+				allplaylistsactive = true
+				currentPlaylistPage = 1
+				playlistsActor:playcommand("RefreshUI")
+				return true
+			end
+		end
+
+		-- Add Current button
+		if singleplaylistactive then
+			if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 235, SCREEN_CENTER_Y - overlayH/2 + 18, 100, 18) then
+				local currentSteps = GAMESTATE:GetCurrentSteps()
+				if currentSteps then
+					local ck = currentSteps:GetChartKey()
+					if pl then
+						pl:AddChart(ck)
+						ms.ok("Chart added to " .. pl:GetName())
+						RefreshChartList()
+						playlistsActor:playcommand("RefreshUI")
+					end
+				end
+				return true
+			end
+			
+			-- Play as Course button
+			if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 130, SCREEN_CENTER_Y - overlayH/2 + 18, 90, 18) then
+				if pl and #chartlist > 0 then
+					SCREENMAN:GetTopScreen():StartPlaylistAsCourse(pl:GetName())
+				end
+				return true
+			end
+		end
+
+		-- Advanced Controls
+		if not singleplaylistactive then
+			local ctrlsY = SCREEN_CENTER_Y + overlayH / 2 - 35
+			if IsMouseOverCentered(SCREEN_CENTER_X - 120, ctrlsY, 70, 20) then -- NEW
+				easyInputStringOKCancel("New Playlist Name:", 32, false, function(name)
+					if name and name ~= "" then
+						SONGMAN:NewPlaylist(name)
+						ms.ok("Playlist created: " .. name)
+						RefreshPlaylistList()
+						playlistsActor:playcommand("RefreshUI")
+					end
+				end)
+				return true
+			end
+			if IsMouseOverCentered(SCREEN_CENTER_X, ctrlsY, 80, 20) then -- RENAME
+				local activePl = SONGMAN:GetActivePlaylist()
+				if activePl then
+					easyInputStringOKCancel("Rename Playlist To:", 32, false, function(name)
+						if name and name ~= "" then
+							local oldName = activePl:GetName()
+							activePl:SetName(name)
+							ms.ok("Playlist renamed: " .. oldName .. " -> " .. name)
+							RefreshPlaylistList()
+							playlistsActor:playcommand("RefreshUI")
+						end
+					end, nil, activePl:GetName())
+				else
+					ms.ok("Set a playlist as Active to rename it")
+				end
+				return true
+			end
+			if IsMouseOverCentered(SCREEN_CENTER_X + 120, ctrlsY, 80, 20) then -- DELETE
+				local activePl = SONGMAN:GetActivePlaylist()
+				if activePl then
+					local name = activePl:GetName()
+					SONGMAN:DeletePlaylist(name)
+					ms.ok("Deleted: " .. name)
+					RefreshPlaylistList()
+					playlistsActor:playcommand("RefreshUI")
+				else
+					ms.ok("Set a playlist as Active to delete it")
+				end
+				return true
+			end
+			if DLMAN:IsLoggedIn() and IsMouseOverCentered(SCREEN_CENTER_X + 160, ctrlsY, 100, 20) then -- GET EO
+				ms.ok("Downloading missing playlists from online...")
+				DLMAN:DownloadMissingPlaylists()
+				return true
+			end
+		end
+
+		-- Row clicks
+		local perPage = singleplaylistactive and chartsPerPage or playlistsPerPage
+		for ri = 1, perPage do
+			local rowTop = SCREEN_CENTER_Y + rowStartY + (ri - 1) * rowH
+			local rowLeft = SCREEN_CENTER_X - overlayW/2 + 25
+			if mx >= rowLeft and mx <= rowLeft + overlayW - 50 and my >= rowTop and my <= rowTop + rowH then
+				if singleplaylistactive then
+					local idx = (currentChartPage - 1) * chartsPerPage + ri
+					if idx <= #chartlist then
+						local entry = chartlist[idx]
+						local hx = mx - rowLeft
+						
+						-- 1. Reorder Column (More generous hitbox: 0 to 60)
+						if hx <= 60 then
+							if my < rowTop + rowH / 2 then -- UP
+								if idx > 1 then
+									pcall(function() pl:MoveChart(idx - 1, idx - 2) end)
+									RefreshChartList()
+									playlistsActor:playcommand("RefreshUI")
+								end
+							else -- DOWN
+								if idx < #chartlist then
+									pcall(function() pl:MoveChart(idx - 1, idx) end)
+									RefreshChartList()
+									playlistsActor:playcommand("RefreshUI")
+								end
+							end
+							return true
+						
+						-- 2. Rate Adjustment (60 to 220 from right)
+						elseif hx >= overlayW - 240 and hx <= overlayW - 70 then
+							local curRate = entry.chart:GetRate()
+							if hx <= overlayW - 155 then -- Left side (-0.1)
+								pcall(function() entry.chart:SetRate(math.max(0.1, curRate - 0.1)) end)
+							else -- Right side (+0.1)
+								pcall(function() entry.chart:SetRate(math.min(3.0, curRate + 0.1)) end)
+							end
+							playlistsActor:playcommand("RefreshUI")
+							return true
+
+						-- 3. Delete button (Far Right)
+						elseif hx >= overlayW - 70 then
+							pcall(function() pl:DeleteChart(idx) end)
+							RefreshChartList()
+							playlistsActor:playcommand("RefreshUI")
+							return true
+
+						-- 4. Song selection (Center area)
+						else
+							local ck = entry.key
+							if ck then
+								local song = SONGMAN:GetSongByChartKey(ck)
+								if song and whee then
+									whee:SelectSong(song)
+								end
+							end
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+							return true
+						end
+					end
+				else
+					local idx = (currentPlaylistPage - 1) * playlistsPerPage + ri
+					if idx <= #allplaylists then
+						pl = allplaylists[idx].playlist
+						SONGMAN:SetActivePlaylist(pl:GetName())
+						singleplaylistactive = true
+						allplaylistsactive = false
+						currentChartPage = 1
+						RefreshChartList()
+						playlistsActor:playcommand("RefreshUI")
+					end
+					return true
+				end
+			end
+		end
+		
+		return true -- Sink all other clicks inside the overlay
+	end
+
+	if event.button == "Back" or btn == "DeviceButton_escape" then
+		if singleplaylistactive then
+			singleplaylistactive = false
+			allplaylistsactive = true
+			playlistsActor:playcommand("RefreshUI")
+		else
+			MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+		end
+		return true
+	end
+
+	-- Sink all input when overlay is visible
+	return true
 end
 
 local t = Def.ActorFrame {
 	Name = "PlaylistsOverlay",
 	InitCommand = function(self)
+		-- Guard against multiple instances responding to global signals
+		if instances > 1 then 
+			self:visible(false)
+			return 
+		end
 		playlistsActor = self
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
 	end,
 	BeginCommand = function(self)
+		if instances > 1 then return end
 		local screen = SCREENMAN:GetTopScreen()
 		if screen and screen.GetMusicWheel then whee = screen:GetMusicWheel() end
 	end,
 	SelectMusicTabChangedMessageCommand = function(self, params)
 		if params.Tab == "PLAYLISTS" then
-			self:visible(not self:GetVisible())
-			if self:GetVisible() then
-				HV.ActiveTab = "PLAYLISTS"
-				singleplaylistactive = false
-				allplaylistsactive = true
-				currentPlaylistPage = 1
-				currentChartPage = 1
-				RefreshPlaylistList()
-				self:playcommand("RefreshUI")
-			else
-				HV.ActiveTab = ""
-			end
+			-- Use explicit visibility to avoid toggle double-triggering
+			self:visible(true)
+			HV.ActiveTab = "PLAYLISTS"
+			singleplaylistactive = false
+			allplaylistsactive = true
+			currentPlaylistPage = 1
+			currentChartPage = 1
+			RefreshPlaylistList()
+			self:playcommand("RefreshUI")
 		else
 			self:visible(false)
 			if HV.ActiveTab == "PLAYLISTS" then HV.ActiveTab = "" end
@@ -82,38 +366,73 @@ local t = Def.ActorFrame {
 	Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(bgCard) end },
 	Def.Quad { InitCommand = function(self) self:valign(0):y(-overlayH/2):zoomto(overlayW, 2):diffuse(accentColor):diffusealpha(0.7) end },
 
-	-- Title
-	LoadFont("Common Normal") .. {
-		Name = "Title",
-		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 16, -overlayH/2 + 10):zoom(0.35):diffuse(accentColor)
-		end,
-		RefreshUICommand = function(self)
-			if singleplaylistactive and pl then
-				self:settext("PLAYLIST: " .. pl:GetName())
-			else
-				self:settextf("PLAYLISTS (%d)", #allplaylists)
-			end
-		end,
+	-- Title & Stats
+	Def.ActorFrame {
+		Name = "HeaderInfo",
+		InitCommand = function(self) self:xy(-overlayW/2 + 25, -overlayH/2 + 15) end,
+		
+		LoadFont("Common Normal") .. {
+			Name = "Title",
+			InitCommand = function(self) self:halign(0):zoom(0.5):diffuse(accentColor) end,
+			RefreshUICommand = function(self)
+				if singleplaylistactive and pl then
+					self:settext("PLAYLIST: " .. pl:GetName())
+				else
+					self:settextf("PLAYLISTS (%d)", #allplaylists)
+				end
+			end,
+		},
+		
+		LoadFont("Common Normal") .. {
+			Name = "Stats",
+			InitCommand = function(self) self:halign(0):y(20):zoom(0.24):diffuse(subText) end,
+			RefreshUICommand = function(self)
+				if singleplaylistactive and pl then
+					local s = GetPlaylistStats()
+					self:settextf("Avg MSD: %.2f  ·  Duration: %s  ·  Charts: %d", 
+						s.avgMSD, SecondsToMSS(s.totalDuration), s.count)
+				else
+					self:settext("")
+				end
+			end,
+		},
 	},
 
 	-- Back button
-	LoadFont("Common Normal") .. {
+	Def.ActorFrame {
 		Name = "BackBtn",
-		InitCommand = function(self)
-			self:halign(1):valign(0):xy(overlayW/2 - 16, -overlayH/2 + 10):zoom(0.26):diffuse(accentColor)
-		end,
+		InitCommand = function(self) self:xy(overlayW/2 - 50, -overlayH/2 + 18):visible(false) end,
 		RefreshUICommand = function(self)
 			self:visible(singleplaylistactive)
-			if singleplaylistactive then self:settext("< BACK") end
 		end,
+		Def.Quad {
+			InitCommand = function(self) self:zoomto(60, 18):diffuse(accentColor):diffusealpha(0.4) end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("<- BACK") end,
+		},
+	},
+
+	-- Play as Course button
+	Def.ActorFrame {
+		Name = "PlayAsCourseBtn",
+		InitCommand = function(self) self:xy(overlayW/2 - 130, -overlayH/2 + 18):visible(false) end,
+		RefreshUICommand = function(self)
+			self:visible(singleplaylistactive and pl ~= nil and #chartlist > 0)
+		end,
+		Def.Quad {
+			InitCommand = function(self) self:zoomto(90, 18):diffuse(accentColor):diffusealpha(0.4) end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("PLAY AS COURSE") end,
+		},
 	},
 
 	-- Page info
 	LoadFont("Common Normal") .. {
 		Name = "PageInfo",
 		InitCommand = function(self)
-			self:halign(0.5):valign(1):xy(0, overlayH/2 - 8):zoom(0.22):diffuse(dimText)
+			self:halign(1):valign(0):xy(overlayW/2 - 16, -overlayH/2 + 30):zoom(0.24):diffuse(dimText)
 		end,
 		RefreshUICommand = function(self)
 			local total, perPage, curPage
@@ -127,49 +446,164 @@ local t = Def.ActorFrame {
 				curPage = currentPlaylistPage
 			end
 			local totalPages = math.max(1, math.ceil(total / perPage))
-			self:settextf("Page %d / %d · CLICK to select · SCROLL to page", curPage, totalPages)
+			self:settextf("Page %d / %d", curPage, totalPages)
 		end,
+	},
+	Def.ActorFrame {
+		Name = "AddCurrentBtn",
+		InitCommand = function(self)
+			self:xy(overlayW/2 - 235, -overlayH/2 + 18)
+		end,
+		RefreshUICommand = function(self)
+			self:visible(singleplaylistactive)
+		end,
+		Def.Quad {
+			Name = "Bg",
+			InitCommand = function(self)
+				self:zoomto(100, 18):diffuse(accentColor):diffusealpha(0.15)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:zoom(0.24):diffuse(brightText):settext("+ ADD CURRENT")
+			end
+		}
+	},
+
+	-- Advanced Controls Row (Bottom)
+	Def.ActorFrame {
+		Name = "AdvancedControls",
+		InitCommand = function(self) self:xy(0, overlayH / 2 - 35) end,
+		RefreshUICommand = function(self)
+			self:visible(not singleplaylistactive)
+		end,
+
+		-- NEW
+		Def.ActorFrame {
+			Name = "NewBtn",
+			InitCommand = function(self) self:x(-120) end,
+			Def.Quad { InitCommand = function(self) self:zoomto(70, 20):diffuse(accentColor):diffusealpha(0.2) end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("NEW") end },
+		},
+		-- RENAME
+		Def.ActorFrame {
+			Name = "RenameBtn",
+			InitCommand = function(self) self:x(0) end,
+			Def.Quad { InitCommand = function(self) self:zoomto(80, 20):diffuse(accentColor):diffusealpha(0.2) end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("RENAME") end },
+		},
+		-- DELETE
+		Def.ActorFrame {
+			Name = "DeleteBtn",
+			InitCommand = function(self) self:x(70) end,
+			Def.Quad { InitCommand = function(self) self:zoomto(60, 20):diffuse(color("1,0.2,0.2,0.2")) end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("DELETE") end },
+		},
+		-- GET EO PLAYLISTS
+		Def.ActorFrame {
+			Name = "GetEOBtn",
+			InitCommand = function(self) self:x(160) end,
+			RefreshUICommand = function(self)
+				self:visible(DLMAN:IsLoggedIn())
+			end,
+			Def.Quad { InitCommand = function(self) self:zoomto(100, 20):diffuse(accentColor):diffusealpha(0.2) end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("GET EO PLAYLISTS") end },
+		},
 	},
 }
 
--- Rows for playlist list and chart entries
-local rowStartY = -overlayH/2 + 40
+-- Single Playlist EO Controls (Top Right)
+t[#t+1] = Def.ActorFrame {
+	Name = "SingleEOControls",
+	InitCommand = function(self) self:xy(overlayW/2 - 365, -overlayH/2 + 18) end,
+	RefreshUICommand = function(self)
+		self:visible(singleplaylistactive and DLMAN:IsLoggedIn() and pl and pl:GetName() ~= "Favorites")
+	end,
+	-- UPLOAD
+	Def.ActorFrame {
+		Name = "UploadBtn",
+		InitCommand = function(self) self:x(-45) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(70, 18):diffuse(accentColor):diffusealpha(0.15) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("UPLOAD EO") end },
+	},
+	-- SYNC (DL)
+	Def.ActorFrame {
+		Name = "SyncBtn",
+		InitCommand = function(self) self:x(35) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(70, 18):diffuse(accentColor):diffusealpha(0.15) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("SYNC EO") end },
+	},
+}
 
+
+-- Column Headers (Sortable)
+t[#t+1] = Def.ActorFrame {
+	Name = "ColumnHeaders",
+	InitCommand = function(self) self:xy(-overlayW/2 + 25, -overlayH/2 + 65):visible(false) end,
+	RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
+	
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(60):zoom(0.32):diffuse(accentColor):settext("SONG TITLE") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 180):zoom(0.32):diffuse(accentColor):settext("RATE") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 110):zoom(0.32):diffuse(accentColor):settext("MSD") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 60):zoom(0.32):diffuse(accentColor):settext("PB") end },
+}
+
+-- Rows for playlist list and chart entries
 for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 	t[#t + 1] = Def.ActorFrame {
 		Name = "Row_" .. i,
 		InitCommand = function(self)
-			self:xy(-overlayW/2 + 16, rowStartY + (i - 1) * rowH)
+			self:xy(-overlayW/2 + 25, rowStartY + (i - 1) * rowH)
 		end,
 
 		Def.Quad {
 			Name = "Bg",
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(overlayW - 32, rowH - 2):diffuse(color("0,0,0,0.2"))
+				self:halign(0):valign(0):zoomto(overlayW - 50, rowH - 4):diffuse(color("0,0,0,0.2"))
 			end,
+		},
+
+		-- Reorder Buttons
+		Def.ActorFrame {
+			Name = "Reorder",
+			InitCommand = function(self) self:visible(false) end,
+			RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
+			
+			LoadFont("Common Normal") .. { Name = "Up", InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 - 6):zoom(0.35):diffuse(accentColor):settext("▲") end },
+			LoadFont("Common Normal") .. { Name = "Down", InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 + 6):zoom(0.35):diffuse(accentColor):settext("▼") end },
 		},
 
 		-- Main text line
-		LoadFont("Zpix Normal") .. {
+		LoadFont("Common Normal") .. {
 			Name = "MainText",
 			InitCommand = function(self)
-				self:halign(0):valign(0.5):xy(15, rowH/2):zoom(0.5):diffuse(brightText):maxwidth((overlayW - 250) / 0.5)
+				self:halign(0):valign(0.5):xy(40, rowH / 2):zoom(0.42):diffuse(brightText):maxwidth((overlayW - 320) / 0.42)
 			end,
 		},
 
-		-- Sub text (right side)
+		-- Rate Controls
+		Def.ActorFrame {
+			Name = "RateControls",
+			InitCommand = function(self) self:x(overlayW - 180):y(rowH/2):visible(false) end,
+			RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
+			LoadFont("Common Normal") .. { Name = "L", InitCommand = function(self) self:x(-25):zoom(0.3):diffuse(accentColor):settext("<") end },
+			LoadFont("Common Normal") .. { Name = "Val", InitCommand = function(self) self:zoom(0.35):diffuse(brightText) end },
+			LoadFont("Common Normal") .. { Name = "R", InitCommand = function(self) self:x(25):zoom(0.3):diffuse(accentColor):settext(">") end },
+		},
+
+		-- Sub text (PB display)
 		LoadFont("Common Normal") .. {
 			Name = "SubText",
 			InitCommand = function(self)
-				self:halign(1):valign(0.5):x(overlayW - 120):y(rowH/2):zoom(0.4):diffuse(subText)
+				self:halign(1):valign(0.5):x(overlayW - 60):y(rowH / 2):zoom(0.32):diffuse(subText)
 			end,
 		},
 
-		-- Rate display
+		-- MSD display
 		LoadFont("Common Normal") .. {
 			Name = "RateText",
 			InitCommand = function(self)
-				self:halign(1):valign(0.5):x(overlayW - 60):y(rowH/2):zoom(0.4):diffuse(dimText)
+				self:halign(1):valign(0.5):x(overlayW - 110):y(rowH / 2):zoom(0.32):diffuse(dimText)
 			end,
 		},
 
@@ -177,7 +611,7 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 		LoadFont("Common Normal") .. {
 			Name = "DelBtn",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(overlayW - 60):y(rowH/2):zoom(0.4):diffuse(color("1,0.3,0.3,0.6")):settext("✕")
+				self:halign(0.5):valign(0.5):x(overlayW - 25):y(rowH / 2):zoom(0.35):diffuse(color("1,0.3,0.3,0.6")):settext("✕")
 			end,
 		},
 
@@ -188,23 +622,31 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 				if idx <= #chartlist then
 					self:visible(true)
 					local entry = chartlist[idx]
-					local songTitle = entry:GetSongTitle() or "???"
+					local songTitle = entry.chart:GetSongTitle() or "???"
 					self:GetChild("MainText"):settext(songTitle)
 
 					-- Check if song exists
-					local song = SONGMAN:GetSongByChartKey(entry:GetChartkey())
+					local song = SONGMAN:GetSongByChartKey(entry.key)
 					if song then
 						self:GetChild("MainText"):diffuse(brightText)
 					else
 						self:GetChild("MainText"):diffuse(color("1,0.3,0.3,1"))
 					end
 
-					self:GetChild("RateText"):settextf("%.2fx", entry:GetRate()):visible(true)
+					self:GetChild("RateControls"):GetChild("Val"):settextf("%.1fx", entry.chart:GetRate())
+					
+					-- MSD calculation
+					local msd = 0
+					local steps = SONGMAN:GetStepsByChartKey(entry.key)
+					if steps then
+						msd = steps:GetMSD(entry.chart:GetRate(), 1)
+					end
+					self:GetChild("RateText"):settextf("%.2f", msd):visible(true)
 
 					-- Show personal best if available
 					local pb = ""
 					pcall(function()
-						local best = SCOREMAN:GetScoresByKey(entry:GetChartkey())
+						local best = SCOREMAN:GetScoresByKey(entry.key)
 						if best then
 							for _, sl in pairs(best) do
 								local scores = sl:GetScores()
@@ -217,6 +659,8 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 					end)
 					self:GetChild("SubText"):settext(pb):visible(true)
 					self:GetChild("DelBtn"):visible(true)
+					self:GetChild("Reorder"):playcommand("RefreshUI")
+					self:GetChild("RateControls"):playcommand("RefreshUI")
 				else
 					self:visible(false)
 				end
@@ -226,7 +670,14 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 				if idx <= #allplaylists then
 					self:visible(true)
 					local plEntry = allplaylists[idx]
-					self:GetChild("MainText"):settext(plEntry.name):diffuse(brightText)
+					self:GetChild("MainText"):settext(plEntry.name)
+					-- Highlight active playlist
+					local activePl = SONGMAN:GetActivePlaylist()
+					if activePl and activePl:GetName() == plEntry.name then
+						self:GetChild("MainText"):diffuse(accentColor)
+					else
+						self:GetChild("MainText"):diffuse(brightText)
+					end
 					local ct = 0
 					pcall(function() ct = plEntry.playlist:GetNumCharts() end)
 					self:GetChild("SubText"):settextf("%d charts", ct):visible(true)
@@ -245,115 +696,14 @@ t[#t + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-			screen:AddInputCallback(function(event)
-				if not playlistsActor or not playlistsActor:GetVisible() then return false end
-				if not event or not event.DeviceInput then return false end
-				
-				if event.type ~= "InputEventType_FirstPress" then return true end
-				local btn = event.DeviceInput.button
-
-				-- Pagination
-				local dir = 0
-				if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
-				if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
-				if dir ~= 0 then
-					if singleplaylistactive then
-						local totalPages = math.max(1, math.ceil(#chartlist / chartsPerPage))
-						currentChartPage = math.max(1, math.min(totalPages, currentChartPage + dir))
-					else
-						local totalPages = math.max(1, math.ceil(#allplaylists / playlistsPerPage))
-						currentPlaylistPage = math.max(1, math.min(totalPages, currentPlaylistPage + dir))
-					end
-					playlistsActor:playcommand("RefreshUI")
-					return true
-				end
-
-				if btn == "DeviceButton_left mouse button" then
-					local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-
-					-- Close on outside click
-					if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-						return true
-					end
-
-					-- Back button
-					if singleplaylistactive then
-						local backX = SCREEN_CENTER_X + overlayW/2 - 40
-						local backY = SCREEN_CENTER_Y - overlayH/2 + 18
-						if mx >= backX - 30 and mx <= backX + 30 and my >= backY - 10 and my <= backY + 10 then
-							singleplaylistactive = false
-							allplaylistsactive = true
-							currentPlaylistPage = 1
-							playlistsActor:playcommand("RefreshUI")
-							return true
-						end
-					end
-
-					-- Row clicks
-					local perPage = singleplaylistactive and chartsPerPage or playlistsPerPage
-					for ri = 1, perPage do
-						local rowTop = SCREEN_CENTER_Y + rowStartY + (ri - 1) * rowH
-						local rowLeft = SCREEN_CENTER_X - overlayW/2 + 16
-						if mx >= rowLeft and mx <= rowLeft + overlayW - 32 and my >= rowTop and my <= rowTop + rowH then
-							if singleplaylistactive then
-								local idx = (currentChartPage - 1) * chartsPerPage + ri
-								if idx <= #chartlist then
-									local entry = chartlist[idx]
-									local hx = mx - rowLeft
-
-									-- Delete button
-									if hx >= overlayW - 60 then
-										pcall(function()
-											pl:DeleteChart(idx)
-										end)
-										RefreshChartList()
-										playlistsActor:playcommand("RefreshUI")
-										return true
-									end
-
-									-- Song select
-									local ck = entry:GetChartkey()
-									if ck then
-										local song = SONGMAN:GetSongByChartKey(ck)
-										if song and whee then
-											whee:SelectSong(song)
-										end
-									end
-									MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-								end
-							else
-								local idx = (currentPlaylistPage - 1) * playlistsPerPage + ri
-								if idx <= #allplaylists then
-									pl = allplaylists[idx].playlist
-									singleplaylistactive = true
-									allplaylistsactive = false
-									currentChartPage = 1
-									RefreshChartList()
-									playlistsActor:playcommand("RefreshUI")
-								end
-							end
-							return true
-						end
-					end
-					
-					return true -- Sink all other clicks inside the overlay
-				end
-
-				if event.button == "Back" then
-					if singleplaylistactive then
-						singleplaylistactive = false
-						allplaylistsactive = true
-						playlistsActor:playcommand("RefreshUI")
-					else
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-					end
-					return true
-				end
-
-				-- Sink all input when overlay is visible
-				return true
-			end)
+		-- Always cleanup any existing callback from a previous load
+		if HV.PlaylistsInputCallback then
+			pcall(function() screen:RemoveInputCallback(HV.PlaylistsInputCallback) end)
+		end
+		-- Only the primary instance (1) or the latest reloaded one should handle input.
+		-- We assign a fresh function here to ensure it uses the latest local state.
+		HV.PlaylistsInputCallback = function(event) return SharedInputHandler(event) end
+		screen:AddInputCallback(HV.PlaylistsInputCallback)
 	end,
 }
 

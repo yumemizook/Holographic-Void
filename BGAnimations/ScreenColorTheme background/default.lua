@@ -28,7 +28,16 @@ for i = 1, 15 do
 	}
 end
 
--- Load Shared Background Particles
+-- Particles
 t[#t + 1] = LoadActor("../_particles.lua")
+
+-- Refresh accent color globally when changed in this screen
+t[#t + 1] = Def.Actor {
+	ThemePrefChangedMessageCommand = function(self, params)
+		if params and params.Name == "HV_AccentColor" and HVColor and HVColor.RefreshAccent then
+			HVColor.RefreshAccent()
+		end
+	end
+}
 
 return t

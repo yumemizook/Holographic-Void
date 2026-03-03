@@ -136,7 +136,7 @@ local function SearchInputCallback(event)
 	end
 
 	-- Use event.char (the C++ provided character) for a cleaner approach
-	if event.char and event.char:match('[%%%+%-%!%@%#%$%^%&%*%(%)%=%_%.%,%:%;%\'%"%>%<%?%/%~%|%w%[%]%{%}%`%\\]') then
+	if event.char and event.char:match("^[%g]$") then
 		-- Skip number keys when not holding Ctrl (they map to tab indices in some themes)
 		-- but we want them for search
 		searchString = searchString .. event.char

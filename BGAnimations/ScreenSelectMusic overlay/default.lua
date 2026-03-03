@@ -109,83 +109,6 @@ local main_af = Def.ActorFrame {
 	end
 }
 
--- ============================================================
--- MASTER INPUT SINK & TAB MANAGEMENT (TOP PRIORITY)
--- ============================================================
-main_af[#main_af + 1] = Def.ActorFrame {
-	Name = "MasterInputSink",
-	BeginCommand = function(self)
-		local screen = SCREENMAN:GetTopScreen()
-		if not screen then return end
-		
-		screen:AddInputCallback(function(event)
-			if not event or not event.DeviceInput then return end
-			local btn = event.DeviceInput.button
-
-			-- 1. TRACK GLOBAL TAB STATE
-			local activeTab = HV.ActiveTab or ""
-			
-			-- 2. CHART PREVIEW TRIGGER (Space key)
-			if btn == "DeviceButton_space" and activeTab == "" then
-				if event.type ~= "InputEventType_FirstPress" then return end
-				if previewActive then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-				else
-					previewActive = true
-					MESSAGEMAN:Broadcast("ChartPreviewOn")
-				end
-				return true
-			end
-			
-			-- 3. HANDLE CHART PREVIEW INPUT
-			if previewActive then
-				-- SINK ALL INPUT while preview is active except mouse
-				if btn and btn:match("mouse") then return false end
-				
-				if event.type ~= "InputEventType_FirstPress" then return true end
-				
-				-- Let rate preview shortcuts pass through
-				if event.button == "EffectUp" or event.button == "EffectDown" then return false end
-				
-				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
-					previewActive = false
-					MESSAGEMAN:Broadcast("ChartPreviewOff")
-				end
-				return true
-			end
-
-			-- 4. MASTER TAB SINK
-			if activeTab ~= "" then
-				-- Special handling for Profile Tab pagination
-				if activeTab == "PROFILE" then
-					local dir = 0
-					if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" or btn == "DeviceButton_left" then
-						dir = -1
-					elseif btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" or btn == "DeviceButton_right" then
-						dir = 1
-					end
-					
-					if dir ~= 0 and (event.type == "InputEventType_FirstPress" or event.type == "InputEventType_Repeat") then
-						if dir == -1 then MESSAGEMAN:Broadcast("PrevScorePage")
-						else MESSAGEMAN:Broadcast("NextScorePage") end
-						return true
-					end
-				end
-
-				-- Let mouse events go through so tab UI works
-				-- This prevents the sink from swallowing clicks meant for the overlay actors
-				if btn and btn:match("mouse") then return false end
-
-				-- Global "Close on Esc"
-				if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
-					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-				end
-				return true
-			end
-		end)
-	end
-}
 
 -- LoginButtonUI was moved to decorations/default.lua to nest visually within the profile card.
 
@@ -240,9 +163,20 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-		screen:AddInputCallback(function(event)
+
+		-- Always cleanup any existing callback from a previous load
+		if HV.OverlayInputCallback then
+			pcall(function() screen:RemoveInputCallback(HV.OverlayInputCallback) end)
+		end
+
+		HV.OverlayInputCallback = function(event)
 			-- Strict nil checks to prevent script crashes
 			if not event or not event.DeviceInput then return false end
+
+			-- Screen state awareness: Only handle input if we are the top screen
+			-- This prevents blocking overlays like ScreenTextEntry (naming/login)
+			local top = SCREENMAN:GetTopScreen()
+			if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
 			
 			-- Banish inputs processing if chart preview is active so clicks don't leak through
 			if previewActive then return false end
@@ -267,6 +201,9 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				return true
 			end
 			if btn == "DeviceButton_left mouse button" and evType == "InputEventType_FirstPress" then
+				-- Skip general overlay buttons (Login, etc.) if a tab is busy
+				if HV.ActiveTab ~= "" then return false end
+
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()
 				
@@ -417,7 +354,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					end
 				end
 			end
-		end)
+		end -- end of HV.OverlayInputCallback
+		screen:AddInputCallback(HV.OverlayInputCallback)
 	end
 }
 
@@ -1173,6 +1111,28 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				end
 			end
 		}
+	},
+
+	-- Nth Stage Display (Top Right)
+	LoadFont("Common Normal") .. {
+		Name = "StageDisplay",
+		InitCommand = function(self)
+			self:halign(1):valign(0.5):xy(SCREEN_WIDTH - 20, headerH / 2):zoom(0.4):diffuse(accentColor)
+		end,
+		OnCommand = function(self) self:playcommand("Set") end,
+		SetCommand = function(self)
+			local stageIdx = GAMESTATE:GetCurrentStageIndex() + 1
+			local text = "STAGE " .. stageIdx
+			
+			-- Safely check for GetCurrentStage as it might be nil in some Etterna contexts
+			if GAMESTATE.GetCurrentStage then
+				local stage = GAMESTATE:GetCurrentStage()
+				if stage == "Stage_Extra1" then text = "EXTRA STAGE"
+				elseif stage == "Stage_Extra2" then text = "ENCORE EXTRA"
+				end
+			end
+			self:settext(text)
+		end
 	}
 }
 
@@ -1205,17 +1165,39 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	},
 	
 	-- Time Display (Right aligned)
-	LoadFont("Common Normal") .. {
-		Name = "TimeDisplay",
-		InitCommand = function(self)
-			self:halign(1):valign(0.5)
-				:xy(SCREEN_WIDTH - 20, footerH / 2)
-				:zoom(0.35)
-				:settext(os.date("%H:%M"))
-		end,
-		UpdateCommand = function(self)
-			self:settext(os.date("%H:%M"))
-		end
+	Def.ActorFrame {
+		Name = "TimeFrame",
+		InitCommand = function(self) self:xy(SCREEN_WIDTH - 20, footerH / 2) end,
+
+		-- Session Time (Wasted human cycles)
+		LoadFont("Common Normal") .. {
+			Name = "SessionTime",
+			InitCommand = function(self)
+				self:halign(1):y(10):zoom(0.32):diffuse(dimText)
+			end,
+			OnCommand = function(self) self:queuecommand("Tick") end,
+			TickCommand = function(self)
+				local secs = GetTimeSinceStart()
+				local h = math.floor(secs / 3600)
+				local m = math.floor((secs % 3600) / 60)
+				local s = math.floor(secs % 60)
+				self:settextf("Wasted Human Cycles: %02d:%02d:%02d", h, m, s)
+				self:sleep(1):queuecommand("Tick")
+			end
+		},
+
+		-- Real Time Clock
+		LoadFont("Common Normal") .. {
+			Name = "Clock",
+			InitCommand = function(self)
+				self:halign(1):y(-6):zoom(0.5):diffuse(mainText)
+			end,
+			OnCommand = function(self) self:queuecommand("Tick") end,
+			TickCommand = function(self)
+				self:settext(os.date("%H:%M:%S"))
+				self:sleep(1):queuecommand("Tick")
+			end
+		}
 	}
 }
 
@@ -1274,6 +1256,69 @@ for _, name in ipairs(decorOverlays) do
 end
 
 main_af[#main_af + 1] = LoadActor("../_cursor")
+
+
+-- ============================================================
+-- MASTER INPUT SINK & TAB MANAGEMENT (LOWER PRIORITY)
+-- ============================================================
+-- Relocated to ensures decoration input callbacks (search, playlists, etc.) 
+-- can capture input FIRST before the global sink takes over.
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "MasterInputSink",
+	BeginCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if not screen then return end
+		
+		screen:AddInputCallback(function(event)
+			if not event or not event.DeviceInput then return end
+			local btn = event.DeviceInput.button
+
+			-- 1. TRACK GLOBAL TAB STATE
+			local activeTab = HV.ActiveTab or ""
+			
+			-- 2. CHART PREVIEW TRIGGER (Space key)
+			if btn == "DeviceButton_space" and activeTab == "" then
+				if event.type ~= "InputEventType_FirstPress" then return end
+				if previewActive then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				else
+					previewActive = true
+					MESSAGEMAN:Broadcast("ChartPreviewOn")
+				end
+				return true
+			end
+			
+			-- 3. HANDLE OVERLAY INPUT SINKING
+			-- If any tab is active, we generally want to sink all non-mouse input 
+			-- from the engine/music wheel. Individual scripts will handle their own keys.
+			if activeTab ~= "" then
+				-- Let mouse clicks pass through for IsMouseOver checks in scripts
+				if btn and btn:match("mouse") then return false end
+				
+				-- Sink everything else
+				return true
+			end
+			
+			-- 3. HANDLE CHART PREVIEW INPUT
+			if previewActive then
+				-- SINK ALL INPUT while preview is active except mouse
+				if btn and btn:match("mouse") then return false end
+				
+				if event.type ~= "InputEventType_FirstPress" then return true end
+				
+				-- Let rate preview shortcuts pass through
+				if event.button == "EffectUp" or event.button == "EffectDown" then return false end
+				
+				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
+					previewActive = false
+					MESSAGEMAN:Broadcast("ChartPreviewOff")
+				end
+				return true
+			end
+		end)
+	end
+}
 
 return main_af
 

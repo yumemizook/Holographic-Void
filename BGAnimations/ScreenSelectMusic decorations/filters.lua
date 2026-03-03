@@ -326,19 +326,6 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
 	},
-
-	-- FilterResults display
-	LoadFont("Common Normal") .. {
-		Name = "Results",
-		InitCommand = function(self)
-			self:halign(0):valign(0.5):xy(200, 34):zoom(0.26):diffuse(subText)
-		end,
-		FilterResultsMessageCommand = function(self, msg)
-			if msg then
-				self:settextf("Matches: %d / %d", msg.Matches or 0, msg.Total or 0)
-			end
-		end,
-	},
 }
 
 -- Action buttons (Reset, Apply Rate+/-, Mode toggle)
@@ -348,30 +335,43 @@ t[#t + 1] = Def.ActorFrame {
 
 	-- Reset button
 	Def.ActorFrame {
-		InitCommand = function(self) self:x(-120) end,
+		InitCommand = function(self) self:x(-200) end,
 		Def.Quad { InitCommand = function(self) self:zoomto(90, 24):diffuse(color("0.15,0,0,0.8")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(color("1,0.4,0.4,1")):settext("RESET ALL") end },
 	},
 
-	-- Rate+ button
-	Def.ActorFrame {
-		InitCommand = function(self) self:x(-20) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(60, 24):diffuse(color("0.1,0.1,0.1,1")) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("RATE+") end },
-	},
-
 	-- Rate- button
 	Def.ActorFrame {
-		InitCommand = function(self) self:x(45) end,
+		InitCommand = function(self) self:x(-110) end,
 		Def.Quad { InitCommand = function(self) self:zoomto(60, 24):diffuse(color("0.1,0.1,0.1,1")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("RATE-") end },
 	},
 
+	-- Rate+ button
+	Def.ActorFrame {
+		InitCommand = function(self) self:x(-45) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(60, 24):diffuse(color("0.1,0.1,0.1,1")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("RATE+") end },
+	},
+
 	-- Mode toggle button
 	Def.ActorFrame {
-		InitCommand = function(self) self:x(120) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(80, 24):diffuse(color("0.1,0.1,0.1,1")) end },
+		InitCommand = function(self) self:x(45) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(95, 24):diffuse(color("0.1,0.1,0.1,1")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("TOGGLE MODE") end },
+	},
+
+	-- FilterResults display
+	LoadFont("Common Normal") .. {
+		Name = "Results",
+		InitCommand = function(self)
+			self:halign(0):x(110):zoom(0.32):diffuse(subText)
+		end,
+		FilterResultsMessageCommand = function(self, msg)
+			if msg then
+				self:settextf("MATCHES: %d / %d", msg.Matches or 0, msg.Total or 0)
+			end
+		end,
 	},
 }
 
@@ -425,7 +425,7 @@ t[#t + 1] = Def.ActorFrame {
 				local btnY = SCREEN_CENTER_Y + overlayH/2 - 25
 
 				-- Reset
-				if IsMouseOverCentered(SCREEN_CENTER_X - 120, btnY, 90, 24) then
+				if IsMouseOverCentered(SCREEN_CENTER_X - 200, btnY, 90, 24) then
 					FILTERMAN:ResetAllFilters()
 					for idx = 1, totalRows do
 						SSQuery[1][idx] = "0"
@@ -439,8 +439,17 @@ t[#t + 1] = Def.ActorFrame {
 					return true
 				end
 
+				-- Rate-
+				if IsMouseOverCentered(SCREEN_CENTER_X - 110, btnY, 60, 24) then
+					FILTERMAN:SetMinFilterRate(math.max(0.1, FILTERMAN:GetMinFilterRate() - 0.1))
+					if whee then whee:SongSearch("") end
+					MESSAGEMAN:Broadcast("HV_FilterUpdated")
+					filtersActor:playcommand("RefreshUI")
+					return true
+				end
+
 				-- Rate+
-				if IsMouseOverCentered(SCREEN_CENTER_X - 20, btnY, 60, 24) then
+				if IsMouseOverCentered(SCREEN_CENTER_X - 45, btnY, 60, 24) then
 					FILTERMAN:SetMaxFilterRate(FILTERMAN:GetMaxFilterRate() + 0.1)
 					if whee then whee:SongSearch("") end
 					MESSAGEMAN:Broadcast("HV_FilterUpdated")
@@ -448,17 +457,8 @@ t[#t + 1] = Def.ActorFrame {
 					return true
 				end
 
-				-- Rate-
-				if IsMouseOverCentered(SCREEN_CENTER_X + 45, btnY, 60, 24) then
-					FILTERMAN:SetMinFilterRate(FILTERMAN:GetMinFilterRate() + 0.1)
-					if whee then whee:SongSearch("") end
-					MESSAGEMAN:Broadcast("HV_FilterUpdated")
-					filtersActor:playcommand("RefreshUI")
-					return true
-				end
-
 				-- Mode toggle
-				if IsMouseOverCentered(SCREEN_CENTER_X + 120, btnY, 80, 24) then
+				if IsMouseOverCentered(SCREEN_CENTER_X + 45, btnY, 95, 24) then
 					FILTERMAN:ToggleFilterMode()
 					if whee then whee:SongSearch("") end
 					MESSAGEMAN:Broadcast("HV_FilterUpdated")
