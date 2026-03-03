@@ -139,10 +139,14 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			
 			-- 3. HANDLE CHART PREVIEW INPUT
 			if previewActive then
-				-- SINK ALL INPUT while preview is active
-				-- We let the ScreenChartPreview's own input callback handle its things,
-				-- but we return true here to stop propagation to the engine.
+				-- SINK ALL INPUT while preview is active except mouse
+				if btn and btn:match("mouse") then return false end
+				
 				if event.type ~= "InputEventType_FirstPress" then return true end
+				
+				-- Let rate preview shortcuts pass through
+				if event.button == "EffectUp" or event.button == "EffectDown" then return false end
+				
 				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
 					previewActive = false
 					MESSAGEMAN:Broadcast("ChartPreviewOff")
@@ -152,6 +156,18 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 			-- 4. MASTER TAB SINK
 			if activeTab ~= "" then
+				-- Sink prevention for input-based tabs that need to capture keys
+				if activeTab == "SEARCH" or activeTab == "FILTERS" then
+					if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+					end
+					-- Let the individual tab's registered callback swallow the rest
+					return false
+				end
+				
+				-- Let mouse clicks go through so tab UI works
+				if btn and btn:match("mouse") then return false end
+
 				-- Global "Close on Esc"
 				if event.type == "InputEventType_FirstPress" and (btn == "DeviceButton_escape" or event.button == "Back") then
 					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
@@ -218,6 +234,10 @@ main_af[#main_af + 1] = Def.ActorFrame {
 		screen:AddInputCallback(function(event)
 			-- Strict nil checks to prevent script crashes
 			if not event or not event.DeviceInput then return false end
+			
+			-- Banish inputs processing if chart preview is active so clicks don't leak through
+			if previewActive then return false end
+			
 			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
 			local evType = event.type or ""
@@ -228,6 +248,15 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			end
 
 			-- 2. Mouse Click
+			-- Right-click to pause/unpause sample music
+			if btn == "DeviceButton_right mouse button" and evType == "InputEventType_FirstPress" then
+				local screen = SCREENMAN:GetTopScreen()
+				if screen and screen.PauseSampleMusic then
+					screen:PauseSampleMusic()
+					MESSAGEMAN:Broadcast("MusicPauseToggled")
+				end
+				return true
+			end
 			if btn == "DeviceButton_left mouse button" and evType == "InputEventType_FirstPress" then
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()

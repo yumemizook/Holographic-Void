@@ -22,17 +22,26 @@ local rootRef = nil
 local musicStartTime = 0
 local musicStartOffset = 0
 local isPaused = false
+local pausedPos = 0
+
+local fullSongMode = false
 
 local function playFrom(pos)
 	if not song then return end
-	musicStartTime = GetTimeSinceStart()
-	musicStartOffset = pos
 	isPaused = false
+	local screen = ssm or SCREENMAN:GetTopScreen()
+	if not screen then return end
 	
-	local rate = getCurRateValue()
-	local path = song:GetMusicPath()
-	SOUND:StopMusic()
-	SOUND:PlayMusicPart(path, pos, song:GetLastSecond() - pos, 0, 0, false, true, false)
+	-- Switch to full-song mode on first seek so the song doesn't loop the preview segment
+	if not fullSongMode then
+		SOUND:StopMusic()
+		screen:PlayCurrentSongSampleMusic(true, true)
+		fullSongMode = true
+	end
+	
+	if screen.SetSampleMusicPosition then
+		screen:SetSampleMusicPosition(pos)
+	end
 end
 
 -- HV Aesthetics constants
@@ -122,19 +131,18 @@ end
 -- AUDIO CONTROL & SYNC
 ------------------------------------------------------------
 local function updateSync(self)
-	if isPaused then return end
+	if isPaused then
+		-- Brute-force the notefield to the captured position to prevent any sliding
+		if noteFieldRef and noteFieldRef.SetSeconds then
+			noteFieldRef:SetSeconds(pausedPos)
+		end
+		return
+	end
+	if not ssm then return end
 	
-	local rate = getCurRateValue()
-	local elapsed = (GetTimeSinceStart() - musicStartTime) * rate
-	local pos = musicStartOffset + elapsed
-	
+	local pos = ssm:GetSampleMusicPosition()
 	if pos > musicLength then pos = musicLength end
 	
-	-- Sync NoteField
-	if noteFieldRef and noteFieldRef.SetSeconds then
-		noteFieldRef:SetSeconds(pos)
-	end
-
 	-- Sync Progress Bar / Seek
 	if progressRef then
 		local p = math.min(pos / math.max(1, musicLength), 1)
@@ -160,6 +168,20 @@ local function input(event)
 	-- Close mechanisms
 	if btn == "DeviceButton_escape" or event.button == "Back" or event.button == "Start" then
 		MESSAGEMAN:Broadcast("ChartPreviewOff")
+		return true
+	end
+
+	-- Keyboard Rate Control (EffectUp/EffectDown are logical game buttons)
+	if event.button == "EffectUp" then
+		local pos = ssm and ssm:GetSampleMusicPosition() or 0
+		changeMusicRate(0.05)
+		playFrom(pos)
+		return true
+	end
+	if event.button == "EffectDown" then
+		local pos = ssm and ssm:GetSampleMusicPosition() or 0
+		changeMusicRate(-0.05)
+		playFrom(pos)
 		return true
 	end
 
@@ -191,16 +213,15 @@ local function input(event)
 		local rateFrame = rootRef:GetChild("HeaderFrame"):GetChild("RateController")
 		if rateFrame then
 			if isOver(rateFrame:GetChild("Dec")) then 
-				changeMusicRate(-0.1)
-				-- Restart music at same position with new rate
-				local elapsed = (GetTimeSinceStart() - musicStartTime) * (getCurRateValue() + 0.1) -- use old rate to find position
-				playFrom(musicStartOffset + elapsed)
+				local pos = ssm and ssm:GetSampleMusicPosition() or 0
+				changeMusicRate(-0.05)
+				playFrom(pos)
 				return true 
 			end
 			if isOver(rateFrame:GetChild("Inc")) then 
-				changeMusicRate(0.1)
-				local elapsed = (GetTimeSinceStart() - musicStartTime) * (getCurRateValue() - 0.1)
-				playFrom(musicStartOffset + elapsed)
+				local pos = ssm and ssm:GetSampleMusicPosition() or 0
+				changeMusicRate(0.05)
+				playFrom(pos)
 				return true 
 			end
 		end
@@ -218,16 +239,20 @@ local function input(event)
 		end
 	end
 
-	-- Right click to pause
+	-- Right click to pause/unpause
 	if btn == "DeviceButton_right mouse button" then
-		if isPaused then
-			local elapsed = (GetTimeSinceStart() - musicStartTime) * getCurRateValue()
-			playFrom(musicStartOffset + elapsed)
-		else
-			local elapsed = (GetTimeSinceStart() - musicStartTime) * getCurRateValue()
-			musicStartOffset = musicStartOffset + elapsed
-			SOUND:StopMusic()
-			isPaused = true
+		if ssm and ssm.PauseSampleMusic then
+			-- Capture exact position BEFORE toggling pause to avoid frame slip
+			if not isPaused then
+				pausedPos = ssm:GetSampleMusicPosition() or 0
+			end
+			ssm:PauseSampleMusic()
+			isPaused = not isPaused
+			MESSAGEMAN:Broadcast("MusicPauseToggled")
+			if rootRef then
+				local text = rootRef:GetChild("NoteFieldContainer"):GetChild("PausedText")
+				if text then text:diffusealpha(isPaused and 1 or 0) end
+			end
 		end
 		return true
 	end
@@ -275,7 +300,7 @@ local function header()
 				Name = "RateVal",
 				ReloadCommand = function(self) 
 					local rate = getCurRateValue()
-					self:settextf("%.1fx", rate):zoom(0.5):diffuse(accentColor)
+					self:settextf("%.2fx", rate):zoom(0.5):diffuse(accentColor)
 				end
 			},
 			LoadFont("Common Normal") .. {
@@ -367,10 +392,10 @@ local function chartPanel()
 		Name = "ChartPanel",
 		ReloadCommand = function(self)
 			stepsTable = song:GetStepsByStepsType(steps:GetStepsType())
-			-- Create a lookup for current available diffs
 			self.available = {}
 			for _, s in ipairs(stepsTable) do
-				self.available[ToEnumShortString(s:GetDifficulty()):gsub("Difficulty_", "")] = s
+				local dStr = ToEnumShortString(s:GetDifficulty()):gsub("Difficulty_", "")
+				self.available[dStr] = s
 			end
 			self:RunCommandsOnChildren(function(c) c:playcommand("Update") end)
 		end,
@@ -388,14 +413,14 @@ local function chartPanel()
 				local short = getDifficultyShort("Difficulty_"..d)
 				items[#items+1] = Def.ActorFrame {
 					Name = "Item_" .. short,
-					InitCommand = function(self) self:y((i-1)*42) end,
+					InitCommand = function(self) self:y((i-1)*30) end,
 					
-					-- Slot Background
 					Def.Quad {
 						Name = "Bg",
-						InitCommand = function(self) self:zoomto(sidePanelWidth - 10, 38):diffuse(bgDark):diffusealpha(0.8) end,
+						InitCommand = function(self) self:zoomto(sidePanelWidth - 10, 26):diffuse(bgDark):diffusealpha(0.8) end,
 						UpdateCommand = function(self)
-							local s = self:GetParent().available and self:GetParent():GetParent().available[d]
+							local panel = self:GetParent():GetParent():GetParent()
+							local s = panel.available and panel.available[d]
 							local isCur = s and (s:GetChartKey() == steps:GetChartKey())
 							if isCur then
 								self:diffuse(HVColor.GetDifficultyColor(s:GetDifficulty())):diffusealpha(0.5)
@@ -405,29 +430,24 @@ local function chartPanel()
 						end
 					},
 
-					-- Difficulty Label (Left)
 					LoadFont("Common Normal") .. {
-						InitCommand = function(self) self:halign(0):x(-sidePanelWidth/2 + 10):settext(short):zoom(0.35):diffuse(textSub) end,
+						InitCommand = function(self) self:halign(0):x(-sidePanelWidth/2 + 10):settext(short):zoom(0.3):diffuse(textSub) end,
 						UpdateCommand = function(self)
-							local s = self:GetParent():GetParent().available and self:GetParent():GetParent().available[d]
+							local panel = self:GetParent():GetParent():GetParent()
+							local s = panel.available and panel.available[d]
 							self:diffuse(s and textBright or textDim)
 						end
 					},
 
-					-- Meter/MSD (Right - Only if active)
 					LoadFont("Common Normal") .. {
 						Name = "Meter",
-						InitCommand = function(self) self:halign(1):x(sidePanelWidth/2 - 10):zoom(0.35) end,
+						InitCommand = function(self) self:halign(1):x(sidePanelWidth/2 - 10):zoom(0.3) end,
 						UpdateCommand = function(self)
-							local s = self:GetParent():GetParent().available and self:GetParent():GetParent().available[d]
+							local panel = self:GetParent():GetParent():GetParent()
+							local s = panel.available and panel.available[d]
 							if s then
-								local isCur = (s:GetChartKey() == steps:GetChartKey())
-								if isCur then
-									local val = s:GetMSD(getCurRateValue(), 1)
-									self:settextf("%.2f", val):diffuse(textBright):visible(true)
-								else
-									self:visible(false)
-								end
+								local val = s:GetMSD(getCurRateValue(), 1)
+								self:settextf("%.2f", val):diffuse(HVColor.GetMSDRatingColor(val)):visible(true)
 							else
 								self:visible(false)
 							end
@@ -436,9 +456,10 @@ local function chartPanel()
 
 					Def.Quad {
 						Name = "ClickArea",
-						InitCommand = function(self) self:zoomto(sidePanelWidth - 10, 38):diffusealpha(0) end,
+						InitCommand = function(self) self:zoomto(sidePanelWidth - 10, 26):diffusealpha(0) end,
 						UpdateCommand = function(self)
-							local s = self:GetParent():GetParent().available and self:GetParent():GetParent().available[d]
+							local panel = self:GetParent():GetParent():GetParent()
+							local s = panel.available and panel.available[d]
 							self:visible(s ~= nil)
 						end
 					}
@@ -534,8 +555,16 @@ local t = Def.ActorFrame {
 			ssm:AddInputCallback(inputCallback)
 		end
 		
-		-- Start audio (Full Song)
-		playFrom(0)
+		-- Ensure any stale pause state is cleared
+		if isPaused and ssm and ssm.IsSampleMusicPaused and ssm:IsSampleMusicPaused() then
+			ssm:PauseSampleMusic()
+		end
+		isPaused = false
+		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
+		if pText then pText:diffusealpha(0) end
+		
+		-- Don't restart music — let the NoteField sync to whatever the screen is already playing.
+		-- The music wheel preview is already active, so the NoteField picks up the current position.
 		
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
 		self:visible(true):playcommand("Reload")
@@ -544,7 +573,10 @@ local t = Def.ActorFrame {
 	ChartPreviewOffMessageCommand = function(self)
 		self:visible(false)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
-		SOUND:StopMusic()
+		-- Don't stop music — let the screen handle it naturally
+		fullSongMode = false
+		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
+		if pText then pText:diffusealpha(0) end
 		if ssm and inputCallback then 
 			pcall(function() ssm:RemoveInputCallback(inputCallback) end)
 			inputCallback = nil 
@@ -566,18 +598,6 @@ local t = Def.ActorFrame {
 		Name = "LeftSidebar",
 		InitCommand = function(self) self:xy(sidePanelWidth/2 + 20, SCREEN_CENTER_Y) end,
 		skillsetPanelComp()
-	},
-
-	-- Right Area: CHART + ANALYSIS
-	Def.ActorFrame {
-		Name = "RightSidebar",
-		InitCommand = function(self) self:xy(SCREEN_WIDTH - 20, SCREEN_CENTER_Y) end,
-		
-		-- CHART (Difficulty Selector) - To the left of Radar
-		chartPanel() .. { InitCommand = function(self) self:x(-sidePanelWidth * 1.5 - innerPadding) end },
-		
-		-- ANALYSIS (Radar) - Far Right
-		radarPanelComp() .. { InitCommand = function(self) self:x(-sidePanelWidth/2) end },
 	},
 
 	densityGraphComp(),
@@ -605,7 +625,24 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:zoom(0.7):y(0) end,
 			OnCommand = function(self) noteFieldRef = self end,
 			ReloadCommand = function(self) if steps then self:LoadNoteData(steps) end end
+		},
+		
+		LoadFont("Common Large") .. {
+			Name = "PausedText",
+			InitCommand = function(self) self:settext("PAUSED"):zoom(0.5):diffuse(color("1,0.2,0.2,1")):diffusealpha(0):shadowlength(1):shadowcolor(0,0,0,1) end
 		}
+	},
+
+	-- Right Area: CHART + ANALYSIS (Moved to end for draw order)
+	Def.ActorFrame {
+		Name = "RightSidebar",
+		InitCommand = function(self) self:xy(SCREEN_WIDTH - 20, SCREEN_CENTER_Y):SortByDrawOrder() end,
+		
+		-- CHART (Difficulty Selector) - To the left of Radar
+		chartPanel() .. { InitCommand = function(self) self:x(-sidePanelWidth * 1.5 - innerPadding):draworder(1000) end },
+		
+		-- ANALYSIS (Radar) - Far Right
+		radarPanelComp() .. { InitCommand = function(self) self:x(-sidePanelWidth/2) end },
 	},
 
 	-- Bottom Global Progress (Tiny line)
