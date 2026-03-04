@@ -27,7 +27,7 @@ local function UpdateDisplay()
 
 	if queryText then
 		if searchString == "" then
-			queryText:settext("Type to search..."):diffuse(dimText)
+			queryText:settext(THEME:GetString("Search", "Placeholder")):diffuse(dimText)
 		else
 			queryText:settext(searchString):diffuse(brightText)
 		end
@@ -44,9 +44,9 @@ local function UpdateDisplay()
 
 	if hintText then
 		if searchActive then
-			hintText:settext("ENTER  apply  ·  ESC  clear & close  ·  BACKSPACE  delete  ·  DEL  clear all")
+			hintText:settext(THEME:GetString("Search", "HintActive"))
 		else
-			hintText:settext("Search applied. Click search bar or Ctrl+4 to edit.")
+			hintText:settext(THEME:GetString("Search", "HintApplied"))
 		end
 	end
 
@@ -240,7 +240,7 @@ local t = Def.ActorFrame {
 	-- SEARCH label
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW / 2 + 25, -overlayH / 2 + 15):zoom(0.5):diffuse(accentColor):settext("SEARCH")
+			self:halign(0):valign(0):xy(-overlayW / 2 + 25, -overlayH / 2 + 15):zoom(0.5):diffuse(accentColor):settext(THEME:GetString("Search", "Title"))
 		end,
 	},
 
@@ -264,7 +264,7 @@ local t = Def.ActorFrame {
 		Name = "QueryText",
 		InitCommand = function(self)
 			self:halign(0):valign(0.5):xy(-overlayW / 2 + 25 + 15, -overlayH / 2 + 65)
-				:zoom(0.55):diffuse(dimText):settext("Type to search...")
+				:zoom(0.55):diffuse(dimText):settext(THEME:GetString("Search", "Placeholder"))
 				:maxwidth((overlayW - 100) / 0.55)
 		end,
 	},
@@ -287,7 +287,7 @@ local t = Def.ActorFrame {
 		Name = "HintText",
 		InitCommand = function(self)
 			self:halign(0.5):valign(1):xy(0, overlayH / 2 - 12):zoom(0.32):diffuse(dimText)
-				:settext("ENTER  apply  ·  ESC  clear & close  ·  BACKSPACE  delete  ·  DEL  clear all")
+				:settext(THEME:GetString("Search", "HintActive"))
 		end,
 	},
 }

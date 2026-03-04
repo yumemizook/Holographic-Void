@@ -216,7 +216,7 @@ local function SharedInputHandler(event)
 					local ck = currentSteps:GetChartKey()
 					if pl then
 						pl:AddChart(ck)
-						ms.ok("Chart added to " .. pl:GetName())
+						ms.ok(string.format(THEME:GetString("Playlists", "ChartAdded"), pl:GetName()))
 						RefreshChartList()
 						playlistsActor:playcommand("RefreshUI")
 					end
@@ -237,10 +237,10 @@ local function SharedInputHandler(event)
 		if not singleplaylistactive then
 			local ctrlsY = SCREEN_CENTER_Y + overlayH / 2 - 35
 			if IsMouseOverCentered(SCREEN_CENTER_X - 55, ctrlsY, 70, 20) then -- NEW
-				easyInputStringOKCancel("New Playlist Name:", 32, false, function(name)
+				easyInputStringOKCancel(THEME:GetString("Playlists", "PromptNewName"), 32, false, function(name)
 					if name and name ~= "" then
 						SONGMAN:NewPlaylistNoDialog(name)
-						ms.ok("Playlist created: " .. name)
+						ms.ok(string.format(THEME:GetString("Playlists", "PlaylistCreated"), name))
 						RefreshPlaylistList()
 						playlistsActor:playcommand("RefreshUI")
 					end
@@ -248,7 +248,7 @@ local function SharedInputHandler(event)
 				return true
 			end
 			if DLMAN:IsLoggedIn() and IsMouseOverCentered(SCREEN_CENTER_X + 55, ctrlsY, 100, 20) then -- GET EO
-				ms.ok("Downloading missing playlists from online...")
+				ms.ok(THEME:GetString("Playlists", "DownloadingPlaylists"))
 				DLMAN:DownloadMissingPlaylists()
 				return true
 			end
@@ -327,7 +327,7 @@ local function SharedInputHandler(event)
 						if hx >= overlayW - 75 then
 							if plEntry.playlist then
 								SONGMAN:DeletePlaylist(name)
-								ms.ok("Deleted: " .. name)
+								ms.ok(string.format(THEME:GetString("Playlists", "PlaylistDeleted"), name))
 								RefreshPlaylistList()
 								playlistsActor:playcommand("RefreshUI")
 							end
@@ -336,10 +336,10 @@ local function SharedInputHandler(event)
 						-- Action: Rename
 						elseif hx >= overlayW - 105 and hx < overlayW - 75 then
 							if plEntry.playlist then
-								easyInputStringOKCancel("Rename Playlist To:", 32, false, function(newName)
+								easyInputStringOKCancel(THEME:GetString("Playlists", "PromptRename"), 32, false, function(newName)
 									if newName and newName ~= "" then
 										plEntry.playlist:SetName(newName)
-										ms.ok("Playlist renamed: " .. name .. " -> " .. newName)
+										ms.ok(string.format(THEME:GetString("Playlists", "PlaylistRenamed"), name, newName))
 										RefreshPlaylistList()
 										playlistsActor:playcommand("RefreshUI")
 									end
@@ -422,9 +422,9 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:halign(0):zoom(0.5):diffuse(accentColor) end,
 			RefreshUICommand = function(self)
 				if singleplaylistactive and pl then
-					self:settext("PLAYLIST: " .. pl:GetName())
+					self:settextf(THEME:GetString("Playlists", "SingleTitle"), pl:GetName())
 				else
-					self:settextf("PLAYLISTS (%d)", #allplaylists)
+					self:settextf(THEME:GetString("Playlists", "Title"), #allplaylists)
 				end
 			end,
 		},
@@ -435,8 +435,10 @@ local t = Def.ActorFrame {
 			RefreshUICommand = function(self)
 				if singleplaylistactive and pl then
 					local s = GetPlaylistStats()
-					self:settextf("Avg MSD: %.2f  ·  Duration: %s  ·  Charts: %d", 
-						s.avgMSD, SecondsToMSS(s.totalDuration), s.count)
+					self:settextf("%s: %.2f  ·  %s: %s  ·  %s: %d", 
+						THEME:GetString("Playlists", "AvgMSD"), s.avgMSD, 
+						THEME:GetString("Playlists", "Duration"), SecondsToMSS(s.totalDuration), 
+						THEME:GetString("Playlists", "Charts"), s.count)
 				else
 					self:settext("")
 				end
@@ -455,7 +457,7 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:zoomto(60, 18):diffuse(accentColor):diffusealpha(0.4) end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("<- BACK") end,
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("<- " .. THEME:GetString("Common", "Back")) end,
 		},
 	},
 
@@ -470,7 +472,7 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:zoomto(90, 18):diffuse(accentColor):diffusealpha(0.4) end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("PLAY AS COURSE") end,
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext(THEME:GetString("Playlists", "PlayAsCourse")) end,
 		},
 	},
 
@@ -492,7 +494,7 @@ local t = Def.ActorFrame {
 				curPage = currentPlaylistPage
 			end
 			local totalPages = math.max(1, math.ceil(total / perPage))
-			self:settextf("Page %d / %d", curPage, totalPages)
+			self:settextf(THEME:GetString("Common", "PageInfo"), curPage, totalPages)
 		end,
 	},
 	Def.ActorFrame {
@@ -511,7 +513,7 @@ local t = Def.ActorFrame {
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:zoom(0.24):diffuse(brightText):settext("+ ADD CURRENT")
+				self:zoom(0.24):diffuse(brightText):settext(THEME:GetString("Playlists", "AddCurrent"))
 			end
 		}
 	},
@@ -529,7 +531,7 @@ local t = Def.ActorFrame {
 			Name = "NewBtn",
 			InitCommand = function(self) self:x(-55) end,
 			Def.Quad { InitCommand = function(self) self:zoomto(70, 20):diffuse(accentColor):diffusealpha(0.2) end },
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("NEW") end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext(THEME:GetString("Playlists", "New")) end },
 		},
 		-- GET EO PLAYLISTS
 		Def.ActorFrame {
@@ -539,7 +541,7 @@ local t = Def.ActorFrame {
 				self:visible(DLMAN:IsLoggedIn())
 			end,
 			Def.Quad { InitCommand = function(self) self:zoomto(100, 20):diffuse(accentColor):diffusealpha(0.2) end },
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("GET EO PLAYLISTS") end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext(THEME:GetString("Playlists", "GetEO")) end },
 		},
 	},
 }
@@ -574,10 +576,10 @@ t[#t+1] = Def.ActorFrame {
 	InitCommand = function(self) self:xy(-overlayW/2 + 25, -overlayH/2 + 65):visible(false) end,
 	RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
 	
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(60):zoom(0.32):diffuse(accentColor):settext("SONG TITLE") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 230):zoom(0.32):diffuse(accentColor):settext("RATE") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 165):zoom(0.32):diffuse(accentColor):settext("MSD") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 115):zoom(0.32):diffuse(accentColor):settext("PB") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(60):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Common", "SongTitle")) end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 230):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Playlists", "Rate")) end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 165):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Playlists", "MSD")) end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 115):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Playlists", "PB")) end },
 }
 
 -- Rows for playlist list and chart entries
@@ -754,7 +756,7 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 					self:GetChild("DiffText"):settext(""):visible(false)
 					local ct = 0
 					pcall(function() ct = plEntry.playlist:GetNumCharts() end)
-					self:GetChild("SubText"):settextf("%d charts", ct):visible(true)
+					self:GetChild("SubText"):settextf("%d %s", ct, THEME:GetString("Playlists", "Charts"):lower()):visible(true)
 					self:GetChild("RateText"):settext(""):visible(false)
 					self:GetChild("DelBtn"):visible(true)
 					self:GetChild("DelBtn"):diffusealpha(1.0)

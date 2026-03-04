@@ -72,7 +72,7 @@ end
 
 local function AddNewTag()
 	easyInputStringOKCancel(
-		"New Tag Name:", 32, false,
+		THEME:GetString("Tags", "NewTagPrompt"), 32, false,
 		function(name)
 			if name and name ~= "" then
 				local tagData = TAGMAN:get_data().playerTags
@@ -138,7 +138,7 @@ local t = Def.ActorFrame {
 	-- Title
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor):settext("MANAGE TAGS")
+			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor):settext(THEME:GetString("Tags", "Title"))
 		end,
 	},
 
@@ -150,7 +150,7 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:zoomto(90, 20):diffuse(accentColor):diffusealpha(0.15) end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext("+ NEW TAG") end,
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext(THEME:GetString("Tags", "AddTag")) end,
 		},
 	},
 
@@ -166,7 +166,7 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0.5):valign(1):xy(0, overlayH/2 - 12):zoom(0.28):diffuse(dimText)
-				:settext("CLICK tag to toggle · RIGHT-CLICK to delete · SCROLL to page · CLICK outside to close")
+				:settext(THEME:GetString("Tags", "Hint"))
 		end,
 	},
 }
@@ -216,7 +216,7 @@ t.RefreshTagsCommand = function(self)
 	
 	local pageInfo = self:GetChild("PageInfo")
 	if pageInfo then
-		pageInfo:settextf("Tags: %d | Page %d/%d", #allTags, currentPage, totalPages)
+		pageInfo:settextf(THEME:GetString("Tags", "PageInfoFormatted"), #allTags, currentPage, totalPages)
 	end
 	
 	for i = 1, pageSize do

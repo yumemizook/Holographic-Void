@@ -85,7 +85,7 @@ local function confirmPick(idx)
 	MESSAGEMAN:Broadcast("AssetChanged", {type = type, path = path})
 	if type == "avatar" then MESSAGEMAN:Broadcast("AvatarChanged") end
 	MESSAGEMAN:Broadcast("UpdateAssetDisplay")
-	ms.ok("Applied " .. type .. ": " .. name)
+	ms.ok(string.format(THEME:GetString("AssetSettings", "AppliedFormatted"), THEME:GetString("AssetSettings", HV.Capitalize(type)), name))
 end
 
 local t = Def.ActorFrame {
@@ -115,7 +115,7 @@ t[#t+1] = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:y(-150):zoom(0.8):settext("ASSETS"):diffuse(HVColor.Accent) end
+		InitCommand = function(self) self:y(-150):zoom(0.8):settext(THEME:GetString("AssetSettings", "Title")):diffuse(HVColor.Accent) end
 	}
 }
 
@@ -133,7 +133,7 @@ for i, type in ipairs(assetTypes) do
 			end
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.5):settext(type:upper()) end,
+			InitCommand = function(self) self:zoom(0.5):settext(THEME:GetString("AssetSettings", HV.Capitalize(type)):upper()) end,
 			UpdateAssetDisplayMessageCommand = function(self)
 				self:stoptweening():linear(0.1):diffuse(curType == i and HVColor.Accent or HVColor.Text)
 			end
@@ -229,13 +229,13 @@ t[#t+1] = gridAF
 t[#t+1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self) self:xy(mainAreaX + mainW/2, mainAreaY + mainH - 20):zoom(0.4) end,
 	UpdateAssetDisplayMessageCommand = function(self)
-		self:settextf("Page %d / %d  (%d assets)", curPage, maxPage, #assetTable)
+		self:settextf(THEME:GetString("AssetSettings", "PageInfoFormatted"), curPage, maxPage, #assetTable)
 	end
 }
 
 t[#t+1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self) self:xy(SCREEN_WIDTH - 80, SCREEN_HEIGHT - 30):zoom(0.4):halign(1) end,
-	InitCommand = function(self) self:settext("Left Click: Select/Double (Apply)   Right Click: Back   Scroll: Page") end
+	UpdateAssetDisplayMessageCommand = function(self) self:settext(THEME:GetString("AssetSettings", "Hint")) end
 }
 
 -- Global Input Handling (Mouse & Keys)

@@ -73,7 +73,7 @@ local function updateGraphMultiVertex(parent, realgraph)
 		end
 
 		parent:GetChild("npsline"):y(-hidth * 0.7)
-		parent:GetChild("npstext"):settext(string.format("%.0f NPS", hodth / 2 * 0.7)):y(-hidth * 0.9)
+		parent:GetChild("npstext"):settext(string.format(THEME:GetString("ScreenEvaluation", "NPSFormatted"), hodth / 2 * 0.7)):y(-hidth * 0.9)
 		hodth = hidth / hodth
 		local verts = {}
 		local yOffset = 0

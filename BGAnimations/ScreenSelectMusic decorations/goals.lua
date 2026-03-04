@@ -79,7 +79,7 @@ local t = Def.ActorFrame {
 			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor)
 		end,
 		GoalTableRefreshCommand = function(self)
-			self:settextf("GOALS (%d)", #goaltable)
+			self:settextf(THEME:GetString("Goals", "Title"), #goaltable)
 		end,
 	},
 
@@ -88,7 +88,7 @@ local t = Def.ActorFrame {
 		Name = "AddGoalBtn",
 		InitCommand = function(self) self:xy(overlayW/2 - 60, -overlayH/2 + 18) end,
 		Def.Quad { InitCommand = function(self) self:zoomto(80, 20):diffuse(accentColor):diffusealpha(0.3) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.26):diffuse(brightText):settext("+ ADD GOAL") end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.26):diffuse(brightText):settext(THEME:GetString("Goals", "AddGoal")) end },
 	},
 
 	-- Page indicator
@@ -101,7 +101,7 @@ local t = Def.ActorFrame {
 			if #goaltable > 0 then
 				self:settextf("%d-%d of %d", ind + 1, math.min(ind + numGoals, #goaltable), #goaltable)
 			else
-				self:settext("No goals")
+				self:settext(THEME:GetString("Goals", "NoGoals"))
 			end
 		end,
 	},
@@ -113,32 +113,32 @@ local t = Def.ActorFrame {
 		-- Priority header (clickable to sort)
 		LoadFont("Common Normal") .. {
 			Name = "HeaderPri",
-			InitCommand = function(self) self:halign(0.5):x(20):zoom(0.32):diffuse(accentColor):settext("PRI") end,
+			InitCommand = function(self) self:halign(0.5):x(20):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "PriorityColumn")) end,
 		},
 		-- Song name header (clickable to sort by name)
 		LoadFont("Common Normal") .. {
 			Name = "HeaderName",
-			InitCommand = function(self) self:halign(0):x(45):zoom(0.32):diffuse(accentColor):settext("SONG") end,
+			InitCommand = function(self) self:halign(0):x(45):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "SongColumn")) end,
 		},
 		-- Rate header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderRate",
-			InitCommand = function(self) self:halign(0.5):x(350):zoom(0.32):diffuse(accentColor):settext("RATE") end,
+			InitCommand = function(self) self:halign(0.5):x(350):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "RateColumn")) end,
 		},
 		-- Target header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderTarget",
-			InitCommand = function(self) self:halign(0.5):x(420):zoom(0.32):diffuse(accentColor):settext("TARGET %") end,
+			InitCommand = function(self) self:halign(0.5):x(420):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "TargetColumn")) end,
 		},
 		-- Diff header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderDiff",
-			InitCommand = function(self) self:halign(0.5):x(500):zoom(0.32):diffuse(accentColor):settext("DIFF") end,
+			InitCommand = function(self) self:halign(0.5):x(500):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "DiffColumn")) end,
 		},
 		-- Date header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderDate",
-			InitCommand = function(self) self:halign(0.5):x(580):zoom(0.32):diffuse(accentColor):settext("STATUS") end,
+			InitCommand = function(self) self:halign(0.5):x(580):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "StatusColumn")) end,
 		},
 	},
 	Def.Quad {
@@ -160,7 +160,7 @@ local t = Def.ActorFrame {
 		Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(color("0,0,0,0.95")) end },
 		
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:y(-overlayH/2 + 60):zoom(0.6):diffuse(accentColor):settext("NEW GOAL CONFIGURATION") end,
+			InitCommand = function(self) self:y(-overlayH/2 + 60):zoom(0.6):diffuse(accentColor):settext(THEME:GetString("Goals", "NewGoalConfig")) end,
 		},
 
 		-- Settings rows
@@ -168,7 +168,7 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:y(-20) end,
 
 			-- Target %
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):halign(1):zoom(0.4):diffuse(subText):settext("TARGET %:") end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "TargetLabel")) end },
 			Def.Quad { 
 				Name = "TargetBg",
 				InitCommand = function(self) self:x(20):zoomto(120, 36):diffuse(color("0.1,0.1,0.1,1")) end,
@@ -181,7 +181,7 @@ local t = Def.ActorFrame {
 			},
 
 			-- Rate
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(60):halign(1):zoom(0.4):diffuse(subText):settext("RATE:") end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(60):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "RateLabel")) end },
 			LoadFont("Common Normal") .. { Name="RateL", InitCommand = function(self) self:x(-30):y(60):zoom(0.4):diffuse(accentColor):settext("<") end },
 			LoadFont("Common Normal") .. { 
 				Name = "RateVal",
@@ -191,7 +191,7 @@ local t = Def.ActorFrame {
 			LoadFont("Common Normal") .. { Name="RateR", InitCommand = function(self) self:x(70):y(60):zoom(0.4):diffuse(accentColor):settext(">") end },
 
 			-- Priority
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(120):halign(1):zoom(0.4):diffuse(subText):settext("PRIORITY:") end },
+			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(120):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "PriorityLabel")) end },
 			LoadFont("Common Normal") .. { Name="PriL", InitCommand = function(self) self:x(-30):y(120):zoom(0.4):diffuse(accentColor):settext("<") end },
 			LoadFont("Common Normal") .. { 
 				Name = "PriVal",
@@ -209,14 +209,14 @@ local t = Def.ActorFrame {
 				Name = "ConfirmBtn",
 				InitCommand = function(self) self:x(100) end,
 				Def.Quad { InitCommand = function(self) self:zoomto(140, 40):diffuse(color("0,0.5,0,0.6")) end },
-				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext("CONFIRM") end },
+				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext(THEME:GetString("Goals", "Confirm")) end },
 			},
 			-- Cancel
 			Def.ActorFrame {
 				Name = "CancelBtn",
 				InitCommand = function(self) self:x(-100) end,
 				Def.Quad { InitCommand = function(self) self:zoomto(140, 40):diffuse(color("0.5,0,0,0.6")) end },
-				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext("CANCEL") end },
+				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext(THEME:GetString("Goals", "Cancel")) end },
 			},
 		},
 	},
@@ -225,7 +225,7 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0.5):valign(1):xy(0, overlayH/2 - 12):zoom(0.26):diffuse(dimText)
-				:settext("CLICK song → find on wheel · L/R click pri/rate to adjust · CLICK header to sort · SCROLL to page")
+				:settext(THEME:GetString("Goals", "Hint"))
 		end,
 	},
 }
@@ -287,7 +287,7 @@ local function makeGoalRow(i)
 					if goalsong then
 						self:settext(goalsong:GetDisplayMainTitle()):diffuse(brightText)
 					else
-						self:settext("[Missing]"):diffuse(color("1,0.3,0.3,1"))
+						self:settext(THEME:GetString("Goals", "SongMissing")):diffuse(color("1,0.3,0.3,1"))
 					end
 				else
 					self:settext("")
@@ -334,9 +334,9 @@ local function makeGoalRow(i)
 			GoalTableRefreshCommand = function(self)
 				if sg then
 					if sg:IsAchieved() then
-						self:settext("DONE"):diffuse(color("0.4,1,0.4,1"))
+						self:settext(THEME:GetString("Goals", "Done")):diffuse(color("0.4,1,0.4,1"))
 					else
-						self:settext("PENDING"):diffuse(color("1,0.7,0.3,1"))
+						self:settext(THEME:GetString("Goals", "Pending")):diffuse(color("1,0.7,0.3,1"))
 					end
 				else
 					self:settext("")

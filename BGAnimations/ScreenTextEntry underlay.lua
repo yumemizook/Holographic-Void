@@ -147,17 +147,17 @@ return Def.ActorFrame {
 				InitCommand = function(self) self:zoomto(100, 1):y(12):diffuse(accentColor):diffusealpha(0.2) end
 			},
 			LoadFont("Common Normal") .. {
-				Text = "UNHIDE",
+				Text = THEME:GetString("ScreenTextEntry", "Unhide"),
 				InitCommand = function(self) self:zoom(0.4):diffuse(accentColor):shadowlength(1) end,
 				UpdateUnhideTextMessageCommand = function(self) self:playcommand("Update") end,
 				UpdateCommand = function(self) 
 					local screen = SCREENMAN:GetTopScreen()
 					local isMasked = screen and screen:IsInputHidden()
 					if not isMasked then
-						self:settext("HIDE")
+						self:settext(THEME:GetString("ScreenTextEntry", "Hide"))
 						self:diffuse(brightText):glow(accentColor)
 					else
-						self:settext("UNHIDE")
+						self:settext(THEME:GetString("ScreenTextEntry", "Unhide"))
 						self:diffuse(accentColor):glow(color("0,0,0,0"))
 					end
 				end
@@ -166,7 +166,7 @@ return Def.ActorFrame {
 
 		-- Help Text
 		LoadFont("Common Normal") .. {
-			Text = "RIGHT-CLICK TO CANCEL",
+			Text = THEME:GetString("ScreenTextEntry", "RightClickCancel"),
 			InitCommand = function(self) self:xy(boxWidth/2 - 80, boxHeight/2 - 25):zoom(0.3):diffuse(dimText) end
 		}
 	}

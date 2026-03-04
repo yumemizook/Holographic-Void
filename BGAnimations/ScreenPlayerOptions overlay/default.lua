@@ -1,81 +1,185 @@
+--- Holographic Void: ScreenPlayerOptions Overlay
+-- Shows effective scroll speed display and noteskin preview.
+-- Uses SpeedChoiceChangedMessage to update in real-time like Til Death.
+
 local t = Def.ActorFrame {
 	Name = "PlayerOptionsOverlay",
 }
 
--- helper to get song bpm
-local function getSongBPM()
-	local song = GAMESTATE:GetCurrentSong()
-	if not song then return 0 end
-	local state = GAMESTATE:GetSongOptionsObject("ModsLevel_Current")
-	local rate = state:MusicRate() or 1
-	local bpms = song:GetDisplayBpms()
-	if bpms[1] == bpms[2] then
-		return bpms[1] * rate
-	else
-		-- for variable bpm, we can't easily show a single number, 
-		-- but we can show the "max" or "common" or just the range.
-		-- let's use the max for readability.
-		return bpms[2] * rate
-	end
+-- Cache song BPMs at screen load time
+local bpms = {}
+if GAMESTATE:GetCurrentSong() then
+	bpms = GAMESTATE:GetCurrentSong():GetDisplayBpms(true)
+	bpms[1] = math.round(bpms[1])
+	bpms[2] = math.round(bpms[2])
 end
 
--- Current Player Speed Display
+-- ============================================================
+-- SPEED DISPLAY (top-left, above the options rows)
+-- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "SpeedDisplay",
 	InitCommand = function(self)
-		self:xy(SCREEN_LEFT + 60, SCREEN_CENTER_Y)
+		self:xy(SCREEN_LEFT + 16, 50)
 	end,
 
 	-- Label
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:zoom(0.4):diffuse(HVColor.TextDim):halign(0)
-			self:settext("SPEED")
+			self:zoom(0.35):diffuse(HVColor.TextDim):halign(0)
+			self:settext(THEME:GetString("ScreenPlayerOptions", "Speed"))
 		end
 	},
 
-	-- Value
+	-- Value (effective BPM)
 	LoadFont("Common Normal") .. {
 		Name = "SpeedValue",
 		InitCommand = function(self)
-			self:y(24):zoom(0.8):diffuse(HVColor.Accent):halign(0)
+			self:y(18):zoom(0.65):diffuse(HVColor.Accent):halign(0)
 		end,
-		SetCommand = function(self)
-			local ps = GAMESTATE:GetPlayerState()
-			if not ps then return end
-			local po = ps:GetPlayerOptions("ModsLevel_Preferred")
-			if not po then return end
-
-			local songBPM = getSongBPM()
-			local displayStr = ""
-
-			local cmod = po:CMod()
-			if cmod and cmod > 0 then
-				displayStr = string.format("C%.0f (%.0f)", cmod, cmod)
-			else
-				local xmod = po:ScrollSpeed()
-				if xmod then
-					local effectiveBPM = songBPM * xmod
-					displayStr = string.format("%.2fx (%.0f)", xmod, effectiveBPM)
+		BeginCommand = function(self)
+			local speed, mode = GetSpeedModeAndValueFromPoptions(PLAYER_1)
+			self:playcommand("SpeedChoiceChanged", {pn = PLAYER_1, mode = mode, speed = speed})
+		end,
+		RateListOptionChangedMessageCommand = function(self)
+			self:finishtweening():sleep(0.01):queuecommand("DelayedUpdate")
+		end,
+		RateListOptionSavedMessageCommand = function(self)
+			self:finishtweening():sleep(0.01):queuecommand("DelayedUpdate")
+		end,
+		DelayedUpdateCommand = function(self)
+			self:playcommand("SpeedChoiceChanged", {pn = PLAYER_1, mode = self._mode, speed = self._speed})
+		end,
+		SpeedChoiceChangedMessageCommand = function(self, param)
+			self._mode = param.mode
+			self._speed = param.speed
+			if param.pn == PLAYER_1 then
+				local text = ""
+				if param.mode == "x" then
+					if not bpms[1] then
+						text = "???"
+					elseif bpms[1] == bpms[2] then
+						text = tostring(math.round(bpms[1] * getCurRateValue() * param.speed / 100))
+					else
+						text = string.format("%d - %d",
+							math.round(bpms[1] * getCurRateValue() * param.speed / 100),
+							math.round(bpms[2] * getCurRateValue() * param.speed / 100))
+					end
+				elseif param.mode == "C" then
+					text = tostring(param.speed)
 				else
-					displayStr = "???"
+					-- mmod
+					if not bpms[1] then
+						text = "??? - " .. param.speed
+					elseif bpms[1] == bpms[2] then
+						text = tostring(param.speed)
+					else
+						local factor = param.speed / bpms[2]
+						text = string.format("%d - %d", math.round(bpms[1] * factor), param.speed)
+					end
 				end
+				self:settext(text)
 			end
-			self:settext(displayStr)
-		end,
-		OnCommand = function(self)
-			self:queuecommand("Set")
-		end,
-		PlayerOptionsChangedMessageCommand = function(self)
-			self:playcommand("Set")
-		end,
-		InitCommand = function(self)
-			self:y(24):zoom(0.8):diffuse(HVColor.Accent):halign(0)
-			self:SetUpdateFunction(function(self)
-				self:playcommand("Set")
-			end)
 		end
 	}
 }
+
+-- ============================================================
+-- NOTESKIN PREVIEW
+-- ============================================================
+local widescreen = GetScreenAspectRatio() > 1.7
+
+local NSPreviewSize   = 0.5
+local NSPreviewX      = 20
+local NSPreviewY      = 125
+local NSPreviewXSpan  = 35
+local NSPreviewReceptorY = -32
+local OptionRowHeight = 35
+local NoteskinRow     = 0
+local NSDirTable      = GameToNSkinElements()
+
+local function NSkinPreviewWrapper(dir, ele)
+	return Def.ActorFrame {
+		InitCommand = function(self)
+			self:zoom(NSPreviewSize)
+		end,
+		LoadNSkinPreview("Get", dir, ele, PLAYER_1)
+	}
+end
+
+local function NSkinPreviewExtraTaps()
+	local out = Def.ActorFrame {}
+	for i = 1, #NSDirTable do
+		if i ~= 2 then
+			out[#out + 1] = Def.ActorFrame {
+				Def.ActorFrame {
+					InitCommand = function(self)
+						self:x(NSPreviewXSpan * (i - 1))
+					end,
+					NSkinPreviewWrapper(NSDirTable[i], "Tap Note")
+				},
+				Def.ActorFrame {
+					InitCommand = function(self)
+						self:x(NSPreviewXSpan * (i - 1)):y(NSPreviewReceptorY)
+					end,
+					NSkinPreviewWrapper(NSDirTable[i], "Receptor")
+				}
+			}
+		end
+	end
+	return out
+end
+
+t[#t + 1] = Def.ActorFrame {
+	OnCommand = function(self)
+		self:xy(NSPreviewX, NSPreviewY)
+		for i = 0, SCREENMAN:GetTopScreen():GetNumRows() - 1 do
+			if SCREENMAN:GetTopScreen():GetOptionRow(i) and
+			   SCREENMAN:GetTopScreen():GetOptionRow(i):GetName() == "NoteSkins" then
+				NoteskinRow = i
+			end
+		end
+		self:SetUpdateFunction(function(self)
+			local row = SCREENMAN:GetTopScreen():GetCurrentRowIndex(PLAYER_1)
+			local pos = 0
+			if row > 4 then
+				pos = NSPreviewY + NoteskinRow * OptionRowHeight -
+				      (SCREENMAN:GetTopScreen():GetCurrentRowIndex(PLAYER_1) - 4) * OptionRowHeight
+			else
+				pos = NSPreviewY + NoteskinRow * OptionRowHeight
+			end
+			self:y(pos)
+			self:visible(NoteskinRow - row > -5 and NoteskinRow - row < 7)
+		end)
+	end,
+
+	-- Middle column (always shown)
+	Def.ActorFrame {
+		InitCommand = function(self)
+			if widescreen then
+				self:x(NSPreviewXSpan)
+			else
+				self:x(NSPreviewXSpan / 4)
+			end
+		end,
+		NSkinPreviewWrapper(NSDirTable[2], "Tap Note")
+	},
+	Def.ActorFrame {
+		InitCommand = function(self)
+			if widescreen then
+				self:x(NSPreviewXSpan)
+			else
+				self:x(NSPreviewXSpan / 4)
+			end
+			self:y(NSPreviewReceptorY)
+		end,
+		NSkinPreviewWrapper(NSDirTable[2], "Receptor")
+	}
+}
+
+-- Extra columns on widescreen
+if widescreen then
+	t[#t][#(t[#t]) + 1] = NSkinPreviewExtraTaps()
+end
 
 return t

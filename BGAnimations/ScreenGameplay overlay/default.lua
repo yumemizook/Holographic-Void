@@ -59,10 +59,10 @@ local judgmentTNS = {
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
-		self:SetUpdateFunction(function(s)
-			s:GetParent():playcommand("Update")
+		self:SetUpdateFunction(function(self)
+			MESSAGEMAN:Broadcast("PlayingUpdate")
 		end)
-		self:SetUpdateRate(1 / 30)
+		self:SetUpdateRate(1 / 60)
 	end
 }
 
@@ -70,8 +70,8 @@ t[#t + 1] = Def.ActorFrame {
 -- SONG PROGRESS BAR (TOP of screen)
 -- ============================================================
 local barW = SCREEN_WIDTH * 0.4
-local barH = 3
-local barY = 10
+local barH = 6
+local barY = 12
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "ProgressBar",
@@ -91,7 +91,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):x(-barW / 2)
 				:zoomto(0, barH):diffuse(accentColor):diffusealpha(0.7)
 		end,
-		UpdateCommand = function(self)
+		PlayingUpdateMessageCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local len = song:MusicLengthSeconds()
@@ -104,39 +104,40 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
+	-- Remaining Time (incorporating music rate and ms)
 	LoadFont("Common Normal") .. {
 		Name = "TimeRemaining",
 		InitCommand = function(self)
-			self:x(barW / 2 + 8):zoom(0.25):halign(0):diffuse(dimText)
+			self:x(barW / 2 + 8):zoom(0.35):halign(0):diffuse(dimText)
 		end,
-		UpdateCommand = function(self)
+		PlayingUpdateMessageCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local songLen = song:MusicLengthSeconds()
 				local curTime = GAMESTATE:GetSongPosition():GetMusicSeconds()
-				local remaining = math.max(0, songLen - curTime)
+				local remaining = math.max(0, songLen - curTime) / getCurRateValue()
 				local mins = math.floor(remaining / 60)
 				local secs = math.floor(remaining % 60)
-				self:settext(string.format("-%d:%02d", mins, secs))
+				local ms = math.floor((remaining - math.floor(remaining)) * 100)
+				self:settext(string.format("-%d:%02d.%02d", mins, secs, ms))
 			end
 		end
 	},
 
-	-- Difficulty / MSD / Rate (left of progress bar)
+	-- Elapsed Time (incorporating music rate and ms)
 	LoadFont("Common Normal") .. {
+		Name = "TimeElapsed",
 		InitCommand = function(self)
-			self:x(-barW / 2 - 8):zoom(0.25):halign(1):diffuse(subText)
+			self:x(-barW / 2 - 8):zoom(0.35):halign(1):diffuse(subText)
 		end,
-		BeginCommand = function(self)
-			local steps = GAMESTATE:GetCurrentSteps()
-			if steps then
-				local diff = ToEnumShortString(steps:GetDifficulty())
-				local msd = steps:GetMSD(getCurRateValue(), 1)
-				local rate = getCurRateString()
-				local txt = diff
-				if msd and msd > 0 then txt = txt .. " " .. string.format("%.2f", msd) end
-				if rate and rate ~= "1x" and rate ~= "1.0x" then txt = txt .. " " .. rate end
-				self:settext(txt)
+		PlayingUpdateMessageCommand = function(self)
+			local song = GAMESTATE:GetCurrentSong()
+			if song then
+				local curTime = math.max(0, GAMESTATE:GetSongPosition():GetMusicSeconds()) / getCurRateValue()
+				local mins = math.floor(curTime / 60)
+				local secs = math.floor(curTime % 60)
+				local ms = math.floor((curTime - math.floor(curTime)) * 100)
+				self:settext(string.format("%d:%02d.%02d", mins, secs, ms))
 			end
 		end
 	}
@@ -147,7 +148,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local lifeBarW = 8
 local lifeBarH = SCREEN_HEIGHT * 0.5
-local lifeBarX = SCREEN_RIGHT - 16
+local lifeBarX = SCREEN_CENTER_X + 220
 local lifeBarY = SCREEN_CENTER_Y
 
 t[#t + 1] = Def.ActorFrame {
@@ -172,7 +173,7 @@ t[#t + 1] = Def.ActorFrame {
 		JudgmentMessageCommand = function(self)
 			self:playcommand("RefreshLife")
 		end,
-		UpdateCommand = function(self)
+		PlayingUpdateMessageCommand = function(self)
 			self:playcommand("RefreshLife")
 		end,
 		RefreshLifeCommand = function(self)
@@ -210,7 +211,7 @@ t[#t + 1] = Def.ActorFrame {
 		JudgmentMessageCommand = function(self)
 			self:playcommand("RefreshLifePct")
 		end,
-		UpdateCommand = function(self)
+		PlayingUpdateMessageCommand = function(self)
 			self:playcommand("RefreshLifePct")
 		end,
 		RefreshLifePctCommand = function(self)
@@ -231,7 +232,7 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 40):diffusealpha(0.8)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 90):diffusealpha(0.8)
 	end,
 
 	LoadFont("Common Normal") .. {
@@ -240,19 +241,77 @@ t[#t + 1] = Def.ActorFrame {
 			self:zoom(0.45):diffuse(brightText):diffusealpha(0.7)
 			self:settext("0.00%")
 		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local wifePct = pss:GetWifeScore() * 100
-				if wifePct < 0 then wifePct = 0 end
-				self:settext(string.format("%.2f%%", wifePct))
-				-- Optional: color shift based on grade
-				local grade = pss:GetGrade()
-				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade))):diffusealpha(0.7)
+		JudgmentMessageCommand = function(self, params)
+			local wifePct
+			if params and params.WifePercent then
+				wifePct = params.WifePercent
+			else
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					wifePct = pss:GetWifeScore() * 100
+				end
 			end
+			if not wifePct then return end
+			self:settext(string.format("%.4f%%", wifePct))
+			-- Color based on wife%
+			local gradeStr = "F"
+			if     wifePct >= 99.9935 then gradeStr = "AAAAA"
+			elseif wifePct >= 99.995 then gradeStr = "AAAA"
+			elseif wifePct >= 99.70 then gradeStr = "AAA"
+			elseif wifePct >= 93.00 then gradeStr = "AA"
+			elseif wifePct >= 80.00 then gradeStr = "A"
+			elseif wifePct >= 70.00 then gradeStr = "B"
+			elseif wifePct >= 60.00 then gradeStr = "C"
+			elseif wifePct >= 0 then gradeStr = "D"
+			end
+			self:diffuse(HVColor.GetGradeColor(gradeStr)):diffusealpha(0.7)
 		end
 	}
 }
+
+-- ============================================================
+-- TEXT PACEMAKER (TIL DEATH STYLE)
+-- ============================================================
+local showTextPacemaker = ThemePrefs.Get("HV_ShowTextPacemaker") == "true"
+if showTextPacemaker then
+	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType") or "Target"
+	local targetGoalPct = tonumber(ThemePrefs.Get("HV_PacemakerTargetGoal")) or 93
+	local targetGoal = targetGoalPct / 100
+
+	-- Set the engine-side target goal and replay mode
+	GAMESTATE:GetPlayerState():SetTargetGoal(targetGoal)
+	GAMESTATE:GetPlayerState():SetGoalTrackerUsesReplay(pacemakerMode == "PBReplay")
+
+	t[#t + 1] = Def.ActorFrame {
+		Name = "TextPacemaker",
+		InitCommand = function(self)
+			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70)
+		end,
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):zoom(0.35)
+				self:settext("")
+			end,
+			JudgmentMessageCommand = function(self, msg)
+				local tDiff = msg.WifeDifferential
+				local displayTarget = targetGoalPct
+
+				-- In PB or PB Replay mode, use the PB goal/differential if available
+				if (pacemakerMode == "PB" or pacemakerMode == "PBReplay") and msg.WifePBGoal ~= nil then
+					tDiff = msg.WifePBDifferential
+					displayTarget = msg.WifePBGoal * 100
+				end
+
+				if tDiff >= 0 then
+					self:diffuse(color("#00ff00"))
+				else
+					self:diffuse(HVColor.Negative or color("#ff0000"))
+				end
+				self:settextf("%+5.2f (%5.2f%%)", tDiff, displayTarget)
+			end
+		}
+	}
+end
 
 -- ============================================================
 -- CENTERED COMBO / MISS STREAK (per-note update)
@@ -262,14 +321,14 @@ local missStreak = 0
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 40)
-		self:visible(false)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 55)
 	end,
 
 	LoadFont("Common Large") .. {
 		Name = "ComboNumber",
 		InitCommand = function(self)
-			self:zoom(0.65):diffuse(brightText):y(-4)
+			self:zoom(0.65):diffuse(dimText):y(-4)
+			self:settext("0")
 		end
 	},
 
@@ -277,96 +336,47 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "ComboLabel",
 		InitCommand = function(self)
 			self:zoom(0.22):diffuse(subText):y(14)
-			self:settext("COMBO")
+			self:settext(THEME:GetString("ScreenGameplay", "Combo"))
 		end
 	},
 
 	JudgmentMessageCommand = function(self, params)
-		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-		if not pss then return end
-
-		-- Track miss streak
 		if params.TapNoteScore == "TapNoteScore_Miss" or params.TapNoteScore == "TapNoteScore_W5" then
 			missStreak = missStreak + 1
 		else
 			missStreak = 0
 		end
+		
+		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		if not pss then return end
+		local combo = pss:GetCurrentCombo()
+		if combo == 0 and missStreak >= 5 then
+			local numActor = self:GetChild("ComboNumber")
+			local labelActor = self:GetChild("ComboLabel")
+			numActor:settext(tostring(missStreak)):diffuse(color("#FF5050"))
+			labelActor:settext(THEME:GetString("ScreenGameplay", "Misses")):diffuse(color("#FF5050")):diffusealpha(0.8)
+		end
+	end,
+
+	ComboChangedMessageCommand = function(self, params)
+		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		if not pss then return end
 
 		local combo = pss:GetCurrentCombo()
 		local numActor = self:GetChild("ComboNumber")
 		local labelActor = self:GetChild("ComboLabel")
 
 		if combo > 0 then
-			self:visible(true)
 			numActor:settext(tostring(combo)):diffuse(brightText)
-			labelActor:settext("COMBO"):diffuse(subText)
-		elseif missStreak >= 5 then
-			self:visible(true)
-			numActor:settext(tostring(missStreak)):diffuse(color("#FF5050"))
-			labelActor:settext("MISSES"):diffuse(color("#FF5050")):diffusealpha(0.8)
-		else
-			self:visible(false)
+			labelActor:settext(THEME:GetString("ScreenGameplay", "Combo")):diffuse(subText)
+		elseif missStreak < 5 then
+			numActor:settext("0"):diffuse(dimText)
+			labelActor:settext(THEME:GetString("ScreenGameplay", "Combo")):diffuse(subText):diffusealpha(0.5)
 		end
 	end
 }
 
--- ============================================================
--- REAL-TIME ACCURACY / SCORE% (BTM LEFT - Secondary reference)
--- ============================================================
-t[#t + 1] = Def.ActorFrame {
-	Name = "AccuracyDisplay",
-	InitCommand = function(self)
-		self:xy(12, SCREEN_BOTTOM - 50):diffusealpha(0.6)
-	end,
-
-	-- NPS Display
-	LoadFont("Common Normal") .. {
-		Name = "NPSDisplay",
-		InitCommand = function(self)
-			self:halign(0):valign(1):y(-40):zoom(0.35):diffuse(accentColor)
-			self:settext("0 NPS")
-			self:visible(ThemePrefs.Get("HV_ShowNPS") == "true")
-		end,
-		UpdateCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				-- GetActualCurrentNotesPerSecond() is not standard Etterna.
-				-- We omit this for now to avoid the nil error.
-				-- self:settext("NPS")
-			end
-		end
-	},
-
-	LoadFont("Common Normal") .. {
-		Name = "ScorePercent",
-		InitCommand = function(self)
-			self:halign(0):valign(1):zoom(0.5):diffuse(brightText)
-			self:settext("0.0000%")
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local wifePct = pss:GetWifeScore() * 100
-				self:settext(string.format("%.4f%%", wifePct))
-			end
-		end
-	},
-
-	-- Player name
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:halign(0):valign(1):y(-20):zoom(0.28):diffuse(dimText)
-		end,
-		BeginCommand = function(self)
-			local profile = PROFILEMAN:GetProfile(PLAYER_1)
-			if profile then
-				local name = profile:GetDisplayName()
-				if name == "" then name = "Player" end
-				self:settext(name)
-			end
-		end
-	}
-}
+-- AccuracyDisplay removed (redundant with pacemaker and NPS graph, overlapping with avatar)
 
 -- ============================================================
 -- ERROR BAR (TIMING BAR)
@@ -423,26 +433,25 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	end,
 
-	Def.ActorFrame {
-		Name = "Pool",
-		InitCommand = function(self)
-			for i=1, 50 do
-				self:AddChild(Def.Quad {
-					Name = "Dot"..i,
-					InitCommand = function(s)
-						s:zoomto(1, ebH + 6):visible(false)
-					end
-				})
-			end
+	(function()
+		local poolDef = Def.ActorFrame { Name = "Pool" }
+		for i=1, 50 do
+			poolDef[#poolDef + 1] = Def.Quad {
+				Name = "Dot"..i,
+				InitCommand = function(s)
+					s:zoomto(1, ebH + 6):visible(false)
+				end
+			}
 		end
-	}
+		return poolDef
+	end)()
 }
 
 -- ============================================================
 -- COMPACT JUDGMENT TALLY + OK/NG + REAL-TIME GRADE
 -- ============================================================
-local tallyX = SCREEN_RIGHT - 160
-local tallyY = SCREEN_CENTER_Y - 80
+local tallyX = SCREEN_CENTER_X + 250
+local tallyY = SCREEN_BOTTOM - 200
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "JudgmentTally",
@@ -459,7 +468,7 @@ for i, label in ipairs(judgmentLabels) do
 
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoom(0.22):diffuse(judgmentColors[i]):diffusealpha(0.8)
+				self:halign(0):valign(0):zoom(0.26):diffuse(judgmentColors[i]):diffusealpha(0.8)
 				self:settext(label)
 			end
 		},
@@ -467,7 +476,7 @@ for i, label in ipairs(judgmentLabels) do
 		LoadFont("Common Normal") .. {
 			Name = "TallyCount_" .. label,
 			InitCommand = function(self)
-				self:halign(1):valign(0):x(100):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
+				self:halign(1):valign(0):x(60):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
 				self:settext("0")
 			end,
 			JudgmentMessageCommand = function(self)
@@ -491,14 +500,14 @@ t[#t + 1] = Def.ActorFrame {
 
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(0.22):diffuse(color("#A0E0A0")):diffusealpha(0.8)
-			self:settext("OK")
+			self:halign(0):valign(0):zoom(0.26):diffuse(color("#A0E0A0")):diffusealpha(0.8)
+			self:settext(THEME:GetString("HoldNoteScore", "OK"))
 		end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "OKCount",
 		InitCommand = function(self)
-			self:halign(1):valign(0):x(100):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
+			self:halign(1):valign(0):x(60):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
 			self:settext("0")
 		end,
 		JudgmentMessageCommand = function(self)
@@ -512,14 +521,14 @@ t[#t + 1] = Def.ActorFrame {
 
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(16):zoom(0.22):diffuse(color("#E0A0A0")):diffusealpha(0.8)
-			self:settext("NG")
+			self:halign(0):valign(0):y(16):zoom(0.26):diffuse(color("#E0A0A0")):diffusealpha(0.8)
+			self:settext(THEME:GetString("HoldNoteScore", "NG"))
 		end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "NGCount",
 		InitCommand = function(self)
-			self:halign(1):valign(0):x(100):y(16):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
+			self:halign(1):valign(0):x(60):y(16):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
 			self:settext("0")
 		end,
 		JudgmentMessageCommand = function(self)
@@ -532,37 +541,8 @@ t[#t + 1] = Def.ActorFrame {
 	}
 }
 
--- Real-time Grade Display (below OK/NG)
-t[#t + 1] = Def.ActorFrame {
-	Name = "RealtimeGrade",
-	InitCommand = function(self)
-		self:xy(tallyX, okngY + 40)
-	end,
+-- Real-time Grade Display has been moved to the pacemaker panel.
 
-	LoadFont("Common Normal") .. {
-		Name = "GradeLabel",
-		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(0.22):diffuse(dimText)
-			self:settext("GRADE")
-		end
-	},
-
-	LoadFont("Common Normal") .. {
-		Name = "GradeValue",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(100):zoom(0.4):diffuse(brightText)
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local grade = pss:GetGrade()
-				local gradeStr = ToEnumShortString(grade)
-				self:settext(THEME:GetString("Grade", gradeStr))
-				self:diffuse(HVColor.GetGradeColor(gradeStr))
-			end
-		end
-	}
-}
 
 -- ============================================================
 -- JUDGE RESCORING & MEAN/SD
@@ -570,21 +550,21 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "RescoreStats",
 	InitCommand = function(self)
-		self:xy(tallyX, okngY + 80)
+		self:xy(tallyX, okngY + 40)
 	end,
 
 	-- Rescored % (J4)
 	LoadFont("Common Normal") .. {
 		Name = "RescoreLabel",
 		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(0.22):diffuse(dimText)
+			self:halign(0):valign(0):zoom(0.26):diffuse(dimText)
 			self:settext("J4")
 		end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "RescoreValue",
 		InitCommand = function(self)
-			self:halign(1):valign(0):x(100):zoom(0.26):diffuse(subText)
+			self:halign(1):valign(0):x(60):zoom(0.26):diffuse(subText)
 			self:settext("0.00%")
 		end,
 		JudgmentMessageCommand = function(self)
@@ -601,14 +581,14 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "MeanSDLabel",
 		InitCommand = function(self)
-			self:halign(0):valign(0):y(16):zoom(0.22):diffuse(dimText)
-			self:settext("MEAN/SD")
+			self:halign(0):valign(0):y(16):zoom(0.26):diffuse(dimText)
+			self:settext(THEME:GetString("ScreenGameplay", "MeanSD"))
 		end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "MeanSDValue",
 		InitCommand = function(self)
-			self:halign(1):valign(0):x(100):y(16):zoom(0.26):diffuse(subText)
+			self:halign(1):valign(0):x(60):y(16):zoom(0.24):diffuse(subText)
 			self:settext("0.0 / 0.0")
 		end,
 		JudgmentMessageCommand = function(self)
@@ -616,8 +596,8 @@ t[#t + 1] = Def.ActorFrame {
 			if pss then
 				local dvt = pss:GetOffsetVector()
 				if dvt and #dvt > 0 then
-					local mean = wifeMean(dvt) * 1000
-					local sd = wifeSd(dvt) * 1000
+					local mean = wifeMean(dvt)
+					local sd = wifeSd(dvt)
 					self:settext(string.format("%.1f / %.1f", mean, sd))
 				end
 			end
@@ -631,15 +611,31 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "SongInfoHUD",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 10)
+		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 14)
 	end,
 	OnCommand = function(self)
-		self:diffusealpha(0.5)
+		self:diffusealpha(0.6)
 	end,
+	
+	-- BPM and Rate display added above song title
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:y(-18):zoom(0.35):diffuse(subText):maxwidth(SCREEN_WIDTH / 0.35)
+		end,
+		PlayingUpdateMessageCommand = function(self)
+			local song = GAMESTATE:GetCurrentSong()
+			if song then
+				local bps = GAMESTATE:GetSongPosition():GetCurBPS()
+				local bpm = bps * 60 * getCurRateValue()
+				local rate = getCurRateString()
+				self:settextf("%d BPM    %s Rate", math.floor(bpm + 0.5), rate)
+			end
+		end
+	},
 
 	LoadFont("Zpix Normal") .. {
 		InitCommand = function(self)
-			self:zoom(0.3):diffuse(mainText):maxwidth(SCREEN_WIDTH * 0.5 / 0.3)
+			self:zoom(0.35):diffuse(mainText):maxwidth(SCREEN_WIDTH * 0.5 / 0.35)
 		end,
 		BeginCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
@@ -655,27 +651,24 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local lastToastyCombo = 0
 
-local toastyImgPath = (function()
-	local candidates = {
-		THEME:GetPathG("", "toasty"),
-		THEME:GetPathG("Common", "toasty"),
+local function safeGetThemePath(type, folder, element)
+	local possiblePaths = {
+		"Themes/Holographic Void/" .. folder .. "/" .. element,
+		"Themes/_fallback/" .. folder .. "/" .. element
 	}
-	for _, p in ipairs(candidates) do
-		if p and p ~= "" and FILEMAN:DoesFileExist(p) then return p end
+	for _, p in ipairs(possiblePaths) do
+		local extensions = type == "G" and {".png", ".jpg", ".jpeg", ".gif", ".webm"} or {".ogg", ".wav", ".mp3"}
+		for _, ext in ipairs(extensions) do
+			if FILEMAN:DoesFileExist(p .. ext) then
+				return p .. ext
+			end
+		end
 	end
 	return nil
-end)()
+end
 
-local toastySndPath = (function()
-	local candidates = {
-		THEME:GetPathS("", "toasty"),
-		THEME:GetPathS("Common", "toasty"),
-	}
-	for _, p in ipairs(candidates) do
-		if p and p ~= "" and FILEMAN:DoesFileExist(p) then return p end
-	end
-	return nil
-end)()
+local toastyImgPath = safeGetThemePath("G", "Graphics", "toasty") or safeGetThemePath("G", "Graphics", "Common toasty")
+local toastySndPath = safeGetThemePath("S", "Sounds", "toasty") or safeGetThemePath("S", "Sounds", "Common toasty")
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "Toasty",
@@ -754,5 +747,11 @@ if laneCoverPct > 0 then
 		}
 	}
 end
+
+t[#t + 1] = LoadActor("scoretracking")
+t[#t + 1] = LoadActor("pacemaker")
+t[#t + 1] = LoadActor("npscalc")
+t[#t + 1] = LoadActor("avatar")
+t[#t + 1] = LoadActor("intro")
 
 return t

@@ -162,7 +162,7 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 12):zoom(0.5)
-				:diffuse(accentColor):settext("FILTERS")
+				:diffuse(accentColor):settext(THEME:GetString("Filters", "Title"))
 		end,
 	},
 
@@ -170,13 +170,13 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 34):zoom(0.24):diffuse(dimText)
-				:settext("Click a cell to type a number · Start/Back to finish · Right-click to cancel")
+				:settext(THEME:GetString("Filters", "Instructions"))
 		end,
 	},
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 48):zoom(0.24):diffuse(dimText)
-				:settext("Grey values indicate no filter is applied · Lower bound ≤ Value ≤ Upper bound")
+				:settext(THEME:GetString("Filters", "Hint"))
 		end,
 	},
 
@@ -187,17 +187,17 @@ local t = Def.ActorFrame {
 		end,
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):zoom(0.28):diffuse(dimText):settext("SKILLSET")
+				self:halign(0):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "SkillsetColumn"))
 			end,
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0.5):x(minColX):zoom(0.28):diffuse(dimText):settext("MIN")
+				self:halign(0.5):x(minColX):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "MinColumn"))
 			end,
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0.5):x(maxColX):zoom(0.28):diffuse(dimText):settext("MAX")
+				self:halign(0.5):x(maxColX):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "MaxColumn"))
 			end,
 		},
 	},
@@ -215,9 +215,9 @@ local function CreateFilterInputBox(i)
 	if i <= #ms.SkillSets then
 		label = ms.SkillSetsTranslated[i] or ms.SkillSets[i]
 	elseif i == #ms.SkillSets + 1 then
-		label = "Length (s)"
+		label = THEME:GetString("Filters", "LengthLabel")
 	else
-		label = "Best %"
+		label = THEME:GetString("Filters", "BestPercentLabel")
 	end
 
 	local rowY = -overlayH / 2 + rowStartY + (i - 1) * spacingY
@@ -390,7 +390,7 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 			:diffuse(accentColor)
 	end,
 	SetCommand = function(self)
-		self:settextf("Max Rate: %5.1fx", FILTERMAN:GetMaxFilterRate())
+		self:settextf(THEME:GetString("Filters", "MaxRateFormatted"), FILTERMAN:GetMaxFilterRate())
 	end,
 	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
 	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
@@ -422,7 +422,7 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 			:diffuse(accentColor)
 	end,
 	SetCommand = function(self)
-		self:settextf("Min Rate: %5.1fx", FILTERMAN:GetMinFilterRate())
+		self:settextf(THEME:GetString("Filters", "MinRateFormatted"), FILTERMAN:GetMinFilterRate())
 	end,
 	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
 	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
@@ -458,9 +458,9 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 	end,
 	SetCommand = function(self)
 		if FILTERMAN:GetFilterMode() then
-			self:settext("Mode: AND")
+			self:settext(THEME:GetString("Filters", "ModeAND"))
 		else
-			self:settext("Mode: OR")
+			self:settext(THEME:GetString("Filters", "ModeOR"))
 		end
 	end,
 	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
@@ -491,8 +491,8 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 			:maxwidth((overlayW / 2 - 40) / textzoom)
 	end,
 	SetCommand = function(self)
-		local onoff = FILTERMAN:GetHighestSkillsetsOnly() and "On" or "Off"
-		self:settext("Highest SS Only: " .. onoff)
+		local onoff = FILTERMAN:GetHighestSkillsetsOnly() and THEME:GetString("Filters", "On") or THEME:GetString("Filters", "Off")
+		self:settextf(THEME:GetString("Filters", "HighestSSOnly"), onoff)
 		if FILTERMAN:GetFilterMode() then
 			self:diffuse(color("1,1,1,0.2"))
 		else
@@ -537,8 +537,8 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 			:maxwidth((overlayW / 2 - 40) / textzoom)
 	end,
 	SetCommand = function(self)
-		local onoff = FILTERMAN:GetHighestDifficultyOnly() and "On" or "Off"
-		self:settext("Highest Diff Only: " .. onoff)
+		local onoff = FILTERMAN:GetHighestDifficultyOnly() and THEME:GetString("Filters", "On") or THEME:GetString("Filters", "Off")
+		self:settextf(THEME:GetString("Filters", "HighestDiffOnly"), onoff)
 		if FILTERMAN:GetFilterMode() then
 			self:diffuse(color("1,1,1,0.2"))
 		else
@@ -585,7 +585,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	end,
 	FilterResultsMessageCommand = function(self, msg)
 		if msg then
-			self:settextf("Matches: %d / %d", msg.Matches or 0, msg.Total or 0)
+			self:settextf(THEME:GetString("Filters", "MatchesFormatted"), msg.Matches or 0, msg.Total or 0)
 		end
 	end,
 }
@@ -599,7 +599,7 @@ t[#t + 1] = UIElements.TextButton(1, 1, "Common Normal") .. {
 		self:xy(overlayW / 2 - 80, bottomY)
 		local txt = self:GetChild("Text")
 		local bg = self:GetChild("BG")
-		txt:zoom(0.30):settext("RESET ALL"):diffuse(color("1,0.4,0.4,1"))
+		txt:zoom(0.30):settext(THEME:GetString("Filters", "ResetAll")):diffuse(color("1,0.4,0.4,1"))
 		bg:zoomto(90, 22):diffuse(color("0.15,0,0,0.8"))
 	end,
 	RolloverUpdateCommand = function(self, params)

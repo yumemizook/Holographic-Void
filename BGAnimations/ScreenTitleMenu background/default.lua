@@ -165,7 +165,7 @@ local t = Def.ActorFrame {
 		end
 	end,
 	LoginFailedMessageCommand = function(self)
-		ms.ok("Login Failed. Please check your credentials.")
+		ms.ok(THEME:GetString("ScreenTitleMenu", "LoginFailed"))
 	end,
 	LogOutMessageCommand = function(self)
 		-- Only clear username on manual logout to preserve auto-login token
@@ -173,31 +173,31 @@ local t = Def.ActorFrame {
 	TriggerLoginFlowMessageCommand = function(self)
 		Trace("[HV] TriggerLoginFlow received in Title")
 		easyInputStringOKCancel(
-			"Email:", 255, false,
+			THEME:GetString("ScreenTitleMenu", "EmailPrompt"), 255, false,
 			function(email)
 				if email ~= "" then
 					self.tempEmail = email
 					self:sleep(0.02):queuecommand("LoginStep2")
 				else
-					ms.ok("Login Canceled")
+					ms.ok(THEME:GetString("ScreenTitleMenu", "LoginCanceled"))
 				end
 			end,
-			function() ms.ok("Login Canceled") end
+			function() ms.ok(THEME:GetString("ScreenTitleMenu", "LoginCanceled")) end
 		)
 	end,
 	
 	LoginStep2Command = function(self)
 		easyInputStringOKCancel(
-			"Password:", 255, true,
+			THEME:GetString("ScreenTitleMenu", "PasswordPrompt"), 255, true,
 			function(password)
 				if password ~= "" then
 					Trace("[HV] Attempting DLMAN:Login for " .. tostring(self.tempEmail))
 					DLMAN:Login(self.tempEmail, password)
 				else
-					ms.ok("Login Canceled")
+					ms.ok(THEME:GetString("ScreenTitleMenu", "LoginCanceled"))
 				end
 			end,
-			function() ms.ok("Login Canceled") end
+			function() ms.ok(THEME:GetString("ScreenTitleMenu", "LoginCanceled")) end
 		)
 	end
 }
@@ -507,9 +507,9 @@ t[#t + 1] = Def.ActorFrame {
 		
 		local srv = af:GetChild("S")
 		if IsNetSMOnline() then
-			srv:settext("SERVER · " .. (GetServerName() or "CONNECTED")):diffuse(color("0.65,1,0.72,1"))
+			srv:settext(THEME:GetString("ScreenTitleMenu", "Server") .. " · " .. (GetServerName() or THEME:GetString("ScreenTitleMenu", "Connected"))):diffuse(color("0.65,1,0.72,1"))
 		else
-			srv:settext("SERVER · OFFLINE"):diffuse(dimText)
+			srv:settext(THEME:GetString("ScreenTitleMenu", "Server") .. " · " .. THEME:GetString("ScreenTitleMenu", "Offline")):diffuse(dimText)
 		end
 	end) end,
 	LoadFont("Common Normal") .. { Name="D", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+14):halign(0):zoom(0.5):diffuse(subText) end },
@@ -545,7 +545,7 @@ t[#t + 1] = Def.ActorFrame {
 			if selIdx >= numLocal then selIdx = 0; HV.TitleState.selectedProfile = 0 end
 
 			if loggedIn then
-				status:settext("ONLINE"):diffuse(color("0.65,1,0.72,1"))
+				status:settext(THEME:GetString("ScreenTitleMenu", "Online")):diffuse(color("0.65,1,0.72,1"))
 				name:settext(DLMAN:GetUsername())
 				local r = DLMAN:GetSkillsetRating("Overall")
 				local showStats = HV.ShowProfileStats()
@@ -561,7 +561,7 @@ t[#t + 1] = Def.ActorFrame {
 				end
 				avatar:visible(true)
 			else
-				status:settext("OFFLINE"):diffuse(dimText)
+				status:settext(THEME:GetString("ScreenTitleMenu", "Offline")):diffuse(dimText)
 
 				if numLocal > 0 then
 					local profile = PROFILEMAN:GetLocalProfileFromIndex(selIdx)
@@ -581,13 +581,13 @@ t[#t + 1] = Def.ActorFrame {
 						end
 						avatar:visible(true)
 					else
-						name:settext("NO PROFILE")
+						name:settext(THEME:GetString("ScreenTitleMenu", "NoProfile"))
 						rating:visible(false)
 						rank:visible(false)
 						avatar:visible(false)
 					end
 				else
-					name:settext("GUEST PLAYER")
+					name:settext(THEME:GetString("ScreenTitleMenu", "GuestPlayer"))
 					rating:visible(false)
 					rank:visible(false)
 					avatar:visible(false)
@@ -712,7 +712,7 @@ t[#t + 1] = Def.ActorFrame {
 					songTxt:settext(artist .. " — " .. title)
 					songTxt:diffuse(subText)
 				else
-					songTxt:settext("NO TRACK")
+					songTxt:settext(THEME:GetString("ScreenTitleMenu", "JukeboxNoTrack"))
 					songTxt:diffuse(dimText)
 				end
 			end

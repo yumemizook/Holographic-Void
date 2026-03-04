@@ -211,12 +211,12 @@ local t = Def.ActorFrame {
 		RefreshScoresCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			local steps = GAMESTATE:GetCurrentSteps()
-			local viewLabel = currentView == VIEW_LOCAL and "LOCAL" or "ONLINE"
+			local viewLabel = currentView == VIEW_LOCAL and THEME:GetString("Scores", "Local") or THEME:GetString("Scores", "Online")
 			if song and steps then
 				local diff = ToEnumShortString(steps:GetDifficulty())
-				self:settextf("SCORES [%s]: %s [%s]", viewLabel, song:GetDisplayMainTitle(), diff)
+				self:settextf(THEME:GetString("Scores", "TitleGeneric"), viewLabel, song:GetDisplayMainTitle(), diff)
 			else
-				self:settextf("SCORES [%s]", viewLabel)
+				self:settextf(THEME:GetString("Scores", "TitleGenericNoChart"), viewLabel)
 			end
 		end
 	},
@@ -239,8 +239,8 @@ local t = Def.ActorFrame {
 			Name = "ToggleViewText",
 			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
 			RefreshScoresCommand = function(self)
-				local viewName = currentView == VIEW_LOCAL and "LOCAL" or "ONLINE"
-				self:settext("VIEW: " .. viewName)
+				local viewName = currentView == VIEW_LOCAL and THEME:GetString("Scores", "Local") or THEME:GetString("Scores", "Online")
+				self:settextf(THEME:GetString("Scores", "ViewToggle"), viewName)
 				if currentView == VIEW_ONLINE and not DLMAN:IsLoggedIn() then
 					self:diffuse(dimText)
 				else
@@ -263,7 +263,7 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
 			RefreshScoresCommand = function(self)
-				self:settext(filterCurrentRate and "CUR. RATE" or "ALL RATES")
+				self:settext(filterCurrentRate and THEME:GetString("Scores", "FilterCurrRate") or THEME:GetString("Scores", "FilterAllRates"))
 				self:diffusealpha(filterCurrentRate and 1 or 0.5)
 			end,
 		},
@@ -279,7 +279,7 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
 			RefreshScoresCommand = function(self)
-				self:settext(currentSort == SORT_SSR and "SORT: SSR" or "SORT: WIFE%")
+				self:settext(currentSort == SORT_SSR and THEME:GetString("Scores", "SortSSR") or THEME:GetString("Scores", "SortWife"))
 				local bg = self:GetParent():GetChild("SortBtnBg")
 				if bg then bg:diffusealpha(0.5) end
 			end,
@@ -298,13 +298,13 @@ local t = Def.ActorFrame {
 	Def.ActorFrame {
 		InitCommand = function(self) self:xy(-overlayW/2 + 25, -overlayH/2 + 65) end,
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):zoom(0.32):diffuse(dimText):settext("#") end },
-		LoadFont("Common Normal") .. { Name = "HdrName", InitCommand = function(self) self:halign(0):x(30):zoom(0.32):diffuse(dimText):settext("PLAYER") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(190):zoom(0.32):diffuse(dimText):settext("WIFE%") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(280):zoom(0.32):diffuse(dimText):settext("SSR") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(345):zoom(0.32):diffuse(dimText):settext("GRADE") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(415):zoom(0.32):diffuse(dimText):settext("RATE") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(485):zoom(0.32):diffuse(dimText):settext("CLEAR") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(1):x(overlayW - 50):zoom(0.32):diffuse(dimText):settext("DATE") end },
+		LoadFont("Common Normal") .. { Name = "HdrName", InitCommand = function(self) self:halign(0):x(30):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "PlayerColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(190):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "WifeColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(280):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "SSRColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(345):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "GradeColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(415):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "RateColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(485):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "ClearColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(1):x(overlayW - 50):zoom(0.32):diffuse(dimText):settext(THEME:GetString("Scores", "DateColumn")) end },
 	},
 	Def.Quad {
 		InitCommand = function(self)
@@ -317,7 +317,7 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "LoadingText",
 		InitCommand = function(self)
-			self:xy(0, 0):zoom(0.35):diffuse(accentColor):settext("Loading..."):visible(false)
+			self:xy(0, 0):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Common", "Loading")):visible(false)
 		end,
 		RefreshScoresCommand = function(self)
 			self:visible(onlineLoading and currentView == VIEW_ONLINE)
@@ -328,7 +328,7 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0.5):valign(1):xy(0, overlayH/2 - 8):zoom(0.20):diffuse(dimText)
-				:settext("SCROLL to page · CLICK LOCAL/ONLINE to toggle · CLICK outside to close")
+				:settext(THEME:GetString("Scores", "ScoreHint"))
 		end,
 	},
 }
@@ -364,8 +364,7 @@ for i = 1, pageSize do
 				if currentView == VIEW_LOCAL then
 					local entry = scores[idx]
 					local s = entry.score
-
-					self:GetChild("Player"):settext("You")
+					self:GetChild("Player"):settext(THEME:GetString("Common", "You"))
 					
 					-- Judgments
 					local w1 = s:GetTapNoteScore("TapNoteScore_W1")
@@ -474,7 +473,7 @@ t.RefreshScoresCommand = function(self)
 
 	local pageInfo = self:GetChild("PageInfo")
 	if pageInfo then
-		pageInfo:settextf("Page %d / %d (%d scores)", currentPage, totalPages, #scores)
+		pageInfo:settextf(THEME:GetString("Common", "PageInfoDetailed"), currentPage, totalPages, #scores)
 	end
 
 	for ri = 1, pageSize do

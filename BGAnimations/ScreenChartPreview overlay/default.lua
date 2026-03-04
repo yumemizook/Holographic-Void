@@ -110,22 +110,6 @@ function getMSDColor(msd)
 	return (HVColor and HVColor.GetMSDRatingColor) and HVColor.GetMSDRatingColor(msd) or textBright
 end
 
--- Alignment helpers for isOver
-local function isOver(self)
-	if not self or not self:GetVisible() then return false end
-	local mx = INPUTFILTER:GetMouseX()
-	local my = INPUTFILTER:GetMouseY()
-	local x = self:GetTrueX()
-	local y = self:GetTrueY()
-	local w = self:GetZoomedWidth()
-	local h = self:GetZoomedHeight()
-
-	local ha = self:GetHAlign()
-	local va = self:GetVAlign()
-
-	return mx >= x - (w * ha) and mx <= x + (w * (1 - ha)) and
-	       my >= y - (h * va) and my <= y + (h * (1 - va))
-end
 
 ------------------------------------------------------------
 -- AUDIO CONTROL & SYNC
@@ -136,24 +120,58 @@ local function updateSync(self)
 		if noteFieldRef and noteFieldRef.SetSeconds then
 			noteFieldRef:SetSeconds(pausedPos)
 		end
-		return
+		-- Still update tooltip while paused
 	end
-	if not ssm then return end
+	if not isPaused and not ssm then return end
 	
-	local pos = ssm:GetSampleMusicPosition()
-	if pos > musicLength then pos = musicLength end
-	
-	-- Sync Progress Bar / Seek
-	if progressRef then
-		local p = math.min(pos / math.max(1, musicLength), 1)
-		progressRef:stoptweening():zoomto(p * (SCREEN_WIDTH - 40), 2)
-	end
-	
-	if cdgFrameRef then
-		local seek = cdgFrameRef:GetChild("ProgressMarker")
-		if seek then
+	if not isPaused and ssm then
+		local pos = ssm:GetSampleMusicPosition()
+		if pos > musicLength then pos = musicLength end
+		
+		-- Sync Progress Bar / Seek
+		if progressRef then
 			local p = math.min(pos / math.max(1, musicLength), 1)
-			seek:x(p * (SCREEN_WIDTH - 120) - (SCREEN_WIDTH - 120)/2)
+			progressRef:stoptweening():zoomto(p * (SCREEN_WIDTH - 40), 2)
+		end
+		
+		if cdgFrameRef then
+			local seek = cdgFrameRef:GetChild("ProgressMarker")
+			if seek then
+				local p = math.min(pos / math.max(1, musicLength), 1)
+				seek:x(p * (SCREEN_WIDTH - 120) - (SCREEN_WIDTH - 120)/2)
+			end
+		end
+	end
+	
+	-- MSD Tooltip hover check
+	if msdTooltipActor and rootRef and rootRef:GetVisible() then
+		local rightSidebar = rootRef:GetChild("RightSidebar")
+		local chartPanelRef = rightSidebar and rightSidebar:GetChild("ChartPanel")
+		local hoveredSteps = nil
+		if chartPanelRef and chartPanelRef:GetVisible() then
+			local list = chartPanelRef:GetChild("List")
+			if list then
+				local diffs = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
+				for _, d in ipairs(diffs) do
+					local short = getDifficultyShort("Difficulty_"..d)
+					local item = list:GetChild("Item_" .. short)
+					if item then
+						local clickArea = item:GetChild("ClickArea")
+						if clickArea and clickArea:GetVisible() and isOver(clickArea) then
+							hoveredSteps = chartPanelRef.available and chartPanelRef.available[d]
+							break
+						end
+					end
+				end
+			end
+		end
+		
+		if hoveredSteps then
+			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+			msdTooltipActor:visible(true):xy(mx + 5, my - 15)
+			msdTooltipActor:playcommand("SetHover", {steps = hoveredSteps})
+		else
+			msdTooltipActor:visible(false)
 		end
 	end
 end
@@ -531,6 +549,82 @@ local function densityGraphComp()
 	}
 end
 
+-- ============================================================
+-- MSD SKILLSET TOOLTIP
+-- ============================================================
+local tooltipW = 280
+local tooltipH = 56
+local msdTooltipActor = nil
+
+local msdTooltip = Def.ActorFrame {
+	Name = "MSDTooltip",
+	InitCommand = function(self)
+		msdTooltipActor = self
+		self:visible(false)
+		self:z(1000)
+	end,
+	-- Background
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(1):zoomto(tooltipW, tooltipH):diffuse(bgDark):diffusealpha(0.95)
+		end
+	},
+	-- Border
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(1):zoomto(tooltipW, 1):y(-tooltipH):diffuse(accentColor):diffusealpha(0.5)
+		end
+	}
+}
+
+local skillsetsList = {
+	{name="Stream", idx=2}, {name="Jumpstream", idx=3}, {name="Handstream", idx=4}, {name="Stamina", idx=5},
+	{name="JackSpeed", idx=6}, {name="Chordjack", idx=7}, {name="Technical", idx=8}
+}
+
+for i, ss in ipairs(skillsetsList) do
+	local col, row, colW, offsetX
+	if i <= 4 then
+		row = 0
+		col = i - 1
+		colW = tooltipW / 4
+		offsetX = col * colW + (colW / 2)
+	else
+		row = 1
+		col = i - 5
+		colW = tooltipW / 3
+		offsetX = col * colW + (colW / 2)
+	end
+
+	local offsetY = -tooltipH + 12 + row * 24
+
+	msdTooltip[#msdTooltip + 1] = Def.ActorFrame {
+		InitCommand = function(self)
+			self:xy(offsetX, offsetY)
+		end,
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:y(-7):zoom(0.25):diffuse(textSub):settext(ss.name) end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Val",
+			InitCommand = function(self) self:y(5):zoom(0.35):diffuse(textMain) end,
+			SetHoverCommand = function(self, params)
+				if params.steps then
+					local rate = getCurRateValue and getCurRateValue() or 1
+					local msd = params.steps:GetMSD(rate, ss.idx)
+					if msd and msd > 0 then
+						self:settext(string.format("%.2f", msd)):diffuse(getMSDColor(msd))
+					else
+						self:settext("-"):diffuse(textDim)
+					end
+				else
+					self:settext("-"):diffuse(textDim)
+				end
+			end
+		}
+	}
+end
+
 ------------------------------------------------------------
 -- ROOT ACTORFRAME
 ------------------------------------------------------------
@@ -649,7 +743,10 @@ local t = Def.ActorFrame {
 	Def.Quad {
 		Name = "GlobalProgressBar",
 		InitCommand = function(self) self:xy(SCREEN_CENTER_X, SCREEN_HEIGHT - 2):zoomto(0, 2):diffuse(accentColor):diffusealpha(0.8); progressRef = self end
-	}
+	},
+
+	-- Tooltip (drawn last for z-order)
+	msdTooltip
 }
 
 return t

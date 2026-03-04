@@ -119,7 +119,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:zoom(0.8):diffuse(brightText)
-			self:settext("THEME OPTIONS")
+			self:settext(THEME:GetString("ScreenHVOptions", "Title"))
 		end
 	},
 
@@ -127,7 +127,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:y(22):zoom(0.3):diffuse(dimText)
-			self:settext("Customize the Holographic Void experience")
+			self:settext(THEME:GetString("ScreenHVOptions", "Subtitle"))
 		end
 	},
 
@@ -198,7 +198,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(1):x(-8):zoom(0.3):diffuse(dimText)
-			self:settext("CURRENT SPEED:")
+			self:settext(THEME:GetString("ScreenHVOptions", "CurrentSpeed"))
 		end
 	},
 
@@ -209,26 +209,35 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):x(8):zoom(0.45):diffuse(accentColor)
 		end,
 		SetCommand = function(self)
-			-- Calculate effective scroll speed from player options
-			local po = GAMESTATE:GetPlayerState():GetPlayerOptions("ModsLevel_Preferred")
-			if po then
-				local cmod = po:CMod()
-				if cmod and cmod > 0 then
-					self:settext(string.format("C%.0f", cmod))
-				else
-					local xmod = po:ScrollSpeed()
-					if xmod then
-						self:settext(string.format("%.1fx", xmod))
+			-- Use the same helper as Til Death to read current speed mode
+			local speed, mode = GetSpeedModeAndValueFromPoptions(PLAYER_1)
+			if mode == "x" then
+				-- Show effective BPM for xmod
+				local song = GAMESTATE:GetCurrentSong()
+				if song then
+					local rate = GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate() or 1
+					local bpms = song:GetDisplayBpms(true)
+					local b1 = math.round(bpms[1])
+					local b2 = math.round(bpms[2])
+					if b1 == b2 then
+						self:settext(tostring(math.round(b1 * rate * speed / 100)))
 					else
-						self:settext("---")
+						self:settext(string.format("%d - %d",
+							math.round(b1 * rate * speed / 100),
+							math.round(b2 * rate * speed / 100)))
 					end
+				else
+					self:settext(string.format("%.2fx", speed / 100))
 				end
+			elseif mode == "C" then
+				self:settext("C" .. speed)
 			else
-				self:settext("---")
+				self:settext("M" .. speed)
 			end
 		end,
 		OnCommand = function(self) self:playcommand("Set") end
 	}
+
 }
 
 -- ============================================================
@@ -238,7 +247,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 16)
 			:zoom(0.28):diffuse(dimText)
-		self:settext("Use Up/Down to navigate · Left/Right to change · Escape to save and return")
+		self:settext(THEME:GetString("ScreenHVOptions", "Hint"))
 	end
 }
 

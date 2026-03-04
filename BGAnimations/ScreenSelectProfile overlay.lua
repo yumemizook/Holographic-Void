@@ -46,7 +46,7 @@ local t = Def.ActorFrame {
 		InitCommand = function(self)
 			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - cardH - 40)
 			self:zoom(0.6):diffuse(brightText)
-			self:settext("SELECT PROFILE")
+			self:settext(THEME:GetString("ScreenSelectProfile", "Title"))
 			self:shadowlength(1)
 		end
 	}
@@ -101,7 +101,7 @@ for i = 0, numProfiles - 1 do
 		LoadFont("Common Large") .. {
 			InitCommand = function(self)
 				self:xy(-cardW/2 + 105, -15):halign(0):zoom(0.5):diffuse(brightText)
-				self:settext(profile:GetDisplayName() or "Unknown")
+				self:settext(profile:GetDisplayName() or THEME:GetString("ScreenSelectProfile", "Unknown"))
 				self:maxwidth((cardW - 120) / 0.5)
 			end
 		},
@@ -111,7 +111,7 @@ for i = 0, numProfiles - 1 do
 			InitCommand = function(self)
 				self:xy(-cardW/2 + 105, 12):halign(0):zoom(0.4)
 				local r = profile:GetPlayerRating()
-				self:settextf("Rating: %.2f", r)
+				self:settextf(THEME:GetString("ScreenSelectProfile", "RatingFormatted"), r)
 				self:diffuse(HVColor.GetMSDRatingColor(r))
 			end
 		},
@@ -120,7 +120,7 @@ for i = 0, numProfiles - 1 do
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
 				self:xy(-cardW/2 + 105, 28):halign(0):zoom(0.35):diffuse(subText)
-				self:settextf("Songs Played: %d", profile:GetNumTotalSongsPlayed())
+				self:settextf(THEME:GetString("ScreenSelectProfile", "SongsPlayedFormatted"), profile:GetNumTotalSongsPlayed())
 			end
 		}
 	}

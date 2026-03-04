@@ -9,12 +9,12 @@ local POINTS_SCALE = 200 / MAX_DISPLAY
 local CAP = 2.5
 
 local categories = {
-	{name="POWER",  color=color("#E0B080"), canOverflow=true},  -- Muted Orange
-	{name="CHAOS",  color=color("#B898CF"), canOverflow=true},  -- Muted Purple
-	{name="HELL",   color=color("#CF9898"), canOverflow=false}, -- Muted Red
-	{name="MACH",   color=color("#80C0CF"), canOverflow=false}, -- Muted Cyan
-	{name="FREEZE", color=color("#CFD198"), canOverflow=false}, -- Muted Yellow
-	{name="EARTH",  color=color("#A0CFAB"), canOverflow=true},  -- Muted Green
+	{name=THEME:GetString("Radar", "POWER"),  color=color("#E0B080"), canOverflow=true},  -- Muted Orange
+	{name=THEME:GetString("Radar", "CHAOS"),  color=color("#B898CF"), canOverflow=true},  -- Muted Purple
+	{name=THEME:GetString("Radar", "HELL"),   color=color("#CF9898"), canOverflow=false}, -- Muted Red
+	{name=THEME:GetString("Radar", "MACH"),   color=color("#80C0CF"), canOverflow=false}, -- Muted Cyan
+	{name=THEME:GetString("Radar", "FREEZE"), color=color("#CFD198"), canOverflow=false}, -- Muted Yellow
+	{name=THEME:GetString("Radar", "EARTH"),  color=color("#A0CFAB"), canOverflow=true},  -- Muted Green
 }
 
 local labelAlign = {
@@ -444,8 +444,8 @@ t[#t+1] = Def.ActorMultiVertex {
 -- labels, tooltips, hell breakdown
 
 local hellSources = {
-	{key="mines", label="Mines"}, {key="rolls", label="Rolls"},
-	{key="lifts", label="Lifts"}, {key="fakes", label="Fakes"},
+	{key="mines", label=THEME:GetString("Radar", "Mines")}, {key="rolls", label=THEME:GetString("Radar", "Rolls")},
+	{key="lifts", label=THEME:GetString("Radar", "Lifts")}, {key="fakes", label=THEME:GetString("Radar", "Fakes")},
 }
 
 for i = 1, 6 do

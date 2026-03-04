@@ -321,7 +321,7 @@ t[#t + 1] = Def.ActorFrame {
             self:xy(mfDisplayX, mfDisplayY)
             self:zoom(mfDisplayZoom)
             self:halign(0)
-            self:settext("Manipulation Factor:")
+            self:settext(THEME:GetString("ScreenEvaluation", "ManipulationFactor"))
             self:diffuse(HVColor.TextSub)
         end,
         MouseOverCommand = function(self)

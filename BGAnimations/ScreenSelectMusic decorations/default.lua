@@ -456,7 +456,7 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "BPMLabel",
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.35):diffuse(dimText)
-			self:settext("BPM")
+			self:settext(THEME:GetString("ScreenSelectMusic", "BPM"))
 		end
 	},
 	-- BPM Value
@@ -494,7 +494,7 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "LengthLabel",
 		InitCommand = function(self)
 			self:halign(0):valign(0):x(panelW * 0.35):zoom(0.35):diffuse(dimText)
-			self:settext("LENGTH")
+			self:settext(THEME:GetString("ScreenSelectMusic", "Length"))
 		end
 	},
 	LoadFont("Common Normal") .. {
@@ -552,7 +552,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.35):diffuse(accentColor)
-			self:settext("MSD RATINGS")
+			self:settext(THEME:GetString("ScreenSelectMusic", "MSDRatings"))
 		end
 	}
 }
@@ -656,11 +656,10 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- MSD SKILLSET TOOLTIP (Mouse-following)
+-- MSD SKILLSET TOOLTIP (Mouse-following, 4-up/3-down grid)
 -- ============================================================
-local msdTooltipW = 185
-local msdTooltipRowH = 24
-local msdTooltipH = #skillsets * msdTooltipRowH + 10
+local msdTooltipW = 280
+local msdTooltipH = 56
 
 local msdTooltipActor = nil
 local msdTooltip = Def.ActorFrame {
@@ -672,38 +671,60 @@ local msdTooltip = Def.ActorFrame {
 	-- Background
 	Def.Quad {
 		InitCommand = function(self)
-			self:halign(0):valign(0):zoomto(msdTooltipW, msdTooltipH):diffuse(color("0.05,0.05,0.05,0.95"))
+			self:halign(0):valign(1):zoomto(msdTooltipW, msdTooltipH):diffuse(color("0.05,0.05,0.05,0.95"))
 		end
 	},
 	-- Border
 	Def.Quad {
 		InitCommand = function(self)
-			self:halign(0):valign(0):zoomto(msdTooltipW, 1):diffuse(accentColor):diffusealpha(0.5)
+			self:halign(0):valign(1):zoomto(msdTooltipW, 1):y(-msdTooltipH):diffuse(accentColor):diffusealpha(0.5)
 		end
 	}
 }
 
--- Add rows to MSD tooltip
-for i, ss in ipairs(skillsets) do
+-- 7 skillsets (no Overall): 4 on top row, 3 on bottom row
+local tooltipSkillsets = {
+	{name="Stream", idx=2}, {name="Jumpstream", idx=3}, {name="Handstream", idx=4}, {name="Stamina", idx=5},
+	{name="JackSpeed", idx=6}, {name="Chordjack", idx=7}, {name="Technical", idx=8}
+}
+
+for i, ss in ipairs(tooltipSkillsets) do
+	local col, row, colW, offsetX
+	if i <= 4 then
+		row = 0
+		col = i - 1
+		colW = msdTooltipW / 4
+		offsetX = col * colW + (colW / 2)
+	else
+		row = 1
+		col = i - 5
+		colW = msdTooltipW / 3
+		offsetX = col * colW + (colW / 2)
+	end
+
+	local offsetY = -msdTooltipH + 12 + row * 24
+
 	msdTooltip[#msdTooltip + 1] = Def.ActorFrame {
-		InitCommand = function(self) self:xy(8, 8 + (i - 1) * msdTooltipRowH) end,
+		InitCommand = function(self)
+			self:xy(offsetX, offsetY)
+		end,
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):zoom(0.32):diffuse(subText):settext(ss) end
+			InitCommand = function(self) self:y(-7):zoom(0.22):diffuse(subText):settext(ss.name) end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Val",
-			InitCommand = function(self) self:halign(1):x(msdTooltipW - 16):zoom(0.4):diffuse(mainText) end,
+			InitCommand = function(self) self:y(5):zoom(0.35):diffuse(mainText) end,
 			SetCommand = function(self)
 				local song = GAMESTATE:GetCurrentSong()
 				if song then
-					local steps = GAMESTATE:GetCurrentSteps()
-					if steps then
-						local msd = steps:GetMSD(getCurRateValue(), i)
+					local curSteps = GAMESTATE:GetCurrentSteps()
+					if curSteps then
+						local msd = curSteps:GetMSD(getCurRateValue(), ss.idx)
 						if msd and msd > 0 then
 							self:settext(string.format("%.2f", msd)):diffuse(HVColor.GetMSDRatingColor(msd))
-						else self:settext("-") end
-					else self:settext("-") end
-				else self:settext("-") end
+						else self:settext("-"):diffuse(dimText) end
+					else self:settext("-"):diffuse(dimText) end
+				else self:settext("-"):diffuse(dimText) end
 			end
 		}
 	}
@@ -714,16 +735,17 @@ t[#t + 1] = msdTooltip
 t[#t + 1] = Def.ActorFrame {
 	Name = "MSDTooltipHandler",
 	OnCommand = function(self)
-		local function Update()
-			if not msdTooltipActor then return end
-			-- Use IsMouseOver for consistent coordinate units
-			-- Hitbox for the large Overall rating (panelX+16 to panelX+120, msdY+20 to msdY+90)
-			local isHovering = IsMouseOver(panelX + 10, msdY + 20, 110, 70)
-			if isHovering and ThemePrefs.Get("HV_ShowMSD") == "true" then
+		self:queuecommand("Tick")
+	end,
+	TickCommand = function(self)
+		if msdTooltipActor then
+			-- The label is at msdY and the number is at msdY + 18 with zoom ~0.45.
+			-- The text height is around 40px, so 18 + 40 = 58.
+			local isHovering = IsMouseOver(panelX + 10, msdY + 14, 120, 48)
+			if isHovering and HV.ShowMSD() then
 				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-				-- Check visibility BEFORE setting it to trigger updates correctly
 				local wasHidden = not msdTooltipActor:GetVisible()
-				msdTooltipActor:visible(true):xy(mx + 15, my + 15)
+				msdTooltipActor:visible(true):xy(mx + 5, my - 15)
 				if wasHidden then
 					msdTooltipActor:playcommand("Set")
 				end
@@ -731,19 +753,6 @@ t[#t + 1] = Def.ActorFrame {
 				msdTooltipActor:visible(false)
 			end
 		end
-
-		if self.SetUpdateFunction then
-			self:SetUpdateFunction(Update)
-		elseif self.SetUpdate then
-			self:SetUpdate(Update)
-		else
-			self:queuecommand("Tick")
-		end
-		-- Attach update function to satisfy TickCommand without re-running On
-		self.HV_Update = Update
-	end,
-	TickCommand = function(self)
-		if self.HV_Update then self.HV_Update() end
 		self:sleep(0.02):queuecommand("Tick")
 	end
 }
@@ -770,7 +779,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.28):diffuse(accentColor)
-			self:settext("CHART")
+			self:settext(THEME:GetString("ScreenSelectMusic", "Chart"))
 		end
 	}
 }
@@ -917,7 +926,7 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "PBHeader",
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(2):zoom(0.28):diffuse(accentColor)
-			self:settext("PERSONAL BEST")
+			self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest"))
 		end
 	},
 	
@@ -985,7 +994,7 @@ t[#t + 1] = Def.ActorFrame {
 				end
 				self:diffuse(brightText)
 			else
-				self:settext("No Score")
+				self:settext(THEME:GetString("ScreenSelectMusic", "NoScore"))
 				self:diffuse(dimText)
 			end
 		end,
@@ -1000,7 +1009,11 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
 			if score then
-				local gradeStr = ToEnumShortString(score:GetWifeGrade())
+				local gradeStr = score:GetWifeGrade()
+				-- gradeStr may be "Grade_Tier09" or "Tier09"; normalize
+				if gradeStr and not gradeStr:find("^Grade_") then
+					gradeStr = "Grade_" .. gradeStr
+				end
 				self:settext(HV.GetGradeName(gradeStr))
 				self:diffuse(HVColor.GetGradeColor(gradeStr))
 			else
@@ -1137,7 +1150,7 @@ t[#t + 1] = Def.ActorFrame {
 				local good = score:GetTapNoteScore("TapNoteScore_W4")
 				local bad = score:GetTapNoteScore("TapNoteScore_W5")
 				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
-				self:settext(string.format("CBs: %d", good + bad + miss))
+				self:settextf(THEME:GetString("ScreenSelectMusic", "CBsFormatted"), good + bad + miss)
 			else
 				self:settext("")
 			end
@@ -1311,7 +1324,9 @@ t[#t + 1] = Def.ActorFrame {
 			if profile then
 				local notesHit = profile:GetTotalTapsAndHolds()
 				local sessionSecs = profile:GetTotalSessionSeconds()
-				self:settextf("Notes: %d\nSession: %d:%02d", notesHit, math.floor(sessionSecs/60), sessionSecs%60):visible(true)
+				self:settextf("%s: %d\n%s: %d:%02d", 
+					THEME:GetString("ScreenSelectMusic", "NotesFormatted"), notesHit, 
+					THEME:GetString("ScreenSelectMusic", "SessionFormatted"), math.floor(sessionSecs/60), sessionSecs%60):visible(true)
 			else
 				self:visible(false)
 			end
@@ -1357,9 +1372,9 @@ t[#t + 1] = Def.ActorFrame {
 			InitCommand = function(self) self:halign(0.5):xy(40, 0):zoom(0.3) end,
 			SetMessageCommand = function(self)
 				if DLMAN:IsLoggedIn() then
-					self:settext("LOG OUT"):diffuse(color("0.65,1,0.72,1"))
+					self:settext(THEME:GetString("ScreenSelectMusic", "LogOut")):diffuse(color("0.65,1,0.72,1"))
 				else
-					self:settext("LOG IN"):diffuse(brightText)
+					self:settext(THEME:GetString("ScreenSelectMusic", "LogIn")):diffuse(brightText)
 				end
 			end,
 			LoginMessageCommand = function(self) self:playcommand("Set") end,
@@ -1386,7 +1401,7 @@ t[#t + 1] = Def.ActorFrame {
 	end,
 	LoadFont("Common Normal") .. {
 		Name = "RateLabel",
-		InitCommand = function(self) self:halign(1):valign(0):x(-2):zoom(0.35):diffuse(dimText):settext("RATE") end
+		InitCommand = function(self) self:halign(1):valign(0):x(-2):zoom(0.35):diffuse(dimText):settext(THEME:GetString("ScreenSelectMusic", "Rate")) end
 	},
 	LoadFont("Common Normal") .. {
 		Name = "RateValue",
@@ -1477,7 +1492,7 @@ t[#t + 1] = Def.ActorFrame {
 				local bg = creditTooltipActor:GetChild("Bg")
 				local border = creditTooltipActor:GetChild("Border")
 				
-				txt:settext("Credit: " .. cStr)
+				txt:settextf(THEME:GetString("ScreenSelectMusic", "CreditFormatted"), cStr)
 				local w = txt:GetZoomedWidth() + 16
 				local h = txt:GetZoomedHeight() + 16
 				bg:zoomto(w, h)

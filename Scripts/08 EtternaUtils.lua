@@ -93,15 +93,11 @@ HV.CustomGrades = {
 
 function HV.GetGradeName(grade)
 	if not grade then return "" end
-	local s = tostring(grade):gsub("Grade_", "")
-	
-	-- Normalize TierXX to match en.ini (Tier01, Tier02, etc.)
-	if s:lower():find("tier") then
-		local tier = tonumber(s:match("%d+"))
-		if tier then s = string.format("Tier%02d", tier) end
-	end
-
+	-- Safely extract the short name (e.g. "Tier01", "Failed")
+	-- grade may be "Grade_Tier09" (full enum) or "Tier09" (already short)
+	local s = grade:gsub("^Grade_", "")
 	local key = "Grade_" .. s
+
 	local pref = ThemePrefs.Get("HV_UseCustomGrades")
 	if (pref == "true" or pref == true) and HV.CustomGrades[key] then
 		return HV.CustomGrades[key]
@@ -258,28 +254,19 @@ local clearTypeNames = {
 local clearTypeReverse = {}
 for k, v in pairs(clearTypeNames) do clearTypeReverse[v] = k end
 
-local clearTypeTextFull = {
-	ClearType_MFC = "Marvelous Full Combo", ClearType_WF = "Whiteflag",
-	ClearType_SDP = "Single Digit Perfects", ClearType_PFC = "Perfect Full Combo",
-	ClearType_BF = "Blackflag", ClearType_SDG = "Single Digit Greats",
-	ClearType_FC = "Full Combo", ClearType_MF = "Missflag",
-	ClearType_SDCB = "Single Digit CBs", ClearType_EXHC = "EX-Hard Clear",
-	ClearType_HClear = "Hard Clear", ClearType_Clear = "Clear",
-	ClearType_EClear = "Easy Clear", ClearType_AClear = "Assist Clear",
-	ClearType_Failed = "Failed", ClearType_Invalid = "Invalid",
-	ClearType_Noplay = "No Play", ClearType_None = "",
-}
+function getClearTypeText(ct)
+	return THEME:GetString("ClearTypes", ct)
+end
 
-local clearTypeTextShort = {
-	ClearType_MFC = "MFC", ClearType_WF = "WF", ClearType_SDP = "SDP",
-	ClearType_PFC = "PFC", ClearType_BF = "BF", ClearType_SDG = "SDG",
-	ClearType_FC = "FC", ClearType_MF = "MF", ClearType_SDCB = "SDCB",
-	ClearType_EXHC = "EXH", ClearType_HClear = "HC", ClearType_Clear = "Clear",
-	ClearType_EClear = "EC", ClearType_AClear = "AC", ClearType_Failed = "Failed",
-	ClearType_Invalid = "Invalid", ClearType_Noplay = "No Play", ClearType_None = "",
-}
+function getClearTypeShortText(ct)
+	-- If there's no specific short string, fallback to full
+	if THEME:HasString("ClearTypesShort", ct) then
+		return THEME:GetString("ClearTypesShort", ct)
+	end
+	return THEME:GetString("ClearTypes", ct)
+end
 
-local function getClearLevel(pn, steps, score)
+function getClearLevel(pn, steps, score)
 	if score == nil or steps == nil then return 17 end
 	local grade = score:GetWifeGrade()
 	if grade == nil then return 17
@@ -340,13 +327,6 @@ function getClearTypeLevel(ct)
 	return clearTypeReverse[ct] or 18
 end
 
-function getClearTypeText(ct)
-	return clearTypeTextFull[ct] or ""
-end
-
-function getClearTypeShortText(ct)
-	return clearTypeTextShort[ct] or ""
-end
 
 function getClearTypeColor(ct)
 	return HVColor.GetClearTypeColor(ct) or color("1,1,1,1")

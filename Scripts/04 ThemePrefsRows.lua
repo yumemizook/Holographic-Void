@@ -90,6 +90,71 @@ local HVPrefRows = {
 		Values  = {"false", "true"},
 	},
 
+	-- NPS Window Size
+	HV_NPSWindowSize = {
+		Default = "1",
+		Choices = {"1s", "2s", "3s", "4s", "5s"},
+		Values  = {"1", "2", "3", "4", "5"},
+	},
+
+	-- Show Full Pacemaker Graph
+	HV_ShowPacemakerGraph = {
+		Default = "true",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+
+	-- Show Mini Text Pacemaker
+	HV_ShowTextPacemaker = {
+		Default = "false",
+		Choices = {"Off", "On"},
+		Values  = {"false", "true"},
+	},
+
+	-- Pacemaker Target Type
+	HV_PacemakerTargetType = {
+		Default = "Target",
+		Choices = {"Target", "PB", "PB Replay"},
+		Values  = {"Target", "PB", "PBReplay"},
+	},
+
+	-- Pacemaker Target Goal
+	HV_PacemakerTargetGoal = {
+		Default = "93",
+		Choices = {
+			"0%", "1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "9%", "10%",
+			"11%", "12%", "13%", "14%", "15%", "16%", "17%", "18%", "19%", "20%",
+			"21%", "22%", "23%", "24%", "25%", "26%", "27%", "28%", "29%", "30%",
+			"31%", "32%", "33%", "34%", "35%", "36%", "37%", "38%", "39%", "40%",
+			"41%", "42%", "43%", "44%", "45%", "46%", "47%", "48%", "49%", "50%",
+			"51%", "52%", "53%", "54%", "55%", "56%", "57%", "58%", "59%", "60%",
+			"61%", "62%", "63%", "64%", "65%", "66%", "67%", "68%", "69%", "70%",
+			"71%", "72%", "73%", "74%", "75%", "76%", "77%", "78%", "79%", "80%",
+			"81%", "82%", "83%", "84%", "85%", "86%", "87%", "88%", "89%", "90%",
+			"91%", "92%", "93%", "94%", "95%", "96%", "97%", "98%", "99%",
+			"99.50%", "99.70%", "99.80%", "99.90%", "99.95%",
+			"99.96%", "99.97%", "99.98%", "99.99%",
+			"99.990%", "99.991%", "99.992%", "99.993%", "99.994%",
+			"99.995%", "99.996%", "99.997%", "99.998%", "99.999%", "100%"
+		},
+		Values  = {
+			"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+			"11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+			"21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+			"31", "32", "33", "34", "35", "36", "37", "38", "39", "40",
+			"41", "42", "43", "44", "45", "46", "47", "48", "49", "50",
+			"51", "52", "53", "54", "55", "56", "57", "58", "59", "60",
+			"61", "62", "63", "64", "65", "66", "67", "68", "69", "70",
+			"71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
+			"81", "82", "83", "84", "85", "86", "87", "88", "89", "90",
+			"91", "92", "93", "94", "95", "96", "97", "98", "99",
+			"99.50", "99.70", "99.80", "99.90", "99.95",
+			"99.96", "99.97", "99.98", "99.99",
+			"99.990", "99.991", "99.992", "99.993", "99.994",
+			"99.995", "99.996", "99.997", "99.998", "99.999", "100"
+		},
+	},
+
 	-- Show Particles
 	HV_Particles = {
 		Default = "true",
@@ -166,7 +231,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
 	return l
 end
 

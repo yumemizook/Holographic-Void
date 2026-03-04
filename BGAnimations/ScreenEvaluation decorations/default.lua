@@ -107,6 +107,49 @@ local function getRescoreElems()
 	return getRescoreElements(pss, curScore)
 end
 
+-- LA/RA Ratio calculation (ported from Til Death)
+-- Calculates Ludicrous Attack and Ridiculous Attack ratios from replay offsets
+local function calculateRatios(score)
+	local replay = score:GetReplay()
+	if not replay then return -1, -1, -1, -1 end
+	pcall(function() replay:LoadAllData() end)
+	local offsetTable = replay:GetOffsetVector()
+	local typeTable = replay:GetTapNoteTypeVector()
+	if not offsetTable or #offsetTable == 0 or not typeTable or #typeTable == 0 then
+		return -1, -1, -1, -1
+	end
+
+	-- Define judgment windows based on current judge
+	local marvWindow = 22.5 * (ms.JudgeScalers[judge] or 1)
+	local raThreshold = marvWindow / 2
+	local laThreshold = raThreshold / 2
+
+	local ludic = 0
+	local ridicLA = 0
+	local ridic = 0
+	local marvRA = 0
+
+	for i, o in ipairs(offsetTable) do
+		if typeTable[i] == "TapNoteType_Tap" or typeTable[i] == "TapNoteType_HoldHead" then
+			local off = math.abs(o)
+			if off <= raThreshold then
+				ridic = ridic + 1
+			elseif off <= marvWindow then
+				marvRA = marvRA + 1
+			end
+			if off <= laThreshold then
+				ludic = ludic + 1
+			elseif off <= raThreshold then
+				ridicLA = ridicLA + 1
+			end
+		end
+	end
+
+	local ra = marvRA > 0 and (ridic / marvRA) or -1
+	local la = ridicLA > 0 and (ludic / ridicLA) or -1
+	return ra, la, ridicLA, marvRA
+end
+
 ------------------------------------------------------------
 -- LEFT PANEL: SCORE CARD
 ------------------------------------------------------------
@@ -233,11 +276,18 @@ local function scoreBoard(pn)
 	}
 
 	-- ============================================================
-	-- GRADE + SCORE AREA
+	-- GRADE + SCORE AREA (Including Graphs)
 	-- ============================================================
 	board[#board + 1] = Def.ActorFrame {
 		Name = "GradeScore",
 		InitCommand = function(self) self:xy(pad, pad + 65) end,
+
+	-- ============================================================
+	-- GRAPHS AREA
+	-- ============================================================
+	board[#board + 1] = Def.ActorFrame {
+		Name = "Graphs",
+		InitCommand = function(self) self:xy(pad, pad + 120) end,
 
 		-- Life Graph BG
 		Def.GraphDisplay {
@@ -247,103 +297,19 @@ local function scoreBoard(pn)
 					local ss = SCREENMAN:GetTopScreen():GetStageStats()
 					self:Set(ss, pss)
 					self:diffusealpha(0.3)
-					self:y(20)
 					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
 				end)
 			end
 		},
 
-		-- Grade letter
-		LoadFont("Common Large") .. {
-			Name = "GradeLetter",
-			InitCommand = function(self) self:halign(0):valign(0):zoom(0.8) end,
-			OnCommand = function(self)
-				local grade = pss:GetHighScore():GetWifeGrade()
-				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
-				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
-			end,
-			SetJudgeCommand = function(self)
-				if rescoredPercentage then
-					local g = getWifeGradeTier(rescoredPercentage)
-					self:settext(HV.GetGradeName(ToEnumShortString(g)))
-				end
-			end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
-		},
-
-		-- Wife%
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(68, 0):zoom(0.6):diffuse(accentColor) end,
-			OnCommand = function(self)
-				local ws = pss:GetHighScore():GetWifeScore()
-				if ws > 0.99 then
-					self:settextf("%.4f%%", math.floor(ws * 1000000) / 10000)
-				else
-					self:settextf("%.2f%%", math.floor(ws * 10000) / 100)
-				end
-			end,
-			SetJudgeCommand = function(self)
-				if rescoredPercentage then
-					if rescoredPercentage > 99 then
-						self:settextf("%05.4f%% (J%d)", rescoredPercentage, judge)
-					else
-						self:settextf("%05.2f%% (J%d)", rescoredPercentage, judge)
-					end
-				end
-			end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
-		},
-
-		-- SSR
-		LoadFont("Common Normal") .. {
-			Name = "SSR",
-			InitCommand = function(self) self:halign(0):valign(0):xy(68, 24):zoom(0.32) end,
-			OnCommand = function(self)
-				local ssr = curScore:GetSkillsetSSR("Overall")
-				if ssr > 0 and ThemePrefs.Get("HV_ShowMSD") == "true" then
-					self:settextf("SSR: %.2f", ssr):diffuse(HVColor.GetMSDRatingColor(ssr))
-				else
-					self:settext(""):diffuse(dimText)
-				end
-			end,
-			HighlightCommand = function(self)
-				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-				local ax, ay = self:GetTrueX(), self:GetTrueY()
-				local w, h = self:GetZoomedWidth(), self:GetZoomedHeight()
-				local isOver = mx >= ax and mx <= ax + w and my >= ay - h/2 and my <= ay + h/2
-				if isOver then
-					local ssr = curScore:GetSkillsetSSR("Overall")
-					self:settextf("Score Specific Rating: %.2f", ssr)
-				else
-					self:playcommand("On")
-				end
-			end
-		},
-
-		-- WifeDP
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(68, 40):zoom(0.26):diffuse(subText) end,
-			OnCommand = function(self)
-				if steps then
-					local notes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
-					local dp = pss:GetWifeScore() * notes * 2
-					self:settextf("WifeDP: %.2f", dp)
-				end
-			end
-		},
-
-		-- Life %
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(1):valign(0):xy(frameW - pad * 3, 0):zoom(0.28):diffuse(dimText) end,
-			OnCommand = function(self)
-				local text = string.format("Life: %.0f%%", pss:GetCurrentLife() * 100)
-				if pss:GetCurrentLife() == 0 then
-					local ok, alive = pcall(function() return pss:GetAliveSeconds() end)
-					if ok and alive then
-						text = text .. string.format("\n%.2fs Survived", alive)
-					end
-				end
-				self:settext(text)
+		-- Combo Graph
+		Def.ComboGraph {
+			InitCommand = function(self) self:Load("ComboGraph" .. ToEnumShortString(pn)) end,
+			BeginCommand = function(self)
+				pcall(function()
+					local ss = SCREENMAN:GetTopScreen():GetStageStats()
+					self:Set(ss, pss)
+				end)
 			end
 		},
 	}
@@ -352,7 +318,7 @@ local function scoreBoard(pn)
 	-- CLEAR TYPE
 	-- ============================================================
 	board[#board + 1] = Def.ActorFrame {
-		InitCommand = function(self) self:xy(pad, pad + 125) end,
+		InitCommand = function(self) self:xy(pad, pad + 180) end,
 
 		-- Divider
 		Def.Quad {
@@ -360,18 +326,20 @@ local function scoreBoard(pn)
 		},
 		-- Label
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(0, 5):zoom(0.24):diffuse(dimText):settext("CLEAR TYPE") end
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, 8):zoom(0.28)						:diffuse(subText)
+						:settext(THEME:GetString("ScreenEvaluation", "CategoryClearType"))
+				end,
 		},
 		-- Current clear type
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(0, 22):zoom(0.38) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, 26):zoom(0.45) end,
 			OnCommand = function(self)
 				self:settext(getClearTypeText(clearType)):diffuse(getClearTypeColor(clearType))
 			end
 		},
 		-- Record clear type
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(1):valign(0):xy(frameW - pad*2, 22):zoom(0.28):diffusealpha(0.4) end,
+			InitCommand = function(self) self:halign(1):valign(0):xy(frameW - pad*2, 26):zoom(0.35):diffusealpha(0.4) end,
 			OnCommand = function(self)
 				if hsTable then
 					local recCT = getHighestClearType(pn, steps, hsTable, scoreIndex)
@@ -381,7 +349,7 @@ local function scoreBoard(pn)
 		},
 		-- Comparison arrow
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(1):valign(0):xy(frameW - pad*2 - 100, 22):zoom(0.3) end,
+			InitCommand = function(self) self:halign(1):valign(0):xy(frameW - pad*2 - 120, 26):zoom(0.35) end,
 			OnCommand = function(self)
 				if hsTable then
 					local recCT = getHighestClearType(pn, steps, hsTable, scoreIndex)
@@ -402,14 +370,16 @@ local function scoreBoard(pn)
 	-- ============================================================
 	-- TAP JUDGMENTS
 	-- ============================================================
-	local judgY = pad + 170
+	local judgY = pad + 230
 	board[#board + 1] = Def.Quad {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(pad, judgY):zoomto(frameW - pad*2, 1):diffuse(dividerColor)
 		end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, judgY + 4):zoom(0.24):diffuse(accentColor):settext("JUDGMENTS") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, judgY + 8):zoom(0.28)						:diffuse(subText)
+						:settext(THEME:GetString("ScreenEvaluation", "CategoryJudgment"))
+				end,
 	}
 
 	local itemSpacing = (frameW - pad*2) / 6
@@ -418,20 +388,20 @@ local function scoreBoard(pn)
 		-- Label
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(jx, judgY + 22):zoom(0.24):diffuse(judgmentColors[k])
+				self:xy(jx, judgY + 28):zoom(0.28):diffuse(judgmentColors[k])
 				self:settext(getJudgeStrings(v))
 			end
 		}
 		-- Count
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(jx, judgY + 38):zoom(0.38):diffuse(brightText) end,
+			InitCommand = function(self) self:xy(jx, judgY + 48):zoom(0.45):diffuse(brightText) end,
 			OnCommand = function(self) self:settext(pss:GetTapNoteScores(v)) end,
 			SetJudgeCommand = function(self) self:settext(getRescoredJudge(dvt, judge, k)) end,
 			ResetJudgeCommand = function(self) self:playcommand("On") end
 		}
 		-- Percentage
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(jx, judgY + 52):zoom(0.2):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(jx, judgY + 66):zoom(0.24):diffuse(dimText) end,
 			OnCommand = function(self)
 				local pct = pss:GetPercentageOfTaps(v)
 				if tostring(pct) == tostring(0/0) then pct = 0 end
@@ -449,7 +419,7 @@ local function scoreBoard(pn)
 	-- ============================================================
 	-- HOLDS + MINES + STATS ROW
 	-- ============================================================
-	local statsY = judgY + 70
+	local statsY = judgY + 90
 	board[#board + 1] = Def.Quad {
 		InitCommand = function(self) self:halign(0):valign(0):xy(pad, statsY):zoomto(frameW - pad*2, 1):diffuse(dividerColor) end
 	}
@@ -458,12 +428,12 @@ local function scoreBoard(pn)
 	local holdLabels = {"Hold OK", "Hold NG", "Mines Hit"}
 	local holdX = pad
 	for i, label in ipairs(holdLabels) do
-		local hx = holdX + (i - 1) * (frameW - pad*2) / 5
+		local hx = holdX + (i - 1) * (frameW - pad*2) / 6
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 5):zoom(0.22):diffuse(subText):settext(label) end
+			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 8):zoom(0.26):diffuse(subText):settext(label) end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 18):zoom(0.32):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 24):zoom(0.38):diffuse(mainText) end,
 			OnCommand = function(self)
 				if i == 1 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_Held"))
 				elseif i == 2 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_LetGo"))
@@ -475,12 +445,12 @@ local function scoreBoard(pn)
 	-- Mean / |Mean| / Std Dev
 	local mLabels = {"Mean", "|Mean|", "Std Dev"}
 	for i, label in ipairs(mLabels) do
-		local mx = holdX + (i - 1 + 3) * (frameW - pad*2) / 5
+		local mx = holdX + (i - 1 + 3) * (frameW - pad*2) / 6
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 5):zoom(0.22):diffuse(subText):settext(label) end
+			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 8):zoom(0.26):diffuse(subText):settext(label) end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 18):zoom(0.28):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 24):zoom(0.34):diffuse(mainText) end,
 			OnCommand = function(self)
 				if i == 1 then self:settextf("%.2fms", statInfo[1])
 				elseif i == 2 then self:settextf("%.2fms", statInfo[2])
@@ -492,35 +462,37 @@ local function scoreBoard(pn)
 	-- ============================================================
 	-- MISS COUNT + CB BREAKDOWN + MAX COMBO
 	-- ============================================================
-	local miscY = statsY + 40
+	local miscY = statsY + 55
 	board[#board + 1] = Def.Quad {
 		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY):zoomto(frameW - pad*2, 1):diffuse(dividerColor) end
 	}
 
 	-- Max Combo
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 5):zoom(0.22):diffuse(subText):settext("Max Combo") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 8):zoom(0.26)						:diffuse(subText)
+						:settext(THEME:GetString("ScreenEvaluation", "CategoryScore"))
+					end,
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 18):zoom(0.32):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 24):zoom(0.38):diffuse(mainText) end,
 		OnCommand = function(self) self:settext(pss:MaxCombo()) end
 	}
 
 	-- Miss Count
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 5):zoom(0.22):diffuse(subText):settext("Miss Count") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 8):zoom(0.26):diffuse(subText):settext("Miss Count") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 18):zoom(0.32):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 24):zoom(0.38):diffuse(mainText) end,
 		OnCommand = function(self) self:settext(getScoreComboBreaks(curScore)) end
 	}
 
 	-- CBs Left / Right
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 5):zoom(0.22):diffuse(subText):settext("CBs") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 8):zoom(0.26):diffuse(subText):settext("CBs") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 18):zoom(0.26):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 24):zoom(0.32):diffuse(mainText) end,
 		OnCommand = function(self)
 			local text = string.format("L:%d  R:%d", cbl, cbr)
 			if showMiddle then text = text .. string.format("  M:%d", cbm) end
@@ -536,10 +508,10 @@ local function scoreBoard(pn)
 
 	-- Score vs Record comparison
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 5):zoom(0.22):diffuse(subText):settext("vs Record") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 8):zoom(0.26):diffuse(subText):settext("vs Record") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 18):zoom(0.28) end,
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 24):zoom(0.34) end,
 		OnCommand = function(self)
 			if recScore then
 				local curVal = getScore(curScore, steps, false)
@@ -554,6 +526,113 @@ local function scoreBoard(pn)
 		end
 	}
 
+	-- ============================================================
+	-- RATIOS ROW: LA / RA / MA / PA (colored, left to right)
+	-- ============================================================
+	local ratioY = miscY + 40
+	board[#board + 1] = Def.Quad {
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, ratioY):zoomto(frameW - pad*2, 1):diffuse(dividerColor) end
+	}
+
+	local ratioLabels = {"LA", "RA", "MA", "PA"}
+	local ratioColors = {color("#FF69B4"), color("#FFD700"), color("#FFFFFF"), color("#E0E0A0")}
+	local ratioCount = #ratioLabels
+	for ri, rlabel in ipairs(ratioLabels) do
+		local rx = pad + (ri - 1) * (frameW - pad*2) / ratioCount
+		board[#board + 1] = LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):xy(rx, ratioY + 5):zoom(0.22):diffuse(ratioColors[ri]):settext(rlabel)
+			end
+		}
+		board[#board + 1] = LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(rx, ratioY + 18):zoom(0.32):diffuse(mainText) end,
+			OnCommand = function(self)
+				if ri == 1 then
+					-- LA (Ludicrous Attack)
+					local ra, la, ridicLA, marvRA = calculateRatios(curScore)
+					if la >= 0 then
+						self:settextf("%.2f:1", la):rainbow()
+					else
+						self:settext("N/A"):diffuse(dimText)
+					end
+				elseif ri == 2 then
+					-- RA (Ridiculous Attack)
+					local ra, la, ridicLA, marvRA = calculateRatios(curScore)
+					if ra >= 0 then
+						self:settextf("%.2f:1", ra):diffuse(ratioColors[2])
+					else
+						self:settext("N/A"):diffuse(dimText)
+					end
+				elseif ri == 3 then
+					-- MA (Marvelous Attack count)
+					local ma = pss:GetTapNoteScores("TapNoteScore_W1")
+					self:settext(ma):diffuse(ratioColors[3])
+				elseif ri == 4 then
+					-- PA (Perfect Attack count)
+					local pa = pss:GetTapNoteScores("TapNoteScore_W2")
+					self:settext(pa):diffuse(ratioColors[4])
+				end
+			end,
+			SetJudgeCommand = function(self)
+				if ri == 3 then
+					self:settext(getRescoredJudge(dvt, judge, 1))
+				elseif ri == 4 then
+					self:settext(getRescoredJudge(dvt, judge, 2))
+				end
+			end,
+			ResetJudgeCommand = function(self) self:playcommand("On") end
+		}
+	end
+
+	-- ============================================================
+	-- LARGEST OFFSET + NOTE TYPES
+	-- ============================================================
+	local extraY = ratioY + 40
+	board[#board + 1] = Def.Quad {
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY):zoomto(frameW - pad*2, 1):diffuse(dividerColor) end
+	}
+
+	-- Largest Offset
+	board[#board + 1] = LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 5):zoom(0.22):diffuse(subText):settext("Largest Offset") end
+	}
+	board[#board + 1] = LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 18):zoom(0.28):diffuse(mainText) end,
+		OnCommand = function(self)
+			local largest = 0
+			if devianceTable and #devianceTable > 0 then
+				for _, v in ipairs(devianceTable) do
+					if math.abs(v) > largest then largest = math.abs(v) end
+				end
+			end
+			self:settextf("%.2fms", largest)
+		end
+	}
+
+	-- Note Types Hit/Count
+	local noteTypeLabels = {"Taps", "Holds", "Rolls", "Lifts", "Mines"}
+	local noteTypeRadars = {
+		"RadarCategory_Notes", "RadarCategory_Holds", "RadarCategory_Rolls",
+		"RadarCategory_Lifts", "RadarCategory_Mines"
+	}
+	local ntStartX = pad + (frameW - pad*2) / 4
+	for ni, nlabel in ipairs(noteTypeLabels) do
+		local nx = ntStartX + (ni - 1) * (frameW - pad*2 - ntStartX + pad) / #noteTypeLabels
+		board[#board + 1] = LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 5):zoom(0.2):diffuse(subText):settext(nlabel) end
+		}
+		board[#board + 1] = LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 18):zoom(0.26):diffuse(mainText) end,
+			OnCommand = function(self)
+				if steps then
+					local possible = steps:GetRadarValues(pn):GetValue(noteTypeRadars[ni])
+					local actual = pss:GetRadarActual():GetValue(noteTypeRadars[ni])
+					self:settextf("%d/%d", actual, possible)
+				end
+			end
+		}
+	end
+
 	return board
 end
 
@@ -562,29 +641,10 @@ t[#t + 1] = scoreBoard(PLAYER_1)
 ------------------------------------------------------------
 -- RIGHT PANEL: OFFSET PLOT + SCOREBOARD
 ------------------------------------------------------------
+local inMulti = Var("LoadingScreen") == "ScreenNetEvaluation"
 local rightX = SCREEN_CENTER_X + 10
 local rightW = SCREEN_CENTER_X - 20
 local offsetPlotHeight = 160
-local scoreListY = offsetPlotHeight + 30
-
--- Score list state
-local scoreList = hsTable
-local scoresPerPage = 5
-local maxPages = scoreList and math.ceil(#scoreList / scoresPerPage) or 1
-local curPage = 1
-local isLocal = true
-local offsetScoreIndex = scoreIndex
-local offsetisLocal = true
-
-local function movePage(n)
-	if maxPages <= 1 then return end
-	if n > 0 then
-		curPage = ((curPage + n - 1) % maxPages) + 1
-	else
-		curPage = ((curPage + n + maxPages - 1) % maxPages) + 1
-	end
-	MESSAGEMAN:Broadcast("UpdateScoreList")
-end
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "RightPanel",
@@ -593,11 +653,8 @@ t[#t + 1] = Def.ActorFrame {
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
 		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
 			if event.type == "InputEventType_FirstPress" then
-				if event.button == "MenuLeft" then movePage(-1)
-				elseif event.button == "MenuRight" then movePage(1)
-
 				-- Judge cycling
-				elseif event.button == "EffectUp" then
+				if event.button == "EffectUp" then
 					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "NextJudge"})
 				elseif event.button == "EffectDown" then
 					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "PrevJudge"})
@@ -639,204 +696,32 @@ t[#t + 1] = Def.ActorFrame {
 				})
 			end)
 		end,
-		ShowScoreOffsetMessageCommand = function(self)
-			-- When a score in the list is clicked, update the offset plot with its data
-			if scoreList and scoreList[offsetScoreIndex] then
-				local selScore = scoreList[offsetScoreIndex]
-				if selScore:HasReplayData() then
-					local replay = selScore:GetReplay()
-					if replay then
-						self:RunCommandsOnChildren(function(child)
-							child:playcommand("Update", {
-								width = rightW - 20,
-								height = offsetPlotHeight,
-								song = song,
-								steps = steps,
-								nrv = replay:GetNoteRowVector() or {},
-								dvt = replay:GetOffsetVector() or {},
-								ctt = replay:GetTrackVector() or {},
-								ntt = replay:GetTapNoteTypeVector() or {},
-								columns = steps and steps:GetNumColumns() or 4
-							})
-						end)
-					end
-				end
-			end
-		end
 	},
 
 	-- Offset Plot Label
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(15, 15):zoom(0.2):diffuse(dimText):halign(0):settext("OFFSET PLOT")
-		end
-	},
-
-	-- ============================================================
-	-- SCOREBOARD HEADER
-	-- ============================================================
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(15, offsetPlotHeight + 30):zoom(0.24):diffuse(accentColor):halign(0):settext("SCOREBOARD")
-		end
-	},
-
-	-- Local / Online indicator
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(rightW - 10, offsetPlotHeight + 30):zoom(0.2):diffuse(dimText):halign(1)
-			self:settext("Local Scores")
-		end
-	},
-
-	-- Page info
-	LoadFont("Common Normal") .. {
-		Name = "PageInfo",
-		InitCommand = function(self)
-			self:xy(rightW / 2, SCREEN_HEIGHT - 40):zoom(0.22):diffuse(dimText)
+			self:xy(15, 15):zoom(0.2):diffuse(subText)
+			self:settext(THEME:GetString("ScreenEvaluation", "CategoryOffset"))
 		end,
-		OnCommand = function(self) self:playcommand("UpdateText") end,
-		UpdateScoreListMessageCommand = function(self) self:playcommand("UpdateText") end,
-		UpdateTextCommand = function(self)
-			if scoreList and #scoreList > 0 then
-				self:settextf("Page %d/%d  |  %d scores", curPage, maxPages, #scoreList)
-			else
-				self:settext("No scores")
-			end
-		end
 	},
 }
 
 -- ============================================================
--- SCORE ROWS (dynamic)
+-- SCOREBOARD (loaded from external files)
 -- ============================================================
-local scoreRowsFrame = Def.ActorFrame {
-	Name = "ScoreRows",
-	InitCommand = function(self) self:xy(rightX + 10, 10 + offsetPlotHeight + 45) end,
+local scoreboardFrame = Def.ActorFrame {
+	Name = "ScoreboardContainer",
+	InitCommand = function(self) self:xy(rightX + 10, offsetPlotHeight + 50) end,
 }
 
-for i = 1, scoresPerPage do
-	scoreRowsFrame[#scoreRowsFrame + 1] = Def.ActorFrame {
-		Name = "Row" .. i,
-		InitCommand = function(self) self:y((i - 1) * 30) end,
-		OnCommand = function(self) self:playcommand("UpdateRow") end,
-		UpdateScoreListMessageCommand = function(self) self:playcommand("UpdateRow") end,
-		UpdateRowCommand = function(self)
-			local idx = (curPage - 1) * scoresPerPage + i
-			if scoreList and scoreList[idx] then
-				self:visible(true)
-				self:RunCommandsOnChildren(function(child) child:playcommand("SetScore", {index = idx}) end)
-			else
-				self:visible(false)
-			end
-		end,
-
-		-- Row BG
-		Def.Quad {
-			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(rightW - 20, 26):diffuse(color("0,0,0,0.3"))
-			end,
-			SetScoreCommand = function(self, params)
-				if params.index == scoreIndex and isLocal then
-					self:diffuse(accentColor):diffusealpha(0.08)
-				else
-					self:diffuse(color("0,0,0,0.3"))
-				end
-			end,
-			MouseDownCommand = function(self)
-				local idx = (curPage - 1) * scoresPerPage + i
-				if scoreList and scoreList[idx] and scoreList[idx]:HasReplayData() then
-					offsetScoreIndex = idx
-					offsetisLocal = isLocal
-					MESSAGEMAN:Broadcast("ShowScoreOffset")
-				end
-			end,
-			WheelUpSlowMessageCommand = function(self)
-				if self:IsOver() then movePage(-1) end
-			end,
-			WheelDownSlowMessageCommand = function(self)
-				if self:IsOver() then movePage(1) end
-			end
-		},
-
-		-- Clear type lamp
-		Def.Quad {
-			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(4, 26)
-			end,
-			SetScoreCommand = function(self, params)
-				local ct = getClearType(pn, steps, scoreList[params.index])
-				self:diffuse(getClearTypeColor(ct))
-			end
-		},
-
-		-- Grade
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(18, 6):zoom(0.26):halign(0) end,
-			SetScoreCommand = function(self, params)
-				local grade = scoreList[params.index]:GetWifeGrade()
-				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
-				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
-			end
-		},
-
-		-- Score %
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(55, 6):zoom(0.26):halign(0):diffuse(mainText) end,
-			SetScoreCommand = function(self, params)
-				local ws = scoreList[params.index]:GetWifeScore()
-				if ws >= 0.99 then
-					self:settextf("%.4f%%", math.floor(ws * 1000000) / 10000)
-				else
-					self:settextf("%.2f%%", math.floor(ws * 10000) / 100)
-				end
-			end
-		},
-
-		-- Judgments summary
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(55, 18):zoom(0.2):halign(0):diffuse(dimText) end,
-			SetScoreCommand = function(self, params)
-				local s = scoreList[params.index]
-				self:settextf("%d-%d-%d-%d-%d-%d",
-					s:GetTapNoteScore("TapNoteScore_W1"), s:GetTapNoteScore("TapNoteScore_W2"),
-					s:GetTapNoteScore("TapNoteScore_W3"), s:GetTapNoteScore("TapNoteScore_W4"),
-					s:GetTapNoteScore("TapNoteScore_W5"), s:GetTapNoteScore("TapNoteScore_Miss"))
-			end
-		},
-
-		-- Date
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(rightW - 25, 6):zoom(0.2):halign(1):diffuse(dimText) end,
-			SetScoreCommand = function(self, params)
-				self:settext(scoreList[params.index]:GetDate())
-			end
-		},
-
-		-- SSR
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(rightW - 25, 18):zoom(0.2):halign(1) end,
-			SetScoreCommand = function(self, params)
-				local ssr = scoreList[params.index]:GetSkillsetSSR("Overall")
-				self:settextf("%.2f", ssr)
-				self:diffuse(HVColor.GetMSDRatingColor(ssr))
-			end
-		},
-
-		-- Replay indicator
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(rightW - 25, 12):zoom(0.15):halign(1):diffuse(color("#7AFFAF"))
-				self:settext("●"):visible(false)
-			end,
-			SetScoreCommand = function(self, params)
-				self:visible(scoreList[params.index]:HasReplayData())
-			end
-		},
-	}
+if inMulti then
+	scoreboardFrame[#scoreboardFrame + 1] = LoadActor("MPscoreboard")
+else
+	scoreboardFrame[#scoreboardFrame + 1] = LoadActor("online_leaderboard")
 end
 
-t[#t + 1] = scoreRowsFrame
+t[#t + 1] = scoreboardFrame
 t[#t + 1] = LoadActor("manipfactor")
 
 return t

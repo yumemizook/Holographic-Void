@@ -101,7 +101,7 @@ local queuePanel = Def.ActorFrame {
 				:xy(12, SCREEN_BOTTOM - 26)
 				:zoom(0.28)
 				:diffuse(accentColor)
-				:settext("DOWNLOAD QUEUE")
+				:settext(THEME:GetString("DownloadOverlay", "Header"))
 		end
 	},
 
@@ -208,17 +208,17 @@ t.OnCommand = function(self)
 
 			local queueCount = queued and #queued or 0
 			if queueCount > 0 then
-				status:settextf("Downloading: %s  (%.0f/%.0fMB)  +%d queued",
+				status:settextf(THEME:GetString("DownloadOverlay", "DownloadingQueuedFormatted"),
 					packName, mb, total, queueCount)
 			else
-				status:settextf("Downloading: %s  (%.0f/%.0fMB)",
+				status:settextf(THEME:GetString("DownloadOverlay", "DownloadingFormatted"),
 					packName, mb, total)
 			end
 
 			pct:settextf("%.0f%%", percent * 100)
 			bar:zoomto(SCREEN_WIDTH * percent, barH)
 		elseif hasQueued then
-			status:settextf("Queued: %d pack(s)...", #queued)
+			status:settextf(THEME:GetString("DownloadOverlay", "QueuedFormatted"), #queued)
 			pct:settext("")
 			bar:zoomto(0, barH)
 		end
@@ -263,12 +263,12 @@ t.OnCommand = function(self)
 			local dlPacks = DLMAN:GetDownloadingPacks()
 			if dlPacks then
 				for _, p in ipairs(dlPacks) do
-					allItems[#allItems + 1] = { name = p:GetName(), status = "DOWNLOADING" }
+					allItems[#allItems + 1] = { name = p:GetName(), status = THEME:GetString("DownloadOverlay", "StatusDownloading") }
 				end
 			end
 			if queued then
 				for _, p in ipairs(queued) do
-					allItems[#allItems + 1] = { name = p:GetName(), status = "QUEUED" }
+					allItems[#allItems + 1] = { name = p:GetName(), status = THEME:GetString("DownloadOverlay", "StatusQueued") }
 				end
 			end
 
@@ -279,7 +279,7 @@ t.OnCommand = function(self)
 					nameText:settext(allItems[i].name)
 					nameText:visible(true)
 					statusText:settext(allItems[i].status)
-					if allItems[i].status == "DOWNLOADING" then
+					if allItems[i].status == THEME:GetString("DownloadOverlay", "StatusDownloading") then
 						statusText:diffuse(accentColor)
 					else
 						statusText:diffuse(dimText)

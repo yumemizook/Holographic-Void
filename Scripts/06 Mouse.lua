@@ -67,3 +67,23 @@ function GetMouseScrollDirection(btn)
 	end
 	return 0
 end
+
+--- Check if the mouse is over a given actor, accounting for its alignment and scale.
+-- Highly robust and works for actors with any HAlign/VAlign.
+-- @param self The actor to check
+-- @return true if the mouse is currently over the actor
+function isOver(self)
+	if not self or not self:GetVisible() then return false end
+	local mx = INPUTFILTER:GetMouseX()
+	local my = INPUTFILTER:GetMouseY()
+	local x = self:GetTrueX()
+	local y = self:GetTrueY()
+	local w = self:GetZoomedWidth()
+	local h = self:GetZoomedHeight()
+
+	local ha = self:GetHAlign()
+	local va = self:GetVAlign()
+
+	return mx >= x - (w * ha) and mx <= x + (w * (1 - ha)) and
+	       my >= y - (h * va) and my <= y + (h * (1 - va))
+end
