@@ -1,0 +1,1 @@
+﻿add animations between the game screens, as well as adding a 'Press Enter again for options' screen when a song is selected, and an 'Entering Options...' text when the Enter (or the key bound to Start) is pressed a second time.
