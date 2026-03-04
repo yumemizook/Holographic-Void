@@ -20,9 +20,13 @@ function easyInputStringOKCancel(question, maxLength, isPassword, funcOK, funcCa
 		MaxInputLength = maxLength,
 		Password = isPassword,
 		OnOK = function(answer)
+			local top = SCREENMAN:GetTopScreen()
+			if top and top:GetName() == "ScreenTextEntry" then top:Cancel() end
 			funcOK(answer)
 		end,
 		OnCancel = function()
+			local top = SCREENMAN:GetTopScreen()
+			if top and top:GetName() == "ScreenTextEntry" then top:Cancel() end
 			if funcCancel then funcCancel() end
 		end,
 	}

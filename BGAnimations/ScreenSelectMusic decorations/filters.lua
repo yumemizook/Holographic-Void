@@ -1,6 +1,6 @@
 --- Holographic Void: Filters Tab
--- Uses the C++ FILTERMAN singleton for per-skillset MSD filtering,
--- rate bounds, filter mode (AND/OR), and instant wheel refresh via whee:SongSearch("")
+-- Rebuilt from Til Death's implementation using UIElements for proper mouse/keyboard input.
+-- Uses FILTERMAN singleton for per-skillset MSD filtering, rate bounds, filter mode, and wheel refresh.
 
 local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
@@ -10,72 +10,96 @@ local brightText = color("1,1,1,1")
 local bgCard = color("0.04,0.04,0.04,0.97")
 
 local overlayW = 680
-local overlayH = 400
+local overlayH = 420
 local filtersActor = nil
 local whee = nil
+local active = false
 
--- Active numeric input state (0 = none, 1-10 = which filter index)
+local hoverAlpha = 0.6
+local textzoom = 0.32
+local spacingY = 24
+local numbershers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
+
+-- Active numeric input state
 local ActiveSS = 0
 local activebound = 0 -- 0 = lower, 1 = upper
-local SSQuery = {{}, {}}
+local SSQuery = {}
+SSQuery[0] = {}
+SSQuery[1] = {}
 for i = 1, #ms.SkillSets + 2 do
+	SSQuery[0][i] = "0"
 	SSQuery[1][i] = "0"
-	SSQuery[2][i] = "0"
 end
+local numbersafterthedecimal = 0
+
+local totalRows = #ms.SkillSets + 2
 
 -- Numeric input handler (runs when a filter cell is being edited)
 local function FilterInput(event)
-	if event.type == "InputEventType_Release" then return true end
-	if ActiveSS == 0 then return false end
-
-	if event.button == "Start" or event.button == "Back" then
-		ActiveSS = 0
-		MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-		return true
-	end
-
-	local shouldUpdate = false
-	local bnd = activebound + 1 -- SSQuery use 1-indexed bounds
-
-	if event.DeviceInput.button == "DeviceButton_backspace" then
-		SSQuery[bnd][ActiveSS] = SSQuery[bnd][ActiveSS]:sub(1, -2)
-		shouldUpdate = true
-	elseif event.DeviceInput.button == "DeviceButton_delete" then
-		SSQuery[bnd][ActiveSS] = ""
-		shouldUpdate = true
-	else
-		-- Number keys 0-9
-		local numbershers = {"1","2","3","4","5","6","7","8","9","0"}
-		for _, n in ipairs(numbershers) do
-			if event.DeviceInput.button == "DeviceButton_" .. n then
-				shouldUpdate = true
-				if SSQuery[bnd][ActiveSS] == "0" then
-					SSQuery[bnd][ActiveSS] = ""
-				end
-				SSQuery[bnd][ActiveSS] = SSQuery[bnd][ActiveSS] .. n
-				-- Clamp length: 2 digits for MSD, 3 for length, 5 for %
-				local maxLen = ActiveSS <= #ms.SkillSets and 2 or (ActiveSS == #ms.SkillSets + 1 and 3 or 5)
-				if #SSQuery[bnd][ActiveSS] > maxLen then
-					SSQuery[bnd][ActiveSS] = n
+	if event.type ~= "InputEventType_Release" and ActiveSS > 0 and active then
+		local shouldUpdate = false
+		if event.button == "Start" or event.button == "Back" then
+			ActiveSS = 0
+			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			return true
+		elseif event.DeviceInput.button == "DeviceButton_backspace" then
+			SSQuery[activebound][ActiveSS] = SSQuery[activebound][ActiveSS]:sub(1, -2)
+			shouldUpdate = true
+		elseif event.DeviceInput.button == "DeviceButton_delete" then
+			SSQuery[activebound][ActiveSS] = ""
+			shouldUpdate = true
+		else
+			for i = 1, #numbershers do
+				if event.DeviceInput.button == "DeviceButton_" .. numbershers[i] then
+					shouldUpdate = true
+					if SSQuery[activebound][ActiveSS] == "0" then
+						SSQuery[activebound][ActiveSS] = ""
+					end
+					SSQuery[activebound][ActiveSS] = SSQuery[activebound][ActiveSS] .. numbershers[i]
+					-- Clamp lengths: 2 digits for MSD skillsets, 3 for length, 5 for %
+					if (ActiveSS < #ms.SkillSets + 1 and #SSQuery[activebound][ActiveSS] > 2)
+						or (ActiveSS < #ms.SkillSets + 2 and #SSQuery[activebound][ActiveSS] > 3)
+						or #SSQuery[activebound][ActiveSS] > 5 then
+						SSQuery[activebound][ActiveSS] = numbershers[i]
+					end
 				end
 			end
 		end
+		if SSQuery[activebound][ActiveSS] == "" then
+			shouldUpdate = true
+			SSQuery[activebound][ActiveSS] = "0"
+		end
+		if shouldUpdate then
+			local num = 0
+			if ActiveSS == #ms.SkillSets + 2 then
+				local q = SSQuery[activebound][ActiveSS]
+				numbersafterthedecimal = 0
+				if #q > 2 then
+					numbersafterthedecimal = #q - 2
+					local n = tonumber(q) / (10 ^ (#q - 2))
+					n = notShit.round(n, numbersafterthedecimal)
+					num = n
+				else
+					num = tonumber(q)
+				end
+			else
+				num = tonumber(SSQuery[activebound][ActiveSS])
+			end
+			FILTERMAN:SetSSFilter(num, ActiveSS, activebound)
+			if whee then whee:SongSearch("") end
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+		end
 	end
-
-	if SSQuery[bnd][ActiveSS] == "" then
-		shouldUpdate = true
-		SSQuery[bnd][ActiveSS] = "0"
-	end
-
-	if shouldUpdate then
-		local num = tonumber(SSQuery[bnd][ActiveSS]) or 0
-		FILTERMAN:SetSSFilter(num, ActiveSS, activebound)
-		if whee then whee:SongSearch("") end
-		MESSAGEMAN:Broadcast("HV_FilterUpdated")
-	end
-
-	return true
 end
+
+-- Layout constants
+local cellW = 50
+local cellH = 20
+local rowStartY = 70
+local labelColX = 20
+local minColX = overlayW / 2 + 20
+local maxColX = minColX + cellW + 16
 
 -- Build the UI
 local t = Def.ActorFrame {
@@ -88,38 +112,6 @@ local t = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if screen then
 			whee = screen:GetMusicWheel()
-			screen:AddInputCallback(function(event)
-				if not filtersActor or not filtersActor:GetVisible() then return false end
-				if not event or not event.DeviceInput then return false end
-				
-				-- If numeric input is active, it handles everything
-				if ActiveSS > 0 then return FilterInput(event) end
-
-				if event.type ~= "InputEventType_FirstPress" then return true end
-				local btn = event.DeviceInput.button
-
-				-- Click handling
-				if btn == "DeviceButton_left mouse button" then
-					local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-					if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-						return true
-					end
-					
-					-- (The actual cell/button logic is handled in the other callback below, but we must return true here if we're over the overlay)
-					return true 
-				end
-
-				if event.button == "Back" then
-					ActiveSS = 0
-					SCREENMAN:set_input_redirected(PLAYER_1, false)
-					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-					return true
-				end
-
-				-- Sink all other input
-				return true
-			end)
 		end
 	end,
 	SelectMusicTabChangedMessageCommand = function(self, params)
@@ -127,57 +119,98 @@ local t = Def.ActorFrame {
 			self:visible(not self:GetVisible())
 			if self:GetVisible() then
 				HV.ActiveTab = "FILTERS"
-				self:playcommand("RefreshUI")
+				active = true
+				self:playcommand("Set")
 			else
 				HV.ActiveTab = ""
+				active = false
 				ActiveSS = 0
+				SCREENMAN:set_input_redirected(PLAYER_1, false)
 			end
 		else
 			self:visible(false)
 			if HV.ActiveTab == "FILTERS" then HV.ActiveTab = "" end
+			active = false
 			ActiveSS = 0
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
 		end
 	end,
 
-	-- Background
-	Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(bgCard) end },
-	Def.Quad { InitCommand = function(self) self:valign(0):y(-overlayH/2):zoomto(overlayW, 2):diffuse(accentColor):diffusealpha(0.7) end },
+	MouseRightClickMessageCommand = function(self)
+		if active then
+			ActiveSS = 0
+			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+		end
+	end,
+
+	-- Background card
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(overlayW, overlayH):diffuse(bgCard)
+		end,
+	},
+	-- Accent bar at top
+	Def.Quad {
+		InitCommand = function(self)
+			self:valign(0):y(-overlayH / 2):zoomto(overlayW, 2):diffuse(accentColor):diffusealpha(0.7)
+		end,
+	},
 
 	-- Title
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor):settext("FILTERS")
+			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 12):zoom(0.5)
+				:diffuse(accentColor):settext("FILTERS")
 		end,
 	},
 
 	-- Instructions
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 35):zoom(0.28):diffuse(dimText)
-				:settext("CLICK a cell to type a number · ENTER/ESC to finish · Right-click to cancel")
+			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 34):zoom(0.24):diffuse(dimText)
+				:settext("Click a cell to type a number · Start/Back to finish · Right-click to cancel")
+		end,
+	},
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 48):zoom(0.24):diffuse(dimText)
+				:settext("Grey values indicate no filter is applied · Lower bound ≤ Value ≤ Upper bound")
 		end,
 	},
 
 	-- Column headers
 	Def.ActorFrame {
-		InitCommand = function(self) self:xy(-overlayW/2 + 25, -overlayH/2 + 58) end,
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):zoom(0.32):diffuse(dimText):settext("SKILLSET") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 200):zoom(0.32):diffuse(dimText):settext("MIN") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 120):zoom(0.32):diffuse(dimText):settext("MAX") end },
+		InitCommand = function(self)
+			self:xy(-overlayW / 2 + labelColX, -overlayH / 2 + rowStartY - 10)
+		end,
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):zoom(0.28):diffuse(dimText):settext("SKILLSET")
+			end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):x(minColX):zoom(0.28):diffuse(dimText):settext("MIN")
+			end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0.5):x(maxColX):zoom(0.28):diffuse(dimText):settext("MAX")
+			end,
+		},
 	},
 	Def.Quad {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 12, -overlayH/2 + 62):zoomto(overlayW - 24, 1):diffuse(color("0.12,0.12,0.12,1"))
+			self:halign(0):valign(0):xy(-overlayW / 2 + 12, -overlayH / 2 + rowStartY - 4)
+				:zoomto(overlayW - 24, 1):diffuse(color("0.12,0.12,0.12,1"))
 		end,
 	},
 }
 
--- Skillset filter rows (8 skillsets + Length + Best%)
-local rowH = 26
-local rowStartY = -overlayH/2 + 72
-local totalRows = #ms.SkillSets + 2
-
-for i = 1, totalRows do
+-- Helper: create a clickable filter input box for row i
+local function CreateFilterInputBox(i)
 	local label = ""
 	if i <= #ms.SkillSets then
 		label = ms.SkillSetsTranslated[i] or ms.SkillSets[i]
@@ -187,288 +220,464 @@ for i = 1, totalRows do
 		label = "Best %"
 	end
 
-	t[#t + 1] = Def.ActorFrame {
+	local rowY = -overlayH / 2 + rowStartY + (i - 1) * spacingY
+
+	local row = Def.ActorFrame {
 		Name = "FilterRow_" .. i,
 		InitCommand = function(self)
-			self:xy(-overlayW/2 + 16, rowStartY + (i-1) * rowH)
+			self:xy(-overlayW / 2 + labelColX, rowY)
 		end,
 
-		-- Label
+		-- Row label
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0.5):y(rowH/2):zoom(0.28):diffuse(mainText):settext(label) end,
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):y(spacingY / 2):zoom(0.28):diffuse(mainText):settext(label)
+			end,
 		},
 
-		-- Lower bound cell
-		Def.Quad {
+		----------- LOWER BOUND (MIN) -----------
+		-- Clickable background quad
+		UIElements.QuadButton(1, 1) .. {
 			Name = "LowerBg",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(280):y(rowH/2):zoomto(50, rowH - 4):diffuse(color("0.06,0.06,0.06,1"))
+				self:halign(0.5):valign(0.5):x(minColX):y(spacingY / 2):zoomto(cellW, cellH)
 			end,
-			RefreshUICommand = function(self)
+			SetCommand = function(self)
 				if ActiveSS == i and activebound == 0 then
-					self:diffuse(color("0.15,0.15,0.15,1"))
+					self:diffuse(color("#666666"))
 				else
-					self:diffuse(color("0.06,0.06,0.06,1"))
+					self:diffuse(color("#000000"))
 				end
 			end,
-			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("RefreshUI") end,
+			MouseDownCommand = function(self, params)
+				if params.event == "DeviceButton_left mouse button" and active then
+					ActiveSS = i
+					activebound = 0
+					MESSAGEMAN:Broadcast("HV_NumericInputActive")
+					SCREENMAN:set_input_redirected(PLAYER_1, true)
+				end
+			end,
+			MouseOverCommand = function(self)
+				if ActiveSS ~= i or activebound ~= 0 then
+					self:diffusealpha(hoverAlpha)
+				end
+			end,
+			MouseOutCommand = function(self)
+				self:diffusealpha(1)
+			end,
+			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputActiveMessageCommand = function(self) self:playcommand("Set") end,
 		},
+
+		-- Lower bound value text
 		LoadFont("Common Normal") .. {
 			Name = "LowerVal",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(280):y(rowH/2):zoom(0.30):diffuse(brightText)
+				self:halign(0.5):valign(0.5):x(minColX):y(spacingY / 2):zoom(0.30):maxwidth(cellW / 0.30 - 4)
 			end,
-			RefreshUICommand = function(self)
-				local val = FILTERMAN:GetSSFilter(i, 0)
-				if val <= 0 then
-					self:settext("—"):diffuse(dimText)
+			SetCommand = function(self)
+				local fval = notShit.round(FILTERMAN:GetSSFilter(i, 0), numbersafterthedecimal)
+				local fmtstr
+				if i == #ms.SkillSets + 2 then
+					if numbersafterthedecimal > 0 then
+						fmtstr = "%5." .. numbersafterthedecimal .. "f"
+					else
+						fmtstr = "%02d."
+					end
 				else
-					self:settextf("%g", val):diffuse(brightText)
+					fmtstr = "%d"
+				end
+				self:settextf(fmtstr, fval)
+				if fval <= 0 and ActiveSS ~= i then
+					self:diffuse(dimText)
+				else
+					self:diffuse(brightText)
 				end
 			end,
-			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("RefreshUI") end,
+			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputActiveMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("Set") end,
 		},
 
-		-- Upper bound cell
-		Def.Quad {
+		----------- UPPER BOUND (MAX) -----------
+		UIElements.QuadButton(1, 1) .. {
 			Name = "UpperBg",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(350):y(rowH/2):zoomto(50, rowH - 4):diffuse(color("0.06,0.06,0.06,1"))
+				self:halign(0.5):valign(0.5):x(maxColX):y(spacingY / 2):zoomto(cellW, cellH)
 			end,
-			RefreshUICommand = function(self)
+			SetCommand = function(self)
 				if ActiveSS == i and activebound == 1 then
-					self:diffuse(color("0.15,0.15,0.15,1"))
+					self:diffuse(color("#666666"))
 				else
-					self:diffuse(color("0.06,0.06,0.06,1"))
+					self:diffuse(color("#000000"))
 				end
 			end,
-			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("RefreshUI") end,
+			MouseDownCommand = function(self, params)
+				if params.event == "DeviceButton_left mouse button" and active then
+					ActiveSS = i
+					activebound = 1
+					MESSAGEMAN:Broadcast("HV_NumericInputActive")
+					SCREENMAN:set_input_redirected(PLAYER_1, true)
+				end
+			end,
+			MouseOverCommand = function(self)
+				if ActiveSS ~= i or activebound ~= 1 then
+					self:diffusealpha(hoverAlpha)
+				end
+			end,
+			MouseOutCommand = function(self)
+				self:diffusealpha(1)
+			end,
+			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputActiveMessageCommand = function(self) self:playcommand("Set") end,
 		},
+
+		-- Upper bound value text
 		LoadFont("Common Normal") .. {
 			Name = "UpperVal",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(350):y(rowH/2):zoom(0.30):diffuse(brightText)
+				self:halign(0.5):valign(0.5):x(maxColX):y(spacingY / 2):zoom(0.30):maxwidth(cellW / 0.30 - 4)
 			end,
-			RefreshUICommand = function(self)
-				local val = FILTERMAN:GetSSFilter(i, 1)
-				if val <= 0 then
-					self:settext("—"):diffuse(dimText)
+			SetCommand = function(self)
+				local fval = notShit.round(FILTERMAN:GetSSFilter(i, 1), numbersafterthedecimal)
+				local fmtstr
+				if i == #ms.SkillSets + 2 then
+					if numbersafterthedecimal > 0 then
+						fmtstr = "%5." .. numbersafterthedecimal .. "f"
+					else
+						fmtstr = "%02d."
+					end
 				else
-					self:settextf("%g", val):diffuse(brightText)
+					fmtstr = "%d"
+				end
+				self:settextf(fmtstr, fval)
+				if fval <= 0 and ActiveSS ~= i then
+					self:diffuse(dimText)
+				else
+					self:diffuse(brightText)
 				end
 			end,
-			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("RefreshUI") end,
+			HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputActiveMessageCommand = function(self) self:playcommand("Set") end,
+			HV_NumericInputEndedMessageCommand = function(self) self:playcommand("Set") end,
 		},
 	}
 
-	-- Click handlers for the cells (as a separate ActorFrame so they get proper input)
-	t[#t + 1] = Def.ActorFrame {
-		BeginCommand = function(self)
-			local screen = SCREENMAN:GetTopScreen()
-			if not screen then return end
-			-- We use the existing input callback, but also need click detection on cells
-		end,
-	}
+	return row
 end
 
--- Rate filters and mode toggles (below the skillset rows)
-local controlsY = rowStartY + totalRows * rowH + 6
+-- Add all filter rows
+for i = 1, totalRows do
+	t[#t + 1] = CreateFilterInputBox(i)
+end
 
-t[#t + 1] = Def.ActorFrame {
-	Name = "Controls",
-	InitCommand = function(self) self:xy(-overlayW/2 + 16, controlsY) end,
+-- Controls section (below the rows)
+local controlsY = -overlayH / 2 + rowStartY + totalRows * spacingY + 12
 
-	Def.Quad {
-		InitCommand = function(self)
-			self:halign(0):valign(0):y(-4):zoomto(overlayW - 32, 1):diffuse(color("0.12,0.12,0.12,1"))
-		end,
-	},
-
-	-- Max Rate
-	LoadFont("Common Normal") .. {
-		Name = "MaxRate",
-		InitCommand = function(self)
-			self:halign(0):valign(0.5):xy(0, 14):zoom(0.28):diffuse(accentColor)
-		end,
-		RefreshUICommand = function(self)
-			self:settextf("Max Rate: %.1fx", FILTERMAN:GetMaxFilterRate())
-		end,
-		HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-	},
-	-- Min Rate
-	LoadFont("Common Normal") .. {
-		Name = "MinRate",
-		InitCommand = function(self)
-			self:halign(0):valign(0.5):xy(0, 34):zoom(0.28):diffuse(accentColor)
-		end,
-		RefreshUICommand = function(self)
-			self:settextf("Min Rate: %.1fx", FILTERMAN:GetMinFilterRate())
-		end,
-		HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-	},
-
-	-- Mode toggle (AND / OR)
-	LoadFont("Common Normal") .. {
-		Name = "ModeToggle",
-		InitCommand = function(self)
-			self:halign(0):valign(0.5):xy(200, 14):zoom(0.28):diffuse(accentColor)
-		end,
-		RefreshUICommand = function(self)
-			if FILTERMAN:GetFilterMode() then
-				self:settext("Mode: AND")
-			else
-				self:settext("Mode: OR")
-			end
-		end,
-		HV_FilterUpdatedMessageCommand = function(self) self:playcommand("RefreshUI") end,
-	},
+t[#t + 1] = Def.Quad {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + 12, controlsY - 4)
+			:zoomto(overlayW - 24, 1):diffuse(color("0.12,0.12,0.12,1"))
+	end,
 }
 
--- Action buttons (Reset, Apply Rate+/-, Mode toggle)
-t[#t + 1] = Def.ActorFrame {
-	Name = "ActionButtons",
-	InitCommand = function(self) self:xy(0, overlayH/2 - 25) end,
-
-	-- Reset button
-	Def.ActorFrame {
-		InitCommand = function(self) self:x(-200) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(90, 24):diffuse(color("0.15,0,0,0.8")) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(color("1,0.4,0.4,1")):settext("RESET ALL") end },
-	},
-
-	-- Rate- button
-	Def.ActorFrame {
-		InitCommand = function(self) self:x(-110) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(60, 24):diffuse(color("0.1,0.1,0.1,1")) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("RATE-") end },
-	},
-
-	-- Rate+ button
-	Def.ActorFrame {
-		InitCommand = function(self) self:x(-45) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(60, 24):diffuse(color("0.1,0.1,0.1,1")) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("RATE+") end },
-	},
-
-	-- Mode toggle button
-	Def.ActorFrame {
-		InitCommand = function(self) self:x(45) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(95, 24):diffuse(color("0.1,0.1,0.1,1")) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.28):diffuse(mainText):settext("TOGGLE MODE") end },
-	},
-
-	-- FilterResults display
-	LoadFont("Common Normal") .. {
-		Name = "Results",
-		InitCommand = function(self)
-			self:halign(0):x(110):zoom(0.32):diffuse(subText)
-		end,
-		FilterResultsMessageCommand = function(self, msg)
-			if msg then
-				self:settextf("MATCHES: %d / %d", msg.Matches or 0, msg.Total or 0)
-			end
-		end,
-	},
+-- Max Rate (left-click +, right-click -)
+t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6):zoom(textzoom)
+			:diffuse(accentColor)
+	end,
+	SetCommand = function(self)
+		self:settextf("Max Rate: %5.1fx", FILTERMAN:GetMaxFilterRate())
+	end,
+	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
+	MouseOverCommand = function(self) self:diffusealpha(hoverAlpha) end,
+	MouseOutCommand = function(self) self:diffusealpha(1) end,
+}
+t[#t + 1] = UIElements.QuadButton(1, 1) .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6)
+			:zoomto(140, spacingY - 2):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" and active then
+			FILTERMAN:SetMaxFilterRate(FILTERMAN:GetMaxFilterRate() + 0.1)
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		elseif params.event == "DeviceButton_right mouse button" and active then
+			FILTERMAN:SetMaxFilterRate(FILTERMAN:GetMaxFilterRate() - 0.1)
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		end
+	end,
 }
 
--- Click handling for cells and buttons
+-- Min Rate (left-click +, right-click -)
+t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + spacingY):zoom(textzoom)
+			:diffuse(accentColor)
+	end,
+	SetCommand = function(self)
+		self:settextf("Min Rate: %5.1fx", FILTERMAN:GetMinFilterRate())
+	end,
+	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
+	MouseOverCommand = function(self) self:diffusealpha(hoverAlpha) end,
+	MouseOutCommand = function(self) self:diffusealpha(1) end,
+}
+t[#t + 1] = UIElements.QuadButton(1, 1) .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + spacingY)
+			:zoomto(140, spacingY - 2):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" and active then
+			FILTERMAN:SetMinFilterRate(FILTERMAN:GetMinFilterRate() + 0.1)
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		elseif params.event == "DeviceButton_right mouse button" and active then
+			FILTERMAN:SetMinFilterRate(FILTERMAN:GetMinFilterRate() - 0.1)
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		end
+	end,
+}
+
+-- Right-side controls (anchored to right half of overlay)
+local rightColX = overlayW / 2 - 220
+
+-- Mode toggle (AND / OR)
+t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6):zoom(textzoom)
+			:diffuse(accentColor)
+	end,
+	SetCommand = function(self)
+		if FILTERMAN:GetFilterMode() then
+			self:settext("Mode: AND")
+		else
+			self:settext("Mode: OR")
+		end
+	end,
+	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_FilterModeChangedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
+	MouseOverCommand = function(self) self:diffusealpha(hoverAlpha) end,
+	MouseOutCommand = function(self) self:diffusealpha(1) end,
+}
+t[#t + 1] = UIElements.QuadButton(1, 1) .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6)
+			:zoomto(120, spacingY - 2):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" and active then
+			FILTERMAN:ToggleFilterMode()
+			MESSAGEMAN:Broadcast("HV_FilterModeChanged")
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		end
+	end,
+}
+
+-- Highest Skillsets Only toggle (greyed when AND mode)
+t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY):zoom(textzoom)
+			:maxwidth((overlayW / 2 - 40) / textzoom)
+	end,
+	SetCommand = function(self)
+		local onoff = FILTERMAN:GetHighestSkillsetsOnly() and "On" or "Off"
+		self:settext("Highest SS Only: " .. onoff)
+		if FILTERMAN:GetFilterMode() then
+			self:diffuse(color("1,1,1,0.2"))
+		else
+			self:diffuse(accentColor)
+		end
+	end,
+	HV_FilterModeChangedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
+	MouseOverCommand = function(self)
+		if not FILTERMAN:GetFilterMode() then
+			self:diffusealpha(hoverAlpha)
+		end
+	end,
+	MouseOutCommand = function(self)
+		if FILTERMAN:GetFilterMode() then
+			self:diffusealpha(0.2)
+		else
+			self:diffusealpha(1)
+		end
+	end,
+}
+t[#t + 1] = UIElements.QuadButton(1, 1) .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY)
+			:zoomto(180, spacingY - 2):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" and active and not FILTERMAN:GetFilterMode() then
+			FILTERMAN:ToggleHighestSkillsetsOnly()
+			MESSAGEMAN:Broadcast("HV_FilterModeChanged")
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		end
+	end,
+}
+
+-- Highest Difficulty Only toggle (greyed when AND mode)
+t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 2):zoom(textzoom)
+			:maxwidth((overlayW / 2 - 40) / textzoom)
+	end,
+	SetCommand = function(self)
+		local onoff = FILTERMAN:GetHighestDifficultyOnly() and "On" or "Off"
+		self:settext("Highest Diff Only: " .. onoff)
+		if FILTERMAN:GetFilterMode() then
+			self:diffuse(color("1,1,1,0.2"))
+		else
+			self:diffuse(accentColor)
+		end
+	end,
+	HV_FilterModeChangedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_FilterUpdatedMessageCommand = function(self) self:playcommand("Set") end,
+	HV_ResetFilterMessageCommand = function(self) self:playcommand("Set") end,
+	MouseOverCommand = function(self)
+		if not FILTERMAN:GetFilterMode() then
+			self:diffusealpha(hoverAlpha)
+		end
+	end,
+	MouseOutCommand = function(self)
+		if FILTERMAN:GetFilterMode() then
+			self:diffusealpha(0.2)
+		else
+			self:diffusealpha(1)
+		end
+	end,
+}
+t[#t + 1] = UIElements.QuadButton(1, 1) .. {
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 2)
+			:zoomto(180, spacingY - 2):diffusealpha(0)
+	end,
+	MouseDownCommand = function(self, params)
+		if params.event == "DeviceButton_left mouse button" and active and not FILTERMAN:GetFilterMode() then
+			FILTERMAN:ToggleHighestDifficultyOnly()
+			MESSAGEMAN:Broadcast("HV_FilterModeChanged")
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			if whee then whee:SongSearch("") end
+		end
+	end,
+}
+
+-- Filter match count
+t[#t + 1] = LoadFont("Common Normal") .. {
+	Name = "FilterResults",
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 3):zoom(textzoom)
+			:diffuse(subText):settext("")
+	end,
+	FilterResultsMessageCommand = function(self, msg)
+		if msg then
+			self:settextf("Matches: %d / %d", msg.Matches or 0, msg.Total or 0)
+		end
+	end,
+}
+
+-- Bottom action bar
+local bottomY = overlayH / 2 - 28
+
+-- Reset button
+t[#t + 1] = UIElements.TextButton(1, 1, "Common Normal") .. {
+	InitCommand = function(self)
+		self:xy(overlayW / 2 - 80, bottomY)
+		local txt = self:GetChild("Text")
+		local bg = self:GetChild("BG")
+		txt:zoom(0.30):settext("RESET ALL"):diffuse(color("1,0.4,0.4,1"))
+		bg:zoomto(90, 22):diffuse(color("0.15,0,0,0.8"))
+	end,
+	RolloverUpdateCommand = function(self, params)
+		if params.update == "in" then
+			self:diffusealpha(hoverAlpha)
+		else
+			self:diffusealpha(1)
+		end
+	end,
+	ClickCommand = function(self, params)
+		if params.update ~= "OnMouseDown" then return end
+		if params.event == "DeviceButton_left mouse button" and active then
+			FILTERMAN:ResetAllFilters()
+			for idx = 1, totalRows do
+				SSQuery[0][idx] = "0"
+				SSQuery[1][idx] = "0"
+			end
+			numbersafterthedecimal = 0
+			activebound = 0
+			ActiveSS = 0
+			MESSAGEMAN:Broadcast("HV_FilterUpdated")
+			MESSAGEMAN:Broadcast("HV_ResetFilter")
+			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
+			MESSAGEMAN:Broadcast("HV_FilterModeChanged")
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			if whee then whee:SongSearch("") end
+		end
+	end,
+}
+
+-- Input callback handler
+local function SharedInputHandler(event)
+	if not filtersActor or not filtersActor:GetVisible() then return false end
+	if not event or not event.DeviceInput then return false end
+
+	local top = SCREENMAN:GetTopScreen()
+	if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
+
+	-- If numeric input is active, delegate to FilterInput
+	if ActiveSS > 0 then
+		FilterInput(event)
+		return true
+	end
+
+	if event.type ~= "InputEventType_FirstPress" then return false end
+	local btn = event.DeviceInput.button
+
+	-- Click outside the overlay to close it
+	if btn == "DeviceButton_left mouse button" then
+		if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
+			ActiveSS = 0
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+			return true
+		end
+	end
+
+	-- Escape/Back closes the overlay
+	if event.button == "Back" or btn == "DeviceButton_escape" then
+		ActiveSS = 0
+		SCREENMAN:set_input_redirected(PLAYER_1, false)
+		MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+		return true
+	end
+
+	return false
+end
+
+-- Register input callback
 t[#t + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-		screen:AddInputCallback(function(event)
-			if not filtersActor or not filtersActor:GetVisible() then return false end
-			if not event or not event.DeviceInput then return false end
-			if event.type ~= "InputEventType_FirstPress" then return false end
-			if event.DeviceInput.button ~= "DeviceButton_left mouse button" and
-			   event.DeviceInput.button ~= "DeviceButton_right mouse button" then return false end
-
-			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-			local isRightClick = event.DeviceInput.button == "DeviceButton_right mouse button"
-
-			-- Right-click cancels numeric input
-			if isRightClick and ActiveSS > 0 then
-				ActiveSS = 0
-				MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-				return true
-			end
-
-			if not isRightClick then
-				-- Check filter cell clicks
-				for fi = 1, totalRows do
-					local cellY = SCREEN_CENTER_Y + rowStartY + (fi-1) * rowH + rowH/2
-					-- Lower bound cell (MIN)
-					if IsMouseOverCentered(SCREEN_CENTER_X + 140, cellY, 50, rowH) then
-						ActiveSS = fi
-						activebound = 0
-						SSQuery[1][fi] = "0"
-						MESSAGEMAN:Broadcast("HV_NumericInputActive")
-						filtersActor:playcommand("RefreshUI")
-						return true
-					end
-					-- Upper bound cell (MAX)
-					if IsMouseOverCentered(SCREEN_CENTER_X + 210, cellY, 50, rowH) then
-						ActiveSS = fi
-						activebound = 1
-						SSQuery[2][fi] = "0"
-						MESSAGEMAN:Broadcast("HV_NumericInputActive")
-						filtersActor:playcommand("RefreshUI")
-						return true
-					end
-				end
-
-				-- Check action buttons
-				local btnY = SCREEN_CENTER_Y + overlayH/2 - 25
-
-				-- Reset
-				if IsMouseOverCentered(SCREEN_CENTER_X - 200, btnY, 90, 24) then
-					FILTERMAN:ResetAllFilters()
-					for idx = 1, totalRows do
-						SSQuery[1][idx] = "0"
-						SSQuery[2][idx] = "0"
-					end
-					ActiveSS = 0
-					MESSAGEMAN:Broadcast("HV_FilterUpdated")
-					MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-					if whee then whee:SongSearch("") end
-					filtersActor:playcommand("RefreshUI")
-					return true
-				end
-
-				-- Rate-
-				if IsMouseOverCentered(SCREEN_CENTER_X - 110, btnY, 60, 24) then
-					FILTERMAN:SetMinFilterRate(math.max(0.1, FILTERMAN:GetMinFilterRate() - 0.1))
-					if whee then whee:SongSearch("") end
-					MESSAGEMAN:Broadcast("HV_FilterUpdated")
-					filtersActor:playcommand("RefreshUI")
-					return true
-				end
-
-				-- Rate+
-				if IsMouseOverCentered(SCREEN_CENTER_X - 45, btnY, 60, 24) then
-					FILTERMAN:SetMaxFilterRate(FILTERMAN:GetMaxFilterRate() + 0.1)
-					if whee then whee:SongSearch("") end
-					MESSAGEMAN:Broadcast("HV_FilterUpdated")
-					filtersActor:playcommand("RefreshUI")
-					return true
-				end
-
-				-- Mode toggle
-				if IsMouseOverCentered(SCREEN_CENTER_X + 45, btnY, 95, 24) then
-					FILTERMAN:ToggleFilterMode()
-					if whee then whee:SongSearch("") end
-					MESSAGEMAN:Broadcast("HV_FilterUpdated")
-					filtersActor:playcommand("RefreshUI")
-					return true
-				end
-			end
-
-			return false
-		end)
+		if HV.FiltersInputCallback then
+			pcall(function() screen:RemoveInputCallback(HV.FiltersInputCallback) end)
+		end
+		HV.FiltersInputCallback = function(event) return SharedInputHandler(event) end
+		screen:AddInputCallback(HV.FiltersInputCallback)
 	end,
 }
 

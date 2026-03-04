@@ -26,8 +26,7 @@ local currentPlaylistPage = 1
 local currentChartPage = 1
 
 -- Guard against double-loading logic
-HV.PlaylistsLoadedCount = (HV.PlaylistsLoadedCount or 0) + 1
-local instances = HV.PlaylistsLoadedCount
+-- (Removed: we must rebuild state on every reload to avoid stale actor references)
 
 -- Active playlist data
 local pl = nil
@@ -96,6 +95,56 @@ local function SortChartList(mode)
 	end
 	-- Note: SONGMAN doesn't support persistent custom sorting via API easily, 
 	-- we are just sorting the local 'chartlist' for display.
+end
+
+-- Manual chart reordering workaround
+-- pl:MoveChart is not available in this Etterna version,
+-- so we rebuild the playlist by deleting all charts and re-adding them in the new order.
+local function ManualMoveChart(fromIdx, toIdx)
+	if not pl then return false end
+	if fromIdx == toIdx then return false end
+	if fromIdx < 1 or toIdx < 1 then return false end
+
+	-- 1. Snapshot current state (keys + rates)
+	local snapshot = {}
+	local ok, steps = pcall(function() return pl:GetAllSteps() end)
+	local ok2, keys = pcall(function() return pl:GetChartkeys() end)
+	if not ok or not steps or not ok2 or not keys then return false end
+	if fromIdx > #keys or toIdx > #keys then return false end
+
+	for i = 1, #keys do
+		snapshot[i] = { key = keys[i], rate = steps[i]:GetRate() }
+	end
+
+	-- 2. Swap entries in snapshot
+	snapshot[fromIdx], snapshot[toIdx] = snapshot[toIdx], snapshot[fromIdx]
+
+	-- 3. Delete all charts from the end to avoid index shifting
+	for i = #keys, 1, -1 do
+		pcall(function() pl:DeleteChart(i) end)
+	end
+
+	-- 4. Re-add all charts in new order
+	for i = 1, #snapshot do
+		pcall(function() pl:AddChart(snapshot[i].key) end)
+	end
+
+	-- 5. Restore rates (AddChart defaults to 1.0x, so adjust by delta)
+	local ok3, newSteps = pcall(function() return pl:GetAllSteps() end)
+	if ok3 and newSteps then
+		for i = 1, #snapshot do
+			if newSteps[i] then
+				local targetRate = snapshot[i].rate
+				local currentRate = newSteps[i]:GetRate()
+				local delta = targetRate - currentRate
+				if math.abs(delta) > 0.001 then
+					pcall(function() newSteps[i]:ChangeRate(delta) end)
+				end
+			end
+		end
+	end
+
+	return true
 end
 
 
@@ -187,10 +236,10 @@ local function SharedInputHandler(event)
 		-- Advanced Controls
 		if not singleplaylistactive then
 			local ctrlsY = SCREEN_CENTER_Y + overlayH / 2 - 35
-			if IsMouseOverCentered(SCREEN_CENTER_X - 120, ctrlsY, 70, 20) then -- NEW
+			if IsMouseOverCentered(SCREEN_CENTER_X - 55, ctrlsY, 70, 20) then -- NEW
 				easyInputStringOKCancel("New Playlist Name:", 32, false, function(name)
 					if name and name ~= "" then
-						SONGMAN:NewPlaylist(name)
+						SONGMAN:NewPlaylistNoDialog(name)
 						ms.ok("Playlist created: " .. name)
 						RefreshPlaylistList()
 						playlistsActor:playcommand("RefreshUI")
@@ -198,37 +247,7 @@ local function SharedInputHandler(event)
 				end)
 				return true
 			end
-			if IsMouseOverCentered(SCREEN_CENTER_X, ctrlsY, 80, 20) then -- RENAME
-				local activePl = SONGMAN:GetActivePlaylist()
-				if activePl then
-					easyInputStringOKCancel("Rename Playlist To:", 32, false, function(name)
-						if name and name ~= "" then
-							local oldName = activePl:GetName()
-							activePl:SetName(name)
-							ms.ok("Playlist renamed: " .. oldName .. " -> " .. name)
-							RefreshPlaylistList()
-							playlistsActor:playcommand("RefreshUI")
-						end
-					end, nil, activePl:GetName())
-				else
-					ms.ok("Set a playlist as Active to rename it")
-				end
-				return true
-			end
-			if IsMouseOverCentered(SCREEN_CENTER_X + 120, ctrlsY, 80, 20) then -- DELETE
-				local activePl = SONGMAN:GetActivePlaylist()
-				if activePl then
-					local name = activePl:GetName()
-					SONGMAN:DeletePlaylist(name)
-					ms.ok("Deleted: " .. name)
-					RefreshPlaylistList()
-					playlistsActor:playcommand("RefreshUI")
-				else
-					ms.ok("Set a playlist as Active to delete it")
-				end
-				return true
-			end
-			if DLMAN:IsLoggedIn() and IsMouseOverCentered(SCREEN_CENTER_X + 160, ctrlsY, 100, 20) then -- GET EO
+			if DLMAN:IsLoggedIn() and IsMouseOverCentered(SCREEN_CENTER_X + 55, ctrlsY, 100, 20) then -- GET EO
 				ms.ok("Downloading missing playlists from online...")
 				DLMAN:DownloadMissingPlaylists()
 				return true
@@ -247,36 +266,38 @@ local function SharedInputHandler(event)
 						local entry = chartlist[idx]
 						local hx = mx - rowLeft
 						
-						-- 1. Reorder Column (More generous hitbox: 0 to 60)
-						if hx <= 60 then
+						-- 1. Reorder Column (More generous hitbox: 0 to 45)
+						if hx <= 45 then
 							if my < rowTop + rowH / 2 then -- UP
 								if idx > 1 then
-									pcall(function() pl:MoveChart(idx - 1, idx - 2) end)
-									RefreshChartList()
-									playlistsActor:playcommand("RefreshUI")
+									if ManualMoveChart(idx, idx - 1) then
+										RefreshChartList()
+										playlistsActor:playcommand("RefreshUI")
+									end
 								end
 							else -- DOWN
 								if idx < #chartlist then
-									pcall(function() pl:MoveChart(idx - 1, idx) end)
-									RefreshChartList()
-									playlistsActor:playcommand("RefreshUI")
+									if ManualMoveChart(idx, idx + 1) then
+										RefreshChartList()
+										playlistsActor:playcommand("RefreshUI")
+									end
 								end
 							end
 							return true
 						
-						-- 2. Rate Adjustment (60 to 220 from right)
-						elseif hx >= overlayW - 240 and hx <= overlayW - 70 then
+						-- 2. Rate Adjustment
+						elseif hx >= overlayW - 260 and hx <= overlayW - 200 then
 							local curRate = entry.chart:GetRate()
-							if hx <= overlayW - 155 then -- Left side (-0.1)
-								pcall(function() entry.chart:SetRate(math.max(0.1, curRate - 0.1)) end)
+							if hx <= overlayW - 230 then -- Left side (-0.1)
+								entry.chart:ChangeRate(-0.1)
 							else -- Right side (+0.1)
-								pcall(function() entry.chart:SetRate(math.min(3.0, curRate + 0.1)) end)
+								entry.chart:ChangeRate(0.1)
 							end
 							playlistsActor:playcommand("RefreshUI")
 							return true
 
-						-- 3. Delete button (Far Right)
-						elseif hx >= overlayW - 70 then
+						-- 3. Delete button
+						elseif hx >= overlayW - 80 then
 							pcall(function() pl:DeleteChart(idx) end)
 							RefreshChartList()
 							playlistsActor:playcommand("RefreshUI")
@@ -298,13 +319,44 @@ local function SharedInputHandler(event)
 				else
 					local idx = (currentPlaylistPage - 1) * playlistsPerPage + ri
 					if idx <= #allplaylists then
-						pl = allplaylists[idx].playlist
-						SONGMAN:SetActivePlaylist(pl:GetName())
-						singleplaylistactive = true
-						allplaylistsactive = false
-						currentChartPage = 1
-						RefreshChartList()
-						playlistsActor:playcommand("RefreshUI")
+						local plEntry = allplaylists[idx]
+						local name = plEntry.name
+						local hx = mx - rowLeft
+
+						-- Action: Delete
+						if hx >= overlayW - 75 then
+							if plEntry.playlist then
+								SONGMAN:DeletePlaylist(name)
+								ms.ok("Deleted: " .. name)
+								RefreshPlaylistList()
+								playlistsActor:playcommand("RefreshUI")
+							end
+							return true
+
+						-- Action: Rename
+						elseif hx >= overlayW - 105 and hx < overlayW - 75 then
+							if plEntry.playlist then
+								easyInputStringOKCancel("Rename Playlist To:", 32, false, function(newName)
+									if newName and newName ~= "" then
+										plEntry.playlist:SetName(newName)
+										ms.ok("Playlist renamed: " .. name .. " -> " .. newName)
+										RefreshPlaylistList()
+										playlistsActor:playcommand("RefreshUI")
+									end
+								end, nil, name)
+							end
+							return true
+							
+						-- Action: Select Playlist
+						else
+							pl = plEntry.playlist
+							SONGMAN:SetActivePlaylist(name)
+							singleplaylistactive = true
+							allplaylistsactive = false
+							currentChartPage = 1
+							RefreshChartList()
+							playlistsActor:playcommand("RefreshUI")
+						end
 					end
 					return true
 				end
@@ -332,16 +384,10 @@ end
 local t = Def.ActorFrame {
 	Name = "PlaylistsOverlay",
 	InitCommand = function(self)
-		-- Guard against multiple instances responding to global signals
-		if instances > 1 then 
-			self:visible(false)
-			return 
-		end
 		playlistsActor = self
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
 	end,
 	BeginCommand = function(self)
-		if instances > 1 then return end
 		local screen = SCREENMAN:GetTopScreen()
 		if screen and screen.GetMusicWheel then whee = screen:GetMusicWheel() end
 	end,
@@ -481,28 +527,14 @@ local t = Def.ActorFrame {
 		-- NEW
 		Def.ActorFrame {
 			Name = "NewBtn",
-			InitCommand = function(self) self:x(-120) end,
+			InitCommand = function(self) self:x(-55) end,
 			Def.Quad { InitCommand = function(self) self:zoomto(70, 20):diffuse(accentColor):diffusealpha(0.2) end },
 			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("NEW") end },
-		},
-		-- RENAME
-		Def.ActorFrame {
-			Name = "RenameBtn",
-			InitCommand = function(self) self:x(0) end,
-			Def.Quad { InitCommand = function(self) self:zoomto(80, 20):diffuse(accentColor):diffusealpha(0.2) end },
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("RENAME") end },
-		},
-		-- DELETE
-		Def.ActorFrame {
-			Name = "DeleteBtn",
-			InitCommand = function(self) self:x(70) end,
-			Def.Quad { InitCommand = function(self) self:zoomto(60, 20):diffuse(color("1,0.2,0.2,0.2")) end },
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("DELETE") end },
 		},
 		-- GET EO PLAYLISTS
 		Def.ActorFrame {
 			Name = "GetEOBtn",
-			InitCommand = function(self) self:x(160) end,
+			InitCommand = function(self) self:x(55) end,
 			RefreshUICommand = function(self)
 				self:visible(DLMAN:IsLoggedIn())
 			end,
@@ -543,9 +575,9 @@ t[#t+1] = Def.ActorFrame {
 	RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
 	
 	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0):x(60):zoom(0.32):diffuse(accentColor):settext("SONG TITLE") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 180):zoom(0.32):diffuse(accentColor):settext("RATE") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 110):zoom(0.32):diffuse(accentColor):settext("MSD") end },
-	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 60):zoom(0.32):diffuse(accentColor):settext("PB") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 230):zoom(0.32):diffuse(accentColor):settext("RATE") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 165):zoom(0.32):diffuse(accentColor):settext("MSD") end },
+	LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(overlayW - 115):zoom(0.32):diffuse(accentColor):settext("PB") end },
 }
 
 -- Rows for playlist list and chart entries
@@ -569,33 +601,57 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 			InitCommand = function(self) self:visible(false) end,
 			RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
 			
-			LoadFont("Common Normal") .. { Name = "Up", InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 - 6):zoom(0.35):diffuse(accentColor):settext("▲") end },
-			LoadFont("Common Normal") .. { Name = "Down", InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 + 6):zoom(0.35):diffuse(accentColor):settext("▼") end },
+			Def.Sprite {
+				Name = "Up",
+				Texture = THEME:GetPathG("", "left"),
+				InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 - 6):zoomto(10, 10):rotationz(90):diffuse(accentColor) end
+			},
+			Def.Sprite {
+				Name = "Down",
+				Texture = THEME:GetPathG("", "right"),
+				InitCommand = function(self) self:halign(0.5):xy(15, rowH/2 + 6):zoomto(10, 10):rotationz(90):diffuse(accentColor) end
+			},
+		},
+
+		-- Difficulty text
+		LoadFont("Common Normal") .. {
+			Name = "DiffText",
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(40, rowH / 2):zoom(0.32):visible(false)
+			end,
 		},
 
 		-- Main text line
 		LoadFont("Common Normal") .. {
 			Name = "MainText",
 			InitCommand = function(self)
-				self:halign(0):valign(0.5):xy(40, rowH / 2):zoom(0.42):diffuse(brightText):maxwidth((overlayW - 320) / 0.42)
+				self:halign(0):valign(0.5):xy(90, rowH / 2):zoom(0.42):diffuse(brightText):maxwidth((overlayW - 350) / 0.42)
 			end,
 		},
 
 		-- Rate Controls
 		Def.ActorFrame {
 			Name = "RateControls",
-			InitCommand = function(self) self:x(overlayW - 180):y(rowH/2):visible(false) end,
+			InitCommand = function(self) self:x(overlayW - 230):y(rowH/2):visible(false) end,
 			RefreshUICommand = function(self) self:visible(singleplaylistactive) end,
-			LoadFont("Common Normal") .. { Name = "L", InitCommand = function(self) self:x(-25):zoom(0.3):diffuse(accentColor):settext("<") end },
+			Def.Sprite {
+				Name = "L",
+				Texture = THEME:GetPathG("", "left"),
+				InitCommand = function(self) self:x(-25):zoomto(12, 12):diffuse(accentColor) end
+			},
 			LoadFont("Common Normal") .. { Name = "Val", InitCommand = function(self) self:zoom(0.35):diffuse(brightText) end },
-			LoadFont("Common Normal") .. { Name = "R", InitCommand = function(self) self:x(25):zoom(0.3):diffuse(accentColor):settext(">") end },
+			Def.Sprite {
+				Name = "R",
+				Texture = THEME:GetPathG("", "right"),
+				InitCommand = function(self) self:x(25):zoomto(12, 12):diffuse(accentColor) end
+			},
 		},
 
 		-- Sub text (PB display)
 		LoadFont("Common Normal") .. {
 			Name = "SubText",
 			InitCommand = function(self)
-				self:halign(1):valign(0.5):x(overlayW - 60):y(rowH / 2):zoom(0.32):diffuse(subText)
+				self:halign(1):valign(0.5):x(overlayW - 115):y(rowH / 2):zoom(0.32):diffuse(subText)
 			end,
 		},
 
@@ -603,15 +659,25 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 		LoadFont("Common Normal") .. {
 			Name = "RateText",
 			InitCommand = function(self)
-				self:halign(1):valign(0.5):x(overlayW - 110):y(rowH / 2):zoom(0.32):diffuse(dimText)
+				self:halign(1):valign(0.5):x(overlayW - 165):y(rowH / 2):zoom(0.32):diffuse(dimText)
 			end,
 		},
 
-		-- Delete button (only for chart view)
-		LoadFont("Common Normal") .. {
-			Name = "DelBtn",
+		-- Rename button (only for playlist list view)
+		Def.Sprite {
+			Name = "RenameBtn",
+			Texture = THEME:GetPathG("", "rename"),
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(overlayW - 25):y(rowH / 2):zoom(0.35):diffuse(color("1,0.3,0.3,0.6")):settext("✕")
+				self:halign(0.5):valign(0.5):xy(overlayW - 90, rowH / 2):zoomto(18, 18)
+			end,
+		},
+
+		-- Delete button (visible in both chart view and playlist list view)
+		Def.Sprite {
+			Name = "DelBtn",
+			Texture = THEME:GetPathG("", "delete"),
+			InitCommand = function(self)
+				self:halign(0.5):valign(0.5):xy(overlayW - 65, rowH / 2):zoomto(18, 18)
 			end,
 		},
 
@@ -624,6 +690,11 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 					local entry = chartlist[idx]
 					local songTitle = entry.chart:GetSongTitle() or "???"
 					self:GetChild("MainText"):settext(songTitle)
+
+					-- Fetch and set difficulty
+					local diff = entry.chart:GetDifficulty()
+					self:GetChild("DiffText"):settext(getShortDifficulty(diff))
+					self:GetChild("DiffText"):diffuse(HVColor.GetDifficultyColor(diff)):visible(true)
 
 					-- Check if song exists
 					local song = SONGMAN:GetSongByChartKey(entry.key)
@@ -659,6 +730,8 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 					end)
 					self:GetChild("SubText"):settext(pb):visible(true)
 					self:GetChild("DelBtn"):visible(true)
+					self:GetChild("DelBtn"):diffusealpha(0.6)
+					if self:GetChild("RenameBtn") then self:GetChild("RenameBtn"):visible(false) end
 					self:GetChild("Reorder"):playcommand("RefreshUI")
 					self:GetChild("RateControls"):playcommand("RefreshUI")
 				else
@@ -678,11 +751,14 @@ for i = 1, math.max(chartsPerPage, playlistsPerPage) do
 					else
 						self:GetChild("MainText"):diffuse(brightText)
 					end
+					self:GetChild("DiffText"):settext(""):visible(false)
 					local ct = 0
 					pcall(function() ct = plEntry.playlist:GetNumCharts() end)
 					self:GetChild("SubText"):settextf("%d charts", ct):visible(true)
 					self:GetChild("RateText"):settext(""):visible(false)
-					self:GetChild("DelBtn"):visible(false)
+					self:GetChild("DelBtn"):visible(true)
+					self:GetChild("DelBtn"):diffusealpha(1.0)
+					if self:GetChild("RenameBtn") then self:GetChild("RenameBtn"):visible(true) end
 				else
 					self:visible(false)
 				end

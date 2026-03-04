@@ -1258,6 +1258,54 @@ end
 main_af[#main_af + 1] = LoadActor("../_cursor")
 
 
+
+-- ============================================================
+-- OPTIONS CONFIRMATION PROMPT
+-- ============================================================
+local lastStartPress = 0
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "OptionsConfirm",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 100):diffusealpha(0):draworder(200)
+	end,
+	
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(320, 40):diffuse(color("0,0,0,0.8")):zoomto(320, 2)
+				:y(20):valign(1):diffuse(accentColor):diffusealpha(0.5)
+		end
+	},
+	
+	LoadFont("Common Normal") .. {
+		Name = "PromptText",
+		Text = "PRESS ENTER AGAIN FOR OPTIONS",
+		InitCommand = function(self)
+			self:zoom(0.4):diffuse(accentColor):diffusealpha(0.9)
+		end
+	},
+	
+	LoadFont("Common Normal") .. {
+		Name = "EnteringText",
+		Text = "ENTERING OPTIONS...",
+		InitCommand = function(self)
+			self:zoom(0.4):diffuse(brightText):visible(false)
+		end
+	},
+	
+	ShowOptionsPromptMessageCommand = function(self)
+		self:GetChild("PromptText"):visible(true)
+		self:GetChild("EnteringText"):visible(false)
+		self:stoptweening():linear(0.15):diffusealpha(1):sleep(1.0):linear(0.15):diffusealpha(0)
+	end,
+	
+	ShowOptionsEnteringMessageCommand = function(self)
+		self:stoptweening():diffusealpha(1)
+		self:GetChild("PromptText"):visible(false)
+		self:GetChild("EnteringText"):visible(true)
+		self:zoom(1.1):linear(0.1):zoom(1)
+	end
+}
+
 -- ============================================================
 -- MASTER INPUT SINK & TAB MANAGEMENT (LOWER PRIORITY)
 -- ============================================================
@@ -1315,6 +1363,30 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					MESSAGEMAN:Broadcast("ChartPreviewOff")
 				end
 				return true
+			end
+			-- 4. START BUTTON (Options Flow)
+			if event.button == "Start" and activeTab == "" and not previewActive then
+				if event.type ~= "InputEventType_FirstPress" then return end
+				
+				local now = GetTimeSinceStart()
+				local diff = now - lastStartPress
+				lastStartPress = now
+				
+				if diff < 0.6 then
+					-- Double press: Go to Options
+					MESSAGEMAN:Broadcast("ShowOptionsEntering")
+					local screen = SCREENMAN:GetTopScreen()
+					if screen then
+						screen:SetNextScreenName("ScreenPlayerOptions")
+						-- The screen is likely already transitioning, but we can try to force it
+						-- or just let the natural Start() finish with the new destination.
+					end
+					return false -- Let engine handle the Start behavior with new destination
+				else
+					-- Single press: Normal Start + Prompt
+					MESSAGEMAN:Broadcast("ShowOptionsPrompt")
+					return false -- Let engine start the song
+				end
 			end
 		end)
 	end
