@@ -57,12 +57,14 @@ local judgmentTNS = {
 -- ============================================================
 -- FRAME UPDATER (for time-based elements: life bar, progress bar)
 -- ============================================================
+-- Remove the global broadcaster as we'll use per-component high-freq updates for critical elements
+-- (Keeping the ActorFrame for any future global needs but removing the broadcast)
 t[#t + 1] = Def.ActorFrame {
-	InitCommand = function(self)
+	BeginCommand = function(self)
 		self:SetUpdateFunction(function(self)
+			-- Lifebar still uses this for now
 			MESSAGEMAN:Broadcast("PlayingUpdate")
 		end)
-		self:SetUpdateRate(1 / 60)
 	end
 }
 
@@ -74,9 +76,13 @@ local barH = 6
 local barY = 12
 
 t[#t + 1] = Def.ActorFrame {
-	Name = "ProgressBar",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, barY)
+	end,
+	BeginCommand = function(self)
+		self:SetUpdateFunction(function(self)
+			self:playcommand("UpdateBars")
+		end)
 	end,
 
 	Def.Quad {
@@ -91,7 +97,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):x(-barW / 2)
 				:zoomto(0, barH):diffuse(accentColor):diffusealpha(0.7)
 		end,
-		PlayingUpdateMessageCommand = function(self)
+		UpdateBarsCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local len = song:MusicLengthSeconds()
@@ -110,7 +116,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:x(barW / 2 + 8):zoom(0.35):halign(0):diffuse(dimText)
 		end,
-		PlayingUpdateMessageCommand = function(self)
+		UpdateBarsCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local songLen = song:MusicLengthSeconds()
@@ -130,7 +136,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:x(-barW / 2 - 8):zoom(0.35):halign(1):diffuse(subText)
 		end,
-		PlayingUpdateMessageCommand = function(self)
+		UpdateBarsCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
 			if song then
 				local curTime = math.max(0, GAMESTATE:GetSongPosition():GetMusicSeconds()) / getCurRateValue()
@@ -324,7 +330,7 @@ t[#t + 1] = Def.ActorFrame {
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 55)
 	end,
 
-	LoadFont("Common Large") .. {
+	LoadFont("combo/_mochiy pop one 24px") .. {
 		Name = "ComboNumber",
 		InitCommand = function(self)
 			self:zoom(0.65):diffuse(dimText):y(-4)
@@ -332,12 +338,29 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
-	LoadFont("Common Normal") .. {
+	Def.ActorFrame {
 		Name = "ComboLabel",
 		InitCommand = function(self)
-			self:zoom(0.22):diffuse(subText):y(14)
-			self:settext(THEME:GetString("ScreenGameplay", "Combo"))
-		end
+			self:y(16)
+		end,
+
+		-- Graphic for "Combo"
+		Def.Sprite {
+			Name = "ComboGraphic",
+			Texture = THEME:GetPathG("", "combo_label.png"),
+			InitCommand = function(self)
+				self:zoom(0.25):diffuse(subText):visible(true)
+			end
+		},
+
+		-- Text for "Misses" (fallback if no graphic, or for text-specific label)
+		LoadFont("Common Normal") .. {
+			Name = "MissesText",
+			InitCommand = function(self)
+				self:zoom(0.22):diffuse(color("#FF5050")):visible(false)
+				self:settext(THEME:GetString("ScreenGameplay", "Misses"))
+			end
+		}
 	},
 
 	JudgmentMessageCommand = function(self, params)
@@ -352,9 +375,13 @@ t[#t + 1] = Def.ActorFrame {
 		local combo = pss:GetCurrentCombo()
 		if combo == 0 and missStreak >= 5 then
 			local numActor = self:GetChild("ComboNumber")
-			local labelActor = self:GetChild("ComboLabel")
+			local labelContainer = self:GetChild("ComboLabel")
+			local graphic = labelContainer:GetChild("ComboGraphic")
+			local text = labelContainer:GetChild("MissesText")
+			
 			numActor:settext(tostring(missStreak)):diffuse(color("#FF5050"))
-			labelActor:settext(THEME:GetString("ScreenGameplay", "Misses")):diffuse(color("#FF5050")):diffusealpha(0.8)
+			graphic:visible(false)
+			text:visible(true):settext(THEME:GetString("ScreenGameplay", "Misses"))
 		end
 	end,
 
@@ -364,14 +391,18 @@ t[#t + 1] = Def.ActorFrame {
 
 		local combo = pss:GetCurrentCombo()
 		local numActor = self:GetChild("ComboNumber")
-		local labelActor = self:GetChild("ComboLabel")
+		local labelContainer = self:GetChild("ComboLabel")
+		local graphic = labelContainer:GetChild("ComboGraphic")
+		local text = labelContainer:GetChild("MissesText")
 
 		if combo > 0 then
 			numActor:settext(tostring(combo)):diffuse(brightText)
-			labelActor:settext(THEME:GetString("ScreenGameplay", "Combo")):diffuse(subText)
+			graphic:visible(true):diffusealpha(1)
+			text:visible(false)
 		elseif missStreak < 5 then
 			numActor:settext("0"):diffuse(dimText)
-			labelActor:settext(THEME:GetString("ScreenGameplay", "Combo")):diffuse(subText):diffusealpha(0.5)
+			graphic:visible(true):diffusealpha(0.5)
+			text:visible(false)
 		end
 	end
 }
@@ -390,7 +421,7 @@ local dotLife = 2.0  -- seconds
 t[#t + 1] = Def.ActorFrame {
 	Name = "ErrorBar",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ThemePrefs.Get("HV_ShowJudgeOffsets"))
+		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ThemePrefs.Get("HV_ShowJudgeOffsets") == "true")
 	end,
 
 	-- Background line

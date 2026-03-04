@@ -20,12 +20,6 @@ local HVPrefs = {
 		Values = {"false", "true"}
 	},
 
-	-- Gameplay: Show judge offset display on evaluation
-	HV_ShowJudgeOffsets = {
-		Default = "true",
-		Choices = {"Off", "On"},
-		Values = {"false", "true"}
-	},
 
 	-- Gameplay: Show player profile stats on select music
 	HV_ShowProfileStats = {
@@ -218,11 +212,6 @@ function HV.ShowMSD()
 	return val == "true" or val == true
 end
 
---- Check if judge offsets should be shown on evaluation.
-function HV.ShowJudgeOffsets()
-	local val = ThemePrefs.Get("HV_ShowJudgeOffsets")
-	return val == "true" or val == true
-end
 
 --- Check if player profile stats should be shown.
 function HV.ShowProfileStats()

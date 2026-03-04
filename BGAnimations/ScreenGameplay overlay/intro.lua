@@ -9,7 +9,7 @@ local t = Def.ActorFrame{
 		self:diffusealpha(0)
 	end,
 	CurrentSongChangedMessageCommand = function(self)
-		self:easeOut(1)
+		self:decelerate(1)
 		self:diffusealpha(0.8)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 60)
 	end,
@@ -29,7 +29,7 @@ t[#t+1] = Def.Quad{
 	end,
 	CurrentSongChangedMessageCommand = function(self)
 		if GAMESTATE:GetCurrentSteps() ~= nil then
-			self:diffuse(getDifficultyColor(GAMESTATE:GetHardestStepsDifficulty()))
+			self:diffuse(HVColor.GetDifficultyColor(GAMESTATE:GetHardestStepsDifficulty()))
 		end
 	end
 }
@@ -57,7 +57,7 @@ t[#t+1] = Def.Sprite {
 	end
 }
 
-t[#t+1] = LoadFont("Common Bold") .. {
+t[#t+1] = LoadFont("Zpix Normal") .. {
 	InitCommand = function(self)
 		self:y(50)
 		self:zoom(0.6)
@@ -71,7 +71,7 @@ t[#t+1] = LoadFont("Common Bold") .. {
 	end
 }
 
-t[#t+1] = LoadFont("Common Normal") .. {
+t[#t+1] = LoadFont("Zpix Normal") .. {
 	InitCommand = function(self)
 		self:y(65)
 		self:zoom(0.4)

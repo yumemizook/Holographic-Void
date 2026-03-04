@@ -281,6 +281,7 @@ local function scoreBoard(pn)
 	board[#board + 1] = Def.ActorFrame {
 		Name = "GradeScore",
 		InitCommand = function(self) self:xy(pad, pad + 65) end,
+	}
 
 	-- ============================================================
 	-- GRAPHS AREA
@@ -594,10 +595,10 @@ local function scoreBoard(pn)
 
 	-- Largest Offset
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 5):zoom(0.22):diffuse(subText):settext("Largest Offset") end
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 5):zoom(0.26):diffuse(subText):settext("Largest Offset") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 18):zoom(0.28):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, extraY + 24):zoom(0.34):diffuse(mainText) end,
 		OnCommand = function(self)
 			local largest = 0
 			if devianceTable and #devianceTable > 0 then
@@ -619,10 +620,10 @@ local function scoreBoard(pn)
 	for ni, nlabel in ipairs(noteTypeLabels) do
 		local nx = ntStartX + (ni - 1) * (frameW - pad*2 - ntStartX + pad) / #noteTypeLabels
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 5):zoom(0.2):diffuse(subText):settext(nlabel) end
+			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 5):zoom(0.26):diffuse(subText):settext(nlabel) end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 18):zoom(0.26):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(nx, extraY + 24):zoom(0.32):diffuse(mainText) end,
 			OnCommand = function(self)
 				if steps then
 					local possible = steps:GetRadarValues(pn):GetValue(noteTypeRadars[ni])
@@ -679,7 +680,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- ============================================================
 	LoadActor(THEME:GetPathG("", "OffsetGraph")) .. {
 		InitCommand = function(self)
-			self:xy(10, 20):visible(ThemePrefs.Get("HV_ShowJudgeOffsets") == "true")
+			self:xy(10, 40) -- Adjusted down slightly
 		end,
 		OnCommand = function(self)
 			self:RunCommandsOnChildren(function(child)
@@ -701,7 +702,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- Offset Plot Label
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(15, 15):zoom(0.2):diffuse(subText)
+			self:xy(20, 25):zoom(0.35):halign(0):diffuse(subText)
 			self:settext(THEME:GetString("ScreenEvaluation", "CategoryOffset"))
 		end,
 	},

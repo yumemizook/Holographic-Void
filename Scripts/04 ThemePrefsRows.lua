@@ -33,12 +33,6 @@ local HVPrefRows = {
 		Values  = {"false", "true"},
 	},
 
-	-- Show Judge Offsets on Evaluation
-	HV_ShowJudgeOffsets = {
-		Default = "true",
-		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
-	},
 
 	-- Show Profile Stats on Select Music
 	HV_ShowProfileStats = {
@@ -231,8 +225,16 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowJudgeOffsets,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
 	return l
+end
+
+function OptionRowPacemakerType()
+	return ThemePrefRow("HV_PacemakerTargetType")
+end
+
+function OptionRowPacemakerGoal()
+	return ThemePrefRow("HV_PacemakerTargetGoal")
 end
 
 -- ScreenPlayerOptions Helpers

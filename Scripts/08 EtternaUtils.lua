@@ -268,21 +268,37 @@ end
 
 function getClearLevel(pn, steps, score)
 	if score == nil or steps == nil then return 17 end
-	local grade = score:GetWifeGrade()
+	
+	local grade
+	if score.GetWifeGrade then grade = score:GetWifeGrade()
+	else grade = score:GetGrade() end
+
 	if grade == nil then return 17
 	elseif grade == "Grade_Failed" then return 15 end
 
-	local tns = {
-		W1 = score:GetTapNoteScore("TapNoteScore_W1"),
-		W2 = score:GetTapNoteScore("TapNoteScore_W2"),
-		W3 = score:GetTapNoteScore("TapNoteScore_W3"),
-		W4 = score:GetTapNoteScore("TapNoteScore_W4"),
-		W5 = score:GetTapNoteScore("TapNoteScore_W5"),
-		Miss = score:GetTapNoteScore("TapNoteScore_Miss"),
-	}
-	local hns = {
-		Held = score:GetHoldNoteScore("HoldNoteScore_Held"),
-	}
+	local tns = {}
+	if score.GetTapNoteScore then
+		tns.W1 = score:GetTapNoteScore("TapNoteScore_W1")
+		tns.W2 = score:GetTapNoteScore("TapNoteScore_W2")
+		tns.W3 = score:GetTapNoteScore("TapNoteScore_W3")
+		tns.W4 = score:GetTapNoteScore("TapNoteScore_W4")
+		tns.W5 = score:GetTapNoteScore("TapNoteScore_W5")
+		tns.Miss = score:GetTapNoteScore("TapNoteScore_Miss")
+	else
+		tns.W1 = score:GetTapNoteScores("TapNoteScore_W1")
+		tns.W2 = score:GetTapNoteScores("TapNoteScore_W2")
+		tns.W3 = score:GetTapNoteScores("TapNoteScore_W3")
+		tns.W4 = score:GetTapNoteScores("TapNoteScore_W4")
+		tns.W5 = score:GetTapNoteScores("TapNoteScore_W5")
+		tns.Miss = score:GetTapNoteScores("TapNoteScore_Miss")
+	end
+
+	local hns = {}
+	if score.GetHoldNoteScore then
+		hns.Held = score:GetHoldNoteScore("HoldNoteScore_Held")
+	else
+		hns.Held = score:GetHoldNoteScores("HoldNoteScore_Held")
+	end
 
 	local maxNotes
 	if GAMESTATE:CountNotesSeparately() then

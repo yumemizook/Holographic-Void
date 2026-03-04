@@ -24,7 +24,7 @@ local fontZoom = 0.65
 local accentColor = HVColor.Accent or color("#00CFFF")
 
 -- Graph settings
-local initialPeak = 10
+local initialPeak = 1 -- Set lower so easy songs don't look broken
 local maxVerts = 150
 local graphFreq = 0.2
 
@@ -68,10 +68,6 @@ local function getCurNPS()
 end
 
 local function Update(self)
-	self.InitCommand = function(self)
-		self:SetUpdateFunction(Update)
-	end
-
 	removeNote()
 	curNPS = getCurNPS()
 
@@ -181,7 +177,7 @@ local graphVerts = Def.ActorFrame {
 			self:SetDrawState {Mode = "DrawMode_LineStrip"}
 		end,
 		BeginCommand = function(self)
-			peakNPS = initialPeak
+			peakNPS = 0
 			graphPeakNPS = initialPeak
 			self:SetDrawState {First = 1, Num = -1}
 			self:SetVertices(verts)
