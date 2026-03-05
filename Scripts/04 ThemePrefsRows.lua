@@ -20,25 +20,25 @@ local HVPrefRows = {
 
 	-- Background Animation Intensity
 	HV_BGAnimIntensity = {
-		Default = "1",
+		Default = 1,
 		Choices = {"Off", "Subtle", "Full"},
-		Values  = {"0", "1", "2"},
+		Values = {0, 1, 2},
 	},
 
 
 	-- Show MSD Ratings
 	HV_ShowMSD = {
-		Default = "true",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 
 	-- Show Profile Stats on Select Music
 	HV_ShowProfileStats = {
-		Default = "true",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 
@@ -51,58 +51,72 @@ local HVPrefRows = {
 
 	-- Show Measure Lines
 	HV_ShowMeasureLines = {
-		Default = "false",
+		Default = false,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- Screen Filter
 	HV_ScreenFilter = {
-		Default = "0.0",
+		Default = 0.0,
 		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
-		Values  = {"0.0", "0.1", "0.2", "0.3", "0.4", "0.5", "0.6", "0.7", "0.8", "0.9", "1.0"},
+		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 	},
 
 	-- Lane Cover
 	HV_LaneCover = {
-		Default = "0",
+		Default = 0,
 		Choices = {"Off", "10%", "25%", "40%", "50%", "60%", "75%"},
-		Values  = {"0", "10", "25", "40", "50", "60", "75"},
+		Values = {0, 10, 25, 40, 50, 60, 75},
 	},
 
 	-- Glow Effects
 	HV_EnableGlow = {
-		Default = "true",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- Show NPS
 	HV_ShowNPS = {
-		Default = "true",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- NPS Window Size
 	HV_NPSWindowSize = {
-		Default = "1",
+		Default = 1,
 		Choices = {"1s", "2s", "3s", "4s", "5s"},
-		Values  = {"1", "2", "3", "4", "5"},
+		Values = {1, 2, 3, 4, 5},
+	},
+
+	-- Show Offset Bar
+	HV_ShowOffsetBar = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- EWMA Smoothing
+	HV_EWMAOffsetBar = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
 	},
 
 	-- Show Full Pacemaker Graph
 	HV_ShowPacemakerGraph = {
-		Default = "true",
+		Default = false,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- Show Mini Text Pacemaker
 	HV_ShowTextPacemaker = {
-		Default = "false",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- Pacemaker Target Type
@@ -114,7 +128,7 @@ local HVPrefRows = {
 
 	-- Pacemaker Target Goal
 	HV_PacemakerTargetGoal = {
-		Default = "93",
+		Default = 93,
 		Choices = {
 			"0%", "1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "9%", "10%",
 			"11%", "12%", "13%", "14%", "15%", "16%", "17%", "18%", "19%", "20%",
@@ -131,29 +145,36 @@ local HVPrefRows = {
 			"99.990%", "99.991%", "99.992%", "99.993%", "99.994%",
 			"99.995%", "99.996%", "99.997%", "99.998%", "99.999%", "100%"
 		},
-		Values  = {
-			"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-			"11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
-			"21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
-			"31", "32", "33", "34", "35", "36", "37", "38", "39", "40",
-			"41", "42", "43", "44", "45", "46", "47", "48", "49", "50",
-			"51", "52", "53", "54", "55", "56", "57", "58", "59", "60",
-			"61", "62", "63", "64", "65", "66", "67", "68", "69", "70",
-			"71", "72", "73", "74", "75", "76", "77", "78", "79", "80",
-			"81", "82", "83", "84", "85", "86", "87", "88", "89", "90",
-			"91", "92", "93", "94", "95", "96", "97", "98", "99",
-			"99.50", "99.70", "99.80", "99.90", "99.95",
-			"99.96", "99.97", "99.98", "99.99",
-			"99.990", "99.991", "99.992", "99.993", "99.994",
-			"99.995", "99.996", "99.997", "99.998", "99.999", "100"
+		Values = {
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+			11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+			21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+			31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+			41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+			51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
+			61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+			71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+			81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+			91, 92, 93, 94, 95, 96, 97, 98, 99,
+			99.50, 99.70, 99.80, 99.90, 99.95,
+			99.96, 99.97, 99.98, 99.99,
+			99.990, 99.991, 99.992, 99.993, 99.994,
+			99.995, 99.996, 99.997, 99.998, 99.999, 100
 		},
 	},
 
 	-- Show Particles
 	HV_Particles = {
-		Default = "true",
+		Default = true,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
+	},
+
+	-- Show Mean on Notefield
+	HV_ShowMean = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
 	},
 	
 	-- Accent Color
@@ -165,9 +186,9 @@ local HVPrefRows = {
 
 	-- Use Custom Grade Names (from grade.costom.md)
 	HV_UseCustomGrades = {
-		Default = "false",
+		Default = false,
 		Choices = {"Off", "On"},
-		Values  = {"false", "true"},
+		Values = {false, true},
 	},
 
 	-- Grade Color Style
@@ -225,25 +246,49 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_AccentColor,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_ShowOffsetBar,HV_EWMAOffsetBar,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
 	return l
 end
 
+-- Wrap ThemePrefRow to ensure it saves to disk immediately when changed
+local function HVThemePrefRow(name, title)
+	local row = ThemePrefRow(name, title)
+	row.ExportOnChange = true
+	local baseSave = row.SaveSelections
+	row.SaveSelections = function(self, list, pn)
+		baseSave(self, list, pn)
+		ThemePrefs.Save()
+	end
+	return row
+end
+
 function OptionRowPacemakerType()
-	return ThemePrefRow("HV_PacemakerTargetType")
+	return HVThemePrefRow("HV_PacemakerTargetType")
 end
 
 function OptionRowPacemakerGoal()
-	return ThemePrefRow("HV_PacemakerTargetGoal")
+	return HVThemePrefRow("HV_PacemakerTargetGoal")
+end
+
+function OptionRowShowTextPacemaker()
+	return HVThemePrefRow("HV_ShowTextPacemaker", "Text Pacemaker")
 end
 
 -- ScreenPlayerOptions Helpers
 function OptionRowScreenFilter()
-	return ThemePrefRow("HV_ScreenFilter", "Screen Filter")
+	return HVThemePrefRow("HV_ScreenFilter", "Screen Filter")
 end
 
 function OptionRowLaneCover()
-	return ThemePrefRow("HV_LaneCover", "Lane Cover")
+	return HVThemePrefRow("HV_LaneCover", "Lane Cover")
+end
+
+function OptionRowShowOffsetBar()
+	return HVThemePrefRow("HV_ShowOffsetBar", "Offset Bar")
+end
+
+function OptionRowEWMAOffsetBar()
+	return HVThemePrefRow("HV_EWMAOffsetBar", "EWMA Smoothing")
 end
 
 -- Listen for pref changes and refresh accent color

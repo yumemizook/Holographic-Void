@@ -38,6 +38,8 @@ local setHeight = 0
 local setSong
 local setSteps
 
+local usingCustomWindows = false
+
 local function fitX(x)
 	if finalSecond == 0 then return 0 end
 	return x / finalSecond * setWidth - setWidth / 2
@@ -73,6 +75,9 @@ local baralpha = 0.4
 -- HV color scheme
 local frameBG = color("0.06,0.06,0.06,0.95")
 local dimText = color("0.45,0.45,0.45,1")
+local accentColor = HVColor.Accent
+local subText = color("0.65,0.65,0.65,1")
+local brightText = color("1,1,1,1")
 
 local t = Def.ActorFrame{
 	InitCommand = function(self)
@@ -123,8 +128,28 @@ local t = Def.ActorFrame{
 			and params.Name ~= "NextJudge" and params.Name ~= "ToggleHands" then return end
 		maxOffset = math.max(180, 180 * (tso or 1))
 		MESSAGEMAN:Broadcast("JudgeDisplayChanged")
+	end,
+	ScoreChangedMessageCommand = function(self)
+		self:queuecommand("Update")
+	end,
+	LoadedCustomWindowMessageCommand = function(self)
+		usingCustomWindows = true
+		self:queuecommand("Update")
+	end,
+	UnloadedCustomWindowMessageCommand = function(self)
+		usingCustomWindows = false
+		self:queuecommand("Update")
 	end
 }
+local function checkParams(params)
+	if type(params) ~= "table" or params.width == nil then
+		params = {width = setWidth, height = setHeight, song = setSong,
+			steps = setSteps, nrv = nrv, dvt = dvt, ctt = ctt, ntt = ntt, columns = columns}
+	end
+	oddColumns = (columns or 4) % 2 ~= 0
+	middleColumn = ((columns or 4) - 1) / 2.0
+	return params
+end
 
 -- Plot BG
 t[#t+1] = Def.Quad{
@@ -133,6 +158,7 @@ t[#t+1] = Def.Quad{
 		self:halign(0):valign(0):diffuse(frameBG)
 	end,
 	UpdateCommand = function(self, params)
+		params = checkParams(params)
 		setWidth = params.width
 		setHeight = params.height
 		setSong = params.song
@@ -177,7 +203,7 @@ t[#t+1] = Def.Quad{
 
 			local row = convertXToRow(xpos)
 			local ok, replay = pcall(function() return REPLAYS:GetActiveReplay() end)
-			if ok and replay then
+			if ok and replay and replay.GetReplaySnapshotForNoterow then
 				local sok, snapshot = pcall(function() return replay:GetReplaySnapshotForNoterow(row) end)
 				if sok and snapshot then
 					local judgments = snapshot:GetJudgments()
@@ -201,30 +227,12 @@ t[#t+1] = Def.Quad{
 	end
 }
 
--- Plot center horizontal line
-t[#t+1] = Def.Quad{
-	Name = "Center Line",
-	InitCommand = function(self)
-		self:halign(0):valign(0):diffusealpha(baralpha)
-	end,
-	UpdateCommand = function(self, params)
-		self:xy(0, params.height / 2):zoomto(params.width, 1)
-	end
-}
-
-local function checkParams(params)
-	if params.width == nil then
-		params = {width = setWidth, height = setHeight, song = setSong,
-			steps = setSteps, nrv = nrv, dvt = dvt, ctt = ctt, ntt = ntt, columns = columns}
-	end
-	oddColumns = (columns or 4) % 2 ~= 0
-	middleColumn = ((columns or 4) - 1) / 2.0
-	return params
-end
+-- Plot center horizontal line removed per user request
 
 -- Judgment threshold lines (symmetric)
 local fantabars = {22.5, 45, 90, 135}
 local bantafars = {"TapNoteScore_W2", "TapNoteScore_W3", "TapNoteScore_W4", "TapNoteScore_W5"}
+local santabarf = {"TapNoteScore_W1", "TapNoteScore_W2", "TapNoteScore_W3", "TapNoteScore_W4"}
 for i = 1, #fantabars do
 	-- Upper line
 	t[#t + 1] = Def.Quad {
@@ -232,9 +240,19 @@ for i = 1, #fantabars do
 		UpdateCommand = function(self, params)
 			params = checkParams(params)
 			self:zoomto(params.width, 1)
-			local c = offsetToJudgeColor(fantabars[i] * (tso or 1) + 1, tso)
+			
+			local fit = fantabars[i] * (tso or 1)
+			if usingCustomWindows and getCustomWindowConfigJudgmentWindow then
+				fit = getCustomWindowConfigJudgmentWindow(santabarf[i])
+			end
+			
+			local c = offsetToJudgeColor(fit + 1, tso)
+			if usingCustomWindows and customOffsetToJudgeColor then
+				c = customOffsetToJudgeColor(fit + 1, getCurrentCustomWindowConfigJudgmentWindowTable())
+			end
+			
 			self:diffuse(c):diffusealpha(baralpha)
-			self:y(fitY(fantabars[i] * (tso or 1)) + params.height / 2)
+			self:y(fitY(fit) + params.height / 2)
 		end,
 		JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 	}
@@ -244,9 +262,19 @@ for i = 1, #fantabars do
 		UpdateCommand = function(self, params)
 			params = checkParams(params)
 			self:zoomto(params.width, 1)
-			local c = offsetToJudgeColor(fantabars[i] * (tso or 1) + 1, tso)
+			
+			local fit = fantabars[i] * (tso or 1)
+			if usingCustomWindows and getCustomWindowConfigJudgmentWindow then
+				fit = getCustomWindowConfigJudgmentWindow(santabarf[i])
+			end
+			
+			local c = offsetToJudgeColor(fit + 1, tso)
+			if usingCustomWindows and customOffsetToJudgeColor then
+				c = customOffsetToJudgeColor(fit + 1, getCurrentCustomWindowConfigJudgmentWindowTable())
+			end
+			
 			self:diffuse(c):diffusealpha(baralpha)
-			self:y(fitY(-fantabars[i] * (tso or 1)) + params.height / 2)
+			self:y(fitY(-fit) + params.height / 2)
 		end,
 		JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 	}
@@ -288,7 +316,7 @@ t[#t+1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self) self:zoom(0.35):diffuse(brightText):settext("") end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
-		self:xy(params.width / 2, 12)
+		self:xy(params.width / 2, -48)
 		if ntt ~= nil and #ntt > 0 then
 			if handspecific then
 				if left then self:settext("HIGHLIGHTING: LEFT HAND")
@@ -296,7 +324,7 @@ t[#t+1] = LoadFont("Common Normal") .. {
 				else self:settext("HIGHLIGHTING: RIGHT HAND") end
 				self:diffuse(accentColor)
 			else
-				self:settext("DOWN LANE: CYCLE HANDS")
+				self:settext("DOWN TOGGLE HIGHLIGHTS")
 				self:diffuse(subText)
 			end
 		else
@@ -351,12 +379,16 @@ t[#t+1] = Def.ActorMultiVertex{
 
 		for i = 1, #params.nrv do
 			if params.dvt[i] ~= nil then
-				local offset = params.dvt[i] / 1000
-				local c = offsetToJudgeColor(params.dvt[i], tso)
+				local offsetMs = params.dvt[i]
+				local rawOffset = offsetMs
+				local c = offsetToJudgeColor(offsetMs, tso)
+				if usingCustomWindows and customOffsetToJudgeColor then
+					c = customOffsetToJudgeColor(offsetMs, getCurrentCustomWindowConfigJudgmentWindowTable())
+				end
 				c = {c[1], c[2], c[3], 1}
 
 				local x = fitX(wuab[i]) + params.width / 2
-				local y = fitY(params.dvt[i]) + params.height / 2
+				local y = fitY(offsetMs) + params.height / 2
 				local alpha = 1
 
 				if handspecific and params.ctt and params.ctt[i] then
@@ -369,8 +401,8 @@ t[#t+1] = Def.ActorMultiVertex{
 					end
 				end
 
-				if math.abs(offset) >= 1 then
-					-- Misses: vertical line
+				if math.abs(rawOffset) >= 1000 then
+					-- Misses: vertical line (Etterna recorded misses as 1000ms)
 					local a = alpha == 1 and 0.3 or 0.1
 					c[4] = a
 					verts[#verts+1] = {{x - dotWidth/4, params.height, 0}, c}

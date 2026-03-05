@@ -96,10 +96,12 @@ local function SearchInputCallback(event)
 		return true
 	end
 
-	-- Escape: Clear filter and close
+	-- Escape: Clear filter AND close
 	if event.button == "Back" or btn == "DeviceButton_escape" then
-		if searchActor then searchActor:playcommand("ClearFilter") end
-		if searchActor then searchActor:queuecommand("CloseFromInput") end
+		if searchActor then 
+			searchActor:playcommand("ClearFilter")
+			searchActor:queuecommand("CloseFromInput")
+		end
 		return true
 	end
 

@@ -10,12 +10,22 @@ local steps = GAMESTATE:GetCurrentSteps()
 local pn = GAMESTATE:GetEnabledPlayers()[1]
 local profile = PROFILEMAN:GetProfile(pn)
 
--- Vectors for rescoring/offset plot
-local nrv = pss:GetNoteRowVector()
-local dvt = pss:GetOffsetVector()
-local ctt = pss:GetTrackVector()
-local ntt = pss:GetTapNoteTypeVector()
-local totalTaps = pss:GetTotalTaps()
+-- Rescoring/offset plot state
+local nrv, dvt, ctt, ntt, totalTaps
+local function updateVectors()
+	nrv = pss:GetNoteRowVector()
+	ctt = pss:GetTrackVector()
+	ntt = pss:GetTapNoteTypeVector()
+	totalTaps = pss:GetTotalTaps()
+	dvt = pss:GetOffsetVector()
+end
+updateVectors()
+
+-- Local timing helpers (to avoid nil global issues if scripts haven't reloaded)
+local function localWifeMean(dvt) return wifeMean(dvt) end
+local function localWifeAbsMean(dvt) return wifeAbsMean(dvt) end
+local function localWifeSd(dvt) return wifeSd(dvt) end
+local function localWifeMax(dvt) return wifeMax(dvt) end
 
 -- Score/Judge state
 local judges = {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"}
@@ -23,6 +33,25 @@ local hjudges = {"HoldNoteScore_Held","HoldNoteScore_LetGo","HoldNoteScore_Misse
 local rate = getCurRate()
 local judge = (PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty())
 local rescoredPercentage
+local usingCustomWindows = false
+local lastSnapshot = nil
+
+-- a helper to get the radar value for a score and fall back to playerstagestats if that fails
+local function gatherRadarValue(radar, score)
+    local n = score:GetRadarValues():GetValue(radar)
+    if n == -1 then
+        return pss:GetRadarActual():GetValue(radar)
+    end
+    return n
+end
+
+local songTotalNotes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
+local songMaxPoints = songTotalNotes * 2
+
+local function getRunningWife(wife, judged)
+	if judged == 0 then return 0 end
+	return wife * (songTotalNotes / judged)
+end
 
 local function clampJudge()
 	if judge < 4 then judge = 4 end
@@ -52,12 +81,13 @@ local showMiddle = middleCol == math.floor(middleCol)
 local function recountCBs()
 	local tso = tst[judge] or 1
 	cbl, cbr, cbm = 0, 0, 0
-	if not tracks or not devianceTable then return end
-	for i = 1, #devianceTable do
-		if tracks[i] then
-			if math.abs(devianceTable[i]) > tso * 90 then
-				if tracks[i] < middleCol then cbl = cbl + 1
-				elseif tracks[i] > middleCol then cbr = cbr + 1
+	if not ctt or not dvt then return end
+	for i = 1, #dvt do
+		if ctt[i] then
+			-- Standard Etterna CB threshold is 90ms (J4). Scales with judge.
+			if math.abs(dvt[i]) > tso * 90 then 
+				if ctt[i] < middleCol then cbl = cbl + 1
+				elseif ctt[i] > middleCol then cbr = cbr + 1
 				else cbm = cbm + 1 end
 			end
 		end
@@ -65,12 +95,15 @@ local function recountCBs()
 end
 recountCBs()
 
-local statInfo = {
-	wifeMean(devianceTable),
-	wifeAbsMean(devianceTable),
-	wifeSd(devianceTable),
-	cbl, cbr, cbm
-}
+local function getStatInfo()
+	return {
+		wifeMean(dvt),
+		wifeAbsMean(dvt),
+		wifeSd(dvt),
+		wifeMax(dvt),
+		cbl, cbr, cbm
+	}
+end
 
 -- HV Color Palette
 local accentColor = HVColor.Accent
@@ -120,12 +153,35 @@ local t = Def.ActorFrame {
 	Name = "EvalDecorations",
 	OnCommand = function(self)
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
+		SCREENMAN:SetSystemCursorVisible(true)
+	end,
+	ScoreChangedMessageCommand = function(self)
+		pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		curScore = pss:GetHighScore()
+		updateVectors()
+		self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
+		self:RunCommandsOnChildren(function(self) self:playcommand("On") end)
 	end
 }
 
 -- Get rescore elements helper
 local function getRescoreElems()
-	return getRescoreElements(pss, curScore)
+	local o = {}
+	local radarpss = pss:GetRadarPossible()
+	local radarscore = curScore:GetRadarValues()
+	
+	o["dvt"] = pss:GetOffsetVector()
+	o["totalHolds"] = radarpss:GetValue("RadarCategory_Holds")
+	o["totalRolls"] = radarpss:GetValue("RadarCategory_Rolls")
+	o["holdsHit"] = radarscore:GetValue("RadarCategory_Holds")
+	o["rollsHit"] = radarscore:GetValue("RadarCategory_Rolls")
+	o["holdsMissed"] = o["totalHolds"] - o["holdsHit"]
+	o["rollsMissed"] = o["totalRolls"] - o["rollsHit"]
+	o["minesHit"] = radarpss:GetValue("RadarCategory_Mines") - radarscore:GetValue("RadarCategory_Mines")
+	o["totalTaps"] = pss:GetTotalTaps()
+	o["misses"] = pss:GetTapNoteScores("TapNoteScore_Miss")
+	o["totalNotes"] = songTotalNotes
+	return o
 end
 
 -- LA/RA Ratio calculation (ported from Til Death)
@@ -152,7 +208,7 @@ local function calculateRatios(score)
 
 	for i, o in ipairs(offsetTable) do
 		if typeTable[i] == "TapNoteType_Tap" or typeTable[i] == "TapNoteType_HoldHead" then
-			local off = math.abs(o)
+			local off = math.abs(o) -- Already ms
 			if off <= raThreshold then
 				ridic = ridic + 1
 			elseif off <= marvWindow then
@@ -169,6 +225,29 @@ local function calculateRatios(score)
 	local ra = marvRA > 0 and (ridic / marvRA) or -1
 	local la = ridicLA > 0 and (ludic / ridicLA) or -1
 	return ra, la, ridic, marvRA, ludic, ridicLA
+end
+
+-- Rescore function (ported from EtternaUtils.lua)
+local function getRescoredWife3Judge(judgeType, judge, rst)
+	local totalPoints = 0
+	local tso = ms.JudgeScalers[judge] or 1
+
+	local dvt = rst["dvt"]
+	if not dvt or #dvt == 0 then return 0 end
+
+	for i = 1, #dvt do
+		totalPoints = totalPoints + wife3(math.abs(dvt[i]), tso)
+	end
+	totalPoints = totalPoints + (rst["misses"] or 0) * -5.5
+	totalPoints = totalPoints + (rst["minesHit"] or 0) * -7
+	totalPoints = totalPoints + (rst["holdsMissed"] or 0) * -4.5
+	totalPoints = totalPoints + (rst["rollsMissed"] or 0) * -4.5
+
+	local maxPoints = (rst["totalNotes"] or rst["totalTaps"] or 0) * 2
+	if maxPoints <= 0 then return 0 end
+
+	local res = (totalPoints / maxPoints) * 100
+	return math.min(res, 100) -- Only clamp upper bound
 end
 
 ------------------------------------------------------------
@@ -189,6 +268,20 @@ local function scoreBoard(pn)
 			self:SetUpdateFunction(highlight)
 		end,
 		OffsetPlotModificationMessageCommand = function(self, params)
+			if params.Name == "Coin" then
+				self:playcommand("ToggleCustomWindows")
+				return
+			end
+
+			if usingCustomWindows then
+				if params.Name == "PrevJudge" then
+					self:playcommand("MoveCustomWindowIndex", {direction=-1})
+				elseif params.Name == "NextJudge" then
+					self:playcommand("MoveCustomWindowIndex", {direction=1})
+				end
+				return
+			end
+
 			local rst = getRescoreElems()
 			if params.Name == "PrevJudge" and judge > 1 then
 				judge = judge - 1
@@ -210,13 +303,66 @@ local function scoreBoard(pn)
 			pcall(function()
 				local tso = tst[judge]
 				if tso then
-					SCREENMAN:GetTopScreen():SetPlayerStageStatsFromReplayData(
-						SCREENMAN:GetTopScreen():GetStageStats():GetPlayerStageStats(), tso, pss:GetHighScore())
+					local screen = SCREENMAN:GetTopScreen()
+					if screen and screen.GetStageStats then
+						local stats = screen:GetStageStats()
+						if stats and stats.GetPlayerStageStats then
+							local ppss = stats:GetPlayerStageStats()
+							if ppss and screen.SetPlayerStageStatsFromReplayData then
+								screen:SetPlayerStageStatsFromReplayData(ppss, tso, pss:GetHighScore())
+							end
+						end
+					end
 				end
 			end)
 		end,
-		ResetJudgeCommand = function(self) recountCBs() end,
-		SetJudgeCommand = function(self) recountCBs() end,
+		ToggleCustomWindowsMessageCommand = function(self)
+			if inMulti then return end
+			usingCustomWindows = not usingCustomWindows
+
+			if not usingCustomWindows then
+				unloadCustomWindowConfig()
+				MESSAGEMAN:Broadcast("UnloadedCustomWindow")
+				self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
+				pcall(function()
+					local tso = tst[judge]
+					local screen = SCREENMAN:GetTopScreen()
+					screen:RescoreReplay(pss, tso, curScore or pss:GetHighScore(), false)
+				end)
+			else
+				loadCurrentCustomWindowConfig()
+				pcall(function()
+					local tso = tst[judge]
+					local screen = SCREENMAN:GetTopScreen()
+					local success = screen:RescoreReplay(pss, tso, curScore or pss:GetHighScore(), currentCustomWindowConfigUsesOldestNoteFirst())
+					if success then
+						lastSnapshot = REPLAYS:GetActiveReplay():GetLastReplaySnapshot()
+					end
+				end)
+				if lastSnapshot then
+					MESSAGEMAN:Broadcast("LoadedCustomWindow")
+				end
+			end
+			self:RunCommandsOnChildren(function(self) self:playcommand("UpdateCustomWindowVisibility") end)
+		end,
+		MoveCustomWindowIndexMessageCommand = function(self, params)
+			if not usingCustomWindows then return end
+			moveCustomWindowConfigIndex(params.direction)
+			loadCurrentCustomWindowConfig()
+			pcall(function()
+				local tso = tst[judge]
+				local screen = SCREENMAN:GetTopScreen()
+				local success = screen:RescoreReplay(pss, tso, curScore or pss:GetHighScore(), currentCustomWindowConfigUsesOldestNoteFirst())
+				if success then
+					lastSnapshot = REPLAYS:GetActiveReplay():GetLastReplaySnapshot()
+				end
+			end)
+			if lastSnapshot then
+				MESSAGEMAN:Broadcast("LoadedCustomWindow")
+			end
+		end,
+		ResetJudgeMessageCommand = function(self) recountCBs() end,
+		SetJudgeMessageCommand = function(self) recountCBs() end,
 
 		-- Main BG
 		Def.Quad {
@@ -259,7 +405,7 @@ local function scoreBoard(pn)
 				self:halign(1):valign(0):xy(frameW - pad, pad):zoom(0.35)
 			end,
 			OnCommand = function(self)
-				if steps and ThemePrefs.Get("HV_ShowMSD") == "true" then
+				if steps and (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) then
 					local diff = ToEnumShortString(steps:GetDifficulty())
 					local stype = ToEnumShortString(steps:GetStepsType()):gsub("_", " ")
 					local meter = steps:GetMSD(getCurRateValue(), 1)
@@ -305,6 +451,7 @@ local function scoreBoard(pn)
 
 		-- Grade
 		LoadFont("Common Normal") .. {
+			Name = "GradeScoreLabel",
 			InitCommand = function(self) self:halign(0):valign(0):xy(0, -5):zoom(0.85):diffuse(mainText) end,
 			OnCommand = function(self)
 				local grade = pss:GetWifeGrade()
@@ -324,9 +471,13 @@ local function scoreBoard(pn)
 
 		-- Wife Score
 		LoadFont("Common Normal") .. {
+			Name = "WifeScoreLabel",
 			InitCommand = function(self) self:halign(0):valign(0):xy(100, -5):zoom(0.6):diffuse(mainText) end,
 			OnCommand = function(self)
 				local wife = pss:GetWifeScore()
+				-- In Etterna, GetWifeScore() is already absolute (song-wide) percentage.
+				-- If we want to show it as points/points, we could, but showing negative % is fine.
+				
 				if wife >= 0.99 then
 					self:settextf("%.4f%%", math.floor(wife * 1000000) / 10000)
 				else
@@ -334,6 +485,7 @@ local function scoreBoard(pn)
 				end
 			end,
 			SetJudgeCommand = function(self)
+				if usingCustomWindows then return end
 				if rescoredPercentage then
 					if rescoredPercentage >= 99 then
 						self:settextf("%.4f%%", math.floor(rescoredPercentage * 10000) / 10000)
@@ -342,15 +494,30 @@ local function scoreBoard(pn)
 					end
 				end
 			end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
+			LoadedCustomWindowMessageCommand = function(self)
+				if not lastSnapshot then return end
+				local wife = lastSnapshot:GetWifePercent() * 100
+				if wife >= 99 then
+					self:settextf("%.4f%%", math.floor(wife * 10000) / 10000)
+				else
+					self:settextf("%.2f%%", math.floor(wife * 100) / 100)
+				end
+			end,
+			ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 		},
 		-- DP
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):valign(0):xy(100, 32):zoom(0.35):diffuse(color("#55b0ff")) end,
 			OnCommand = function(self)
-				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (curScore:GetWifeScore() * totalTaps * 2)
+				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (pss:GetWifeScore() * songMaxPoints)
 				self:settextf("%.2f", dp)
-			end
+			end,
+			SetJudgeCommand = function(self)
+				if rescoredPercentage then
+					self:settextf("%.2f", (rescoredPercentage / 100) * songMaxPoints)
+				end
+			end,
+			ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 		},
 		-- DP slash
 		LoadFont("Common Normal") .. {
@@ -363,9 +530,69 @@ local function scoreBoard(pn)
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):valign(0):xy(170, 34):zoom(0.25):diffuse(subText) end,
 			OnCommand = function(self)
-				local totalDp = curScore.GetTotalWifePoints and curScore:GetTotalWifePoints() or (totalTaps * 2)
-				self:settextf("%.2f", totalDp)
+				self:settextf("%.2f", songMaxPoints)
 			end
+		},
+		-- Personal Best / Record Comparison (Pacemaker Text)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, 48):zoom(0.28):diffuse(subText) end,
+			OnCommand = function(self)
+				if recScore then
+					local pbDp = recScore.GetWifePoints and recScore:GetWifePoints() or (recScore:GetWifeScore() * songMaxPoints)
+					local curDp = pss:GetWifeScore() * songMaxPoints
+					local diff = curDp - pbDp
+					self:settextf("PB: %.2f (%+5.2f)", pbDp, diff)
+				else
+					self:settext("PB: New!"):diffuse(accentColor)
+				end
+			end
+		},
+
+		-- Custom Scoring Display
+		Def.ActorFrame {
+			Name = "CustomScoringDisplay",
+			InitCommand = function(self)
+				self:xy(100, -5):visible(false)
+			end,
+			UpdateCustomWindowVisibilityCommand = function(self)
+				self:visible(usingCustomWindows)
+				self:GetParent():GetChild("GradeScoreLabel"):visible(not usingCustomWindows)
+				self:GetParent():GetChild("WifeScoreLabel"):visible(not usingCustomWindows)
+			end,
+			
+			Def.Quad {
+				InitCommand = function(self)
+					self:zoomto(160, 50):halign(0):valign(0):diffuse(bgCard):diffusealpha(0.8)
+				end,
+				MouseLeftClickMessageCommand = function(self, params)
+					if isOver(self) and usingCustomWindows then
+						MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "NextJudge"})
+					end
+				end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "CustomPercent",
+				InitCommand = function(self)
+					self:xy(0, 0):zoom(0.5):halign(0):valign(0):diffuse(accentColor)
+				end,
+				LoadedCustomWindowMessageCommand = function(self)
+					if not lastSnapshot then return end
+					local wife = lastSnapshot:GetWifePercent() * 100
+					local name = getCurrentCustomWindowConfigName()
+					if wife >= 99 then
+						self:settextf("%.4f%%", math.floor(wife * 10000) / 10000)
+					else
+						self:settextf("%.2f%%", math.floor(wife * 100) / 100)
+					end
+					self:GetParent():GetChild("WindowName"):settext(name)
+				end,
+			},
+			LoadFont("Common Normal") .. {
+				Name = "WindowName",
+				InitCommand = function(self)
+					self:xy(0, 25):zoom(0.35):halign(0):valign(0):diffuse(subText)
+				end
+			}
 		}
 	}
 
@@ -445,14 +672,32 @@ local function scoreBoard(pn)
 			InitCommand = function(self)
 				self:xy(jx, judgY + 28):zoom(0.28):diffuse(judgmentColors[k])
 				self:settext(getJudgeStrings(v))
+			end,
+			LoadedCustomWindowMessageCommand = function(self)
+				if getCustomWindowConfigJudgmentName then
+					self:settext(getCustomWindowConfigJudgmentName(v))
+				end
+			end,
+			UnloadedCustomWindowMessageCommand = function(self)
+				self:settext(getJudgeStrings(v))
 			end
 		}
 		-- Count
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:xy(jx, judgY + 48):zoom(0.45):diffuse(brightText) end,
 			OnCommand = function(self) self:settext(pss:GetTapNoteScores(v)) end,
-			SetJudgeCommand = function(self) self:settext(getRescoredJudge(dvt, judge, k)) end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
+			SetJudgeCommand = function(self) 
+				local count = getRescoredJudge(dvt, judge, k)
+				if k == 6 then count = count + (curScore:GetTapNoteScore("TapNoteScore_Miss")) end
+				self:settext(count)
+			end,
+			LoadedCustomWindowMessageCommand = function(self)
+				if lastSnapshot then
+					local jName = v:gsub("TapNoteScore_", "")
+					self:settext(lastSnapshot:GetJudgments()[jName] or 0)
+				end
+			end,
+			ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 		}
 		-- Percentage
 		board[#board + 1] = LoadFont("Common Normal") .. {
@@ -464,10 +709,12 @@ local function scoreBoard(pn)
 			end,
 			SetJudgeCommand = function(self)
 				if totalTaps > 0 then
-					self:settextf("%.1f%%", getRescoredJudge(dvt, judge, k) / totalTaps * 100)
+					local count = getRescoredJudge(dvt, judge, k)
+					if k == 6 then count = count + (curScore:GetTapNoteScore("TapNoteScore_Miss")) end
+					self:settextf("%.1f%%", count / totalTaps * 100)
 				end
 			end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
+			ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 		}
 	end
 
@@ -497,8 +744,8 @@ local function scoreBoard(pn)
 		}
 	end
 
-	-- Mean / |Mean| / Std Dev
-	local mLabels = {"Mean", "|Mean|", "Std Dev"}
+	-- Mean / Std Dev / Largest
+	local mLabels = {"Mean", "Std Dev", "Largest"}
 	for i, label in ipairs(mLabels) do
 		local mx = holdX + (i - 1 + 3) * (frameW - pad*2) / 6
 		board[#board + 1] = LoadFont("Common Normal") .. {
@@ -507,9 +754,12 @@ local function scoreBoard(pn)
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 24):zoom(0.34):diffuse(mainText) end,
 			OnCommand = function(self)
-				if i == 1 then self:settextf("%.2fms", statInfo[1])
-				elseif i == 2 then self:settextf("%.2fms", statInfo[2])
-				elseif i == 3 then self:settextf("%.2fms", statInfo[3]) end
+				if i == 1 then self:settextf("%.2fms", wifeMean(dvt))
+				elseif i == 2 then self:settextf("%.2fms", wifeSd(dvt))
+				elseif i == 3 then self:settextf("%.2fms", wifeMax(dvt)) end
+			end,
+			SetJudgeCommand = function(self)
+				self:playcommand("On")
 			end
 		}
 	end
@@ -522,63 +772,33 @@ local function scoreBoard(pn)
 		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY):zoomto(frameW - pad*2, 1):diffuse(dividerColor) end
 	}
 
-	-- Max Combo
+	-- CB Breakdown (Merged Miss Count + CBs, Centered)
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 8):zoom(0.26)						:diffuse(subText)
-						:settext(THEME:GetString("ScreenEvaluation", "CategoryScore"))
-					end,
+		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 8):zoom(0.26):diffuse(subText):settext("Combo Breaks") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, miscY + 24):zoom(0.38):diffuse(mainText) end,
-		OnCommand = function(self) self:settext(pss:MaxCombo()) end
-	}
-
-	-- Miss Count
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 8):zoom(0.26):diffuse(subText):settext("Miss Count") end
-	}
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)/4, miscY + 24):zoom(0.38):diffuse(mainText) end,
-		OnCommand = function(self) self:settext(getScoreComboBreaks(curScore)) end
-	}
-
-	-- CBs Left / Right
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 8):zoom(0.26):diffuse(subText):settext("CBs") end
-	}
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*2/4, miscY + 24):zoom(0.32):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 24):zoom(0.32):diffuse(mainText) end,
 		OnCommand = function(self)
-			local text = string.format("L:%d  R:%d", cbl, cbr)
+			local totalCBs = getScoreComboBreaks(curScore)
+			local text = string.format("%d (L:%d  R:%d", totalCBs, cbl, cbr)
 			if showMiddle then text = text .. string.format("  M:%d", cbm) end
-			self:settext(text)
+			self:settext(text .. ")")
 		end,
 		SetJudgeCommand = function(self)
-			local text = string.format("L:%d  R:%d", cbl, cbr)
+			if usingCustomWindows then return end
+			local totalCBs = cbl + cbr + cbm
+			local text = string.format("%d (L:%d  R:%d", totalCBs, cbl, cbr)
 			if showMiddle then text = text .. string.format("  M:%d", cbm) end
-			self:settext(text)
+			self:settext(text .. ")")
 		end,
-		ResetJudgeCommand = function(self) self:playcommand("On") end
-	}
-
-	-- Score vs Record comparison
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 8):zoom(0.26):diffuse(subText):settext("vs Record") end
-	}
-	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad + (frameW - pad*2)*3/4, miscY + 24):zoom(0.34) end,
-		OnCommand = function(self)
-			if recScore then
-				local curVal = getScore(curScore, steps, false)
-				local recVal = getScore(recScore, steps, false)
-				local diff = curVal - recVal
-				local extra = diff >= 0 and "+" or ""
-				self:settextf("%s%.2f", extra, diff)
-				self:diffuse(diff >= 0 and color("#7AFFAF") or color("#FF7A7A"))
-			else
-				self:settext("New!"):diffuse(accentColor)
+		LoadedCustomWindowMessageCommand = function(self)
+			if lastSnapshot then
+				local js = lastSnapshot:GetJudgments()
+				local totalCBs = (js["W4"] or 0) + (js["W5"] or 0) + (js["Miss"] or 0)
+				self:settextf("%d", totalCBs)
 			end
-		end
+		end,
+		ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 	}
 
 	-- ============================================================
@@ -691,7 +911,7 @@ local function scoreBoard(pn)
 					end
 				end
 			end,
-			ResetJudgeCommand = function(self) self:playcommand("On") end
+			ResetJudgeMessageCommand = function(self) self:playcommand("On") end
 		}
 	end
 
@@ -744,6 +964,7 @@ local function scoreBoard(pn)
 		}
 	end
 
+	-- The offset plot has been moved to RightPanel
 	return board
 end
 
@@ -766,13 +987,29 @@ t[#t + 1] = Def.ActorFrame {
 			if event.type == "InputEventType_FirstPress" then
 				-- Judge cycling
 				if event.button == "EffectUp" then
-					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "NextJudge"})
+					if usingCustomWindows then
+						MESSAGEMAN:Broadcast("MoveCustomWindowIndex", {direction = 1})
+					else
+						MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "NextJudge"})
+					end
 				elseif event.button == "EffectDown" then
-					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "PrevJudge"})
+					if usingCustomWindows then
+						MESSAGEMAN:Broadcast("MoveCustomWindowIndex", {direction = -1})
+					else
+						MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "PrevJudge"})
+					end
 				elseif event.button == "MenuUp" then
-					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ResetJudge"})
+					if usingCustomWindows then
+						MESSAGEMAN:Broadcast("ToggleCustomWindows")
+					else
+						MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ResetJudge"})
+					end
 				elseif event.button == "MenuDown" or event.DeviceInput.button == "DeviceButton_down" or event.button == "Down" then
-					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ToggleHands"})
+					if not usingCustomWindows then
+						MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ToggleHands"})
+					end
+				elseif event.button == "Coin" then
+					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "Coin"})
 				end
 			end
 		end)
@@ -808,21 +1045,69 @@ t[#t + 1] = Def.ActorFrame {
 	},
 
 	-- ============================================================
-	-- OFFSET PLOT
+	-- GRAPHS AREA
 	-- ============================================================
 	Def.ActorFrame {
-		InitCommand = function(self) self:visible(not showGraphs) end,
-		ToggleGraphsMessageCommand = function(self) self:visible(not showGraphs) end,
+		Name = "Graphs",
+		InitCommand = function(self) self:xy(0, 40) self:visible(showGraphs) end,
+		ToggleGraphsMessageCommand = function(self) self:visible(showGraphs) end,
 
+		-- Graph Area Label
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(10, -15):zoom(0.35):halign(0):diffuse(subText)
+				self:settext("Combo & Life Graph")
+			end,
+		},
+
+		-- Life Graph BG
+		Def.GraphDisplay {
+			InitCommand = function(self) 
+				self:Load("GraphDisplay") 
+				self:xy(0, 0):zoomto(rightW, 80):halign(0):valign(0)
+			end,
+			BeginCommand = function(self)
+				pcall(function()
+					local ss = SCREENMAN:GetTopScreen():GetStageStats()
+					self:Set(ss, pss)
+					self:diffusealpha(0.3)
+					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
+				end)
+			end
+		},
+
+		-- Combo Graph
+		Def.ComboGraph {
+			InitCommand = function(self) 
+				self:Load("ComboGraph" .. ToEnumShortString(pn)) 
+				self:xy(0, 80):zoomto(rightW, 80):halign(0):valign(0)
+			end,
+			BeginCommand = function(self)
+				pcall(function()
+					local ss = SCREENMAN:GetTopScreen():GetStageStats()
+					self:Set(ss, pss)
+				end)
+			end
+		},
+	},
+
+	-- ============================================================
+	-- OFFSET PLOT (MOVED HERE)
+	-- ============================================================
+	Def.ActorFrame {
+		Name = "OffsetPlotWrapper",
+		InitCommand = function(self) self:xy(0, 50) self:visible(not showGraphs) end,
+		ToggleGraphsMessageCommand = function(self) self:visible(not showGraphs) end,
+		
 		LoadActor(THEME:GetPathG("", "OffsetGraph")) .. {
 			InitCommand = function(self)
-				self:xy(10, 40) -- Adjusted down slightly
+				self:xy(10, 20)
 			end,
 			OnCommand = function(self)
 				self:RunCommandsOnChildren(function(child)
 					child:playcommand("Update", {
 						width = rightW - 20,
-						height = offsetPlotHeight,
+						height = 100,
 						song = song,
 						steps = steps,
 						nrv = nrv,
@@ -837,50 +1122,9 @@ t[#t + 1] = Def.ActorFrame {
 		-- Offset Plot Label
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(20, 25):zoom(0.35):halign(0):diffuse(subText)
+				self:xy(10, -10):zoom(0.35):halign(0):diffuse(subText)
 				self:settext(THEME:GetString("ScreenEvaluation", "CategoryOffset"))
 			end,
-		},
-	},
-
-	-- ============================================================
-	-- GRAPHS AREA
-	-- ============================================================
-	Def.ActorFrame {
-		Name = "Graphs",
-		InitCommand = function(self) self:xy(10, 40) self:visible(showGraphs) end,
-		ToggleGraphsMessageCommand = function(self) self:visible(showGraphs) end,
-
-		-- Graph Area Label
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(10, -15):zoom(0.35):halign(0):diffuse(subText)
-				self:settext("Combo & Life Graph")
-			end,
-		},
-
-		-- Life Graph BG
-		Def.GraphDisplay {
-			InitCommand = function(self) self:Load("GraphDisplay") end,
-			BeginCommand = function(self)
-				pcall(function()
-					local ss = SCREENMAN:GetTopScreen():GetStageStats()
-					self:Set(ss, pss)
-					self:diffusealpha(0.3)
-					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
-				end)
-			end
-		},
-
-		-- Combo Graph
-		Def.ComboGraph {
-			InitCommand = function(self) self:Load("ComboGraph" .. ToEnumShortString(pn)) end,
-			BeginCommand = function(self)
-				pcall(function()
-					local ss = SCREENMAN:GetTopScreen():GetStageStats()
-					self:Set(ss, pss)
-				end)
-			end
 		},
 	},
 }

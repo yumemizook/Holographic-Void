@@ -66,7 +66,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		local targetDiffOption = curSteps:GetDifficulty()
 		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
 		
-		local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+		local showMSD = (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) or ThemePrefs.Get("HV_ShowMSD") == true
 		
 		if allSteps then
 			for _, st in ipairs(allSteps) do

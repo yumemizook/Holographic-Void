@@ -847,7 +847,7 @@ for di, dname in ipairs(diffNames) do
 				local found = data.diffAvailability[dname]
 				if not found then self:settext("") return end
 
-				local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+				local showMSD = (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) or ThemePrefs.Get("HV_ShowMSD") == true
 				
 				if showMSD then
 					local msd = data.diffMSDs[dname]
@@ -1049,7 +1049,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):y(52):zoom(0.30):diffuse(mainText)
 		end,
 		SetCommand = function(self)
-			local showMSD = ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true
+			local showMSD = (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) or ThemePrefs.Get("HV_ShowMSD") == true
 			if not showMSD then
 				self:settext("")
 				return

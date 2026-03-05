@@ -584,11 +584,11 @@ t[#t + 1] = Def.ActorFrame {
 							local ss = s.score or s
 							if currentView == VIEW_LOCAL then
 								if ss:HasReplayData() then
-									SCOREMAN:WatchReplay(ss)
+									SCREENMAN:GetTopScreen():PlayReplay(ss)
 								end
 							else
 								local steps = GAMESTATE:GetCurrentSteps()
-								if steps then
+								if steps and DLMAN.DownloadAndPlayReplay then
 									DLMAN:DownloadAndPlayReplay(steps:GetChartKey(), ss:GetScoreKey())
 								end
 							end

@@ -575,113 +575,202 @@ end
 ------------------------------------------------------------
 -- TIMING STATISTICS
 ------------------------------------------------------------
-function wifeMean(dvt)
-	if dvt == nil or #dvt == 0 then return 0 end
-	local sum = 0
-	for _, v in ipairs(dvt) do sum = sum + v end
-	return sum / #dvt
+function wifeMean(t)
+	local c = #t
+	local m = 0
+	if c == 0 then
+		return 0
+	end
+	local o = 0
+	for i = 1, c do
+		-- ignore EO misses and replay mines
+		if t[i] ~= 1000 and t[i] ~= -1100 then
+			o = o + t[i]
+		else
+			m = m + 1
+		end
+	end
+	return o / (c - m)
 end
 
-function wifeAbsMean(dvt)
-	if dvt == nil or #dvt == 0 then return 0 end
-	local sum = 0
-	for _, v in ipairs(dvt) do sum = sum + math.abs(v) end
-	return sum / #dvt
+function wifeAbsMean(t)
+	local c = #t
+	local m = 0
+	if c == 0 then
+		return 0
+	end
+	local o = 0
+	for i = 1, c do
+		-- ignore EO misses and replay mines
+		if t[i] ~= 1000 and t[i] ~= -1100 then
+			o = o + math.abs(t[i])
+		else
+			m = m + 1
+		end
+	end
+	return o / (c - m)
 end
 
-function wifeSd(dvt)
-	if dvt == nil or #dvt < 2 then return 0 end
-	local m = wifeMean(dvt)
-	local sum = 0
-	for _, v in ipairs(dvt) do sum = sum + (v - m) ^ 2 end
-	return math.sqrt(sum / (#dvt - 1))
+function wifeSd(t)
+	local u = wifeMean(t)
+	local u2 = 0
+	local m = 0
+	for i = 1, #t do
+		-- ignore EO misses and replay mines
+		if t[i] ~= 1000 and t[i] ~= -1100 then
+			u2 = u2 + (t[i] - u) ^ 2
+		else
+			m = m + 1
+		end
+	end
+	if (#t - 1 - m) <= 0 then return 0 end
+	return math.sqrt(u2 / (#t - 1 - m))
+end
+
+function wifeRange(t)
+	local x, y = 10000, 0
+	for i = 1, #t do
+		if math.abs(t[i]) <= 180 then		-- some replays (online ones i think?) are flagging misses as 1100 for some reason
+			if math.abs(t[i]) < math.abs(x) then
+				x = t[i]
+			end
+			if math.abs(t[i]) > math.abs(y) then
+				y = t[i]
+			end
+		end
+	end
+	return x, y
+end
+
+function wifeMax(t)
+	local _, y = wifeRange(t)
+	return math.abs(y)
 end
 
 ------------------------------------------------------------
 -- JUDGE RESCORING
 ------------------------------------------------------------
-function getRescoredJudge(dvt, judgeDiff, window)
-	if dvt == nil or #dvt == 0 then return 0 end
-	local tst = ms.JudgeScalers
-	local tso = tst[judgeDiff]
-	if not tso then return 0 end
+-- For Window-based Scoring
+function getRescoredJudge(offsetVector, judgeScale, judge)
+	local tso = ms.JudgeScalers
+	local ts = tso[judgeScale]
+	local windows = {22.5, 45.0, 90.0, 135.0, 180.0, 500.0}
+	local lowerBound = judge > 1 and windows[judge - 1] * ts or -1.0
+	local upperBound = judge == 5 and math.max(windows[judge] * ts, 180.0) or windows[judge] * ts
+	local judgeCount = 0
 
-	-- Window: 1=W1, 2=W2, 3=W3, 4=W4, 5=W5, 6=Miss
-	local windows = {22.5, 45, 90, 135, 180}
-	local count = 0
-	for _, v in ipairs(dvt) do
-		local absOff = math.abs(v)
-		if window == 6 then
-			if absOff > tso * 180 then count = count + 1 end
-		elseif window == 1 then
-			if absOff <= tso * windows[1] then count = count + 1 end
-		else
-			if absOff > tso * windows[window - 1] and absOff <= tso * windows[window] then
-				count = count + 1
+	if offsetVector == nil then return judgeCount end
+
+	if judge > 5 then
+		lowerBound = math.max(lowerBound, 180.0)
+		for i = 1, #offsetVector do
+			local x = math.abs(offsetVector[i])
+			if (x > lowerBound) then
+				judgeCount = judgeCount + 1
+			end
+		end
+	else
+		for i = 1, #offsetVector do
+			local x = math.abs(offsetVector[i])
+			if (x > lowerBound and x <= upperBound) then
+				judgeCount = judgeCount + 1
 			end
 		end
 	end
-	return count
+	return judgeCount
 end
 
-function getRescoredWife3Judge(scoreType, judgeDiff, rst)
-	if rst == nil or rst["dvt"] == nil then return 0 end
-	local tst = ms.JudgeScalers
-	local tso = tst[judgeDiff]
-	if not tso then return 0 end
+-- erf constants
+local a1 =  0.254829592
+local a2 = -0.284496736
+local a3 =  1.421413741
+local a4 = -1.453152027
+local a5 =  1.061405429
+local p  =  0.3275911
 
-	-- Use the engine's rescoring if available
+function erf(x)
+	-- Save the sign of x
+	local sign = 1
+	if x < 0 then
+		sign = -1
+	end
+	x = math.abs(x)
+
+	-- A&S formula 7.1.26
+	local t = 1.0/(1.0 + p*x)
+	local y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-x*x)
+
+	return sign*y
+end
+
+function wife3(maxms, ts, version)
+	local max_points = 2
+	local miss_weight = -5.5
+	local ridic = 5 * ts
+	local max_boo_weight = 180 * ts
+	local ts_pow = 0.75
+	local zero = 65 * (ts^ts_pow)
+	local dev = 22.7 * (ts^ts_pow)
+
+	-- case handling
+	if maxms <= ridic then			-- anything below this (judge scaled) threshold is counted as full pts
+		return max_points
+	elseif maxms <= zero then			-- ma/pa region, exponential
+			return max_points * erf((zero - maxms) / dev)
+	elseif maxms <= max_boo_weight then -- cb region, linear
+		return (maxms - zero) * miss_weight / (max_boo_weight - zero)
+	else							-- we can just set miss values manually
+		return miss_weight			-- technically the max boo is always 180 above j4 however this is immaterial to the
+	end								-- purpose of the scoring curve, which is to assign point values
+end
+
+-- holy shit this is fugly
+function getRescoredWife3Judge(version, judgeScale, rst)
+	local tso = ms.JudgeScalers
+	local ts = tso[judgeScale]
+	local p = 0.0
 	local dvt = rst["dvt"]
-	local totalPoints = 0
-	local maxPoints = rst["totalTaps"] * 2
+	if dvt == nil then return p end
 
-	for _, v in ipairs(dvt) do
-		local absOff = math.abs(v) * tso
-		-- Wife3 curve approximation
-		if absOff <= 22.5 then
-			totalPoints = totalPoints + 2
-		elseif absOff <= 45 then
-			totalPoints = totalPoints + 2 - (absOff - 22.5) / 22.5
-		elseif absOff <= 90 then
-			totalPoints = totalPoints + 1 - (absOff - 45) / 45
-		elseif absOff <= 135 then
-			totalPoints = totalPoints + 0 - (absOff - 90) / 90
-		elseif absOff <= 180 then
-			totalPoints = totalPoints - 4
-		else
-			totalPoints = totalPoints - 8
-		end
+	for i = 1, #dvt do							-- wife2 does not require abs due to ^2 but this does
+		p = p + wife3(math.abs(dvt[i]), ts, version)
 	end
-
-	-- Subtract for missed holds/mines
-	if rst["holdsMissed"] then
-		totalPoints = totalPoints - rst["holdsMissed"] * 6
-	end
-	if rst["minesHit"] then
-		totalPoints = totalPoints - rst["minesHit"] * 8
-	end
-
-	if maxPoints <= 0 then return 0 end
-	return (totalPoints / maxPoints) * 100
+	p = p + (rst["holdsMissed"] * -4.5)
+	p = p + (rst["minesHit"] * -7)
+	
+	local totalTaps = rst["totalTaps"] or rst["totalNotes"] or #dvt
+	if totalTaps == 0 then return 0 end
+	
+	return (p / (totalTaps * 2)) * 100.0
 end
 
 function getRescoreElements(pss, score)
 	local o = {}
-	local dvt = pss:GetOffsetVector()
-	o["dvt"] = dvt
+	o["dvt"] = pss:GetOffsetVector()
 	
-	-- PSS uses GetRadarActual, HighScore uses GetRadarValues
 	local radarpss = pss.GetRadarActual and pss:GetRadarActual() or pss:GetRadarValues()
 	local radarscore = score.GetRadarValues and score:GetRadarValues() or score:GetRadarActual()
 	
 	o["totalHolds"] = (radarpss:GetValue("RadarCategory_Holds") or 0)
-		+ (radarpss:GetValue("RadarCategory_Rolls") or 0)
+	o["totalRolls"] = (radarpss:GetValue("RadarCategory_Rolls") or 0)
 	o["holdsHit"] = (radarscore:GetValue("RadarCategory_Holds") or 0)
-		+ (radarscore:GetValue("RadarCategory_Rolls") or 0)
+	o["rollsHit"] = (radarscore:GetValue("RadarCategory_Rolls") or 0)
 	o["holdsMissed"] = o["totalHolds"] - o["holdsHit"]
-	o["minesHit"] = (radarpss:GetValue("RadarCategory_Mines") or 0)
-		- (radarscore:GetValue("RadarCategory_Mines") or 0)
+	o["rollsMissed"] = o["totalRolls"] - o["rollsHit"]
+	o["minesHit"] = (radarpss:GetValue("RadarCategory_Mines") or 0) - (radarscore:GetValue("RadarCategory_Mines") or 0)
+	
 	o["totalTaps"] = pss:GetTotalTaps()
+	o["tapsHit"] = #o["dvt"]
+	o["misses"] = o["totalTaps"] - o["tapsHit"]
+	
+	local steps = GAMESTATE:GetCurrentSteps()
+	if steps then
+		local rv = steps:GetRadarValues(PLAYER_1)
+		o["totalNotes"] = rv:GetValue("RadarCategory_Notes")
+	else
+		o["totalNotes"] = o["totalTaps"]
+	end
+	
 	return o
 end
 
@@ -689,6 +778,7 @@ end
 -- OFFSET TO JUDGE COLOR
 ------------------------------------------------------------
 function offsetToJudgeColor(offset, scale)
+	if not offset then return color("#E0A0A0") end
 	scale = scale or 1
 	local absOff = math.abs(offset)
 	if absOff <= 22.5 * scale then

@@ -232,45 +232,7 @@ local function scoreItem(i)
 			end
 		},
 
-		-- Replay Button
-		Def.ActorFrame {
-			Name = "ReplayButton",
-			InitCommand = function(self) self:xy(315, 21):zoom(0.4) end,
-			SetScoreCommand = function(self, params)
-				local s = scoreList[params.index]
-				if isLocal then
-					if s and s.HasReplayData then
-						self:visible(s:HasReplayData())
-					else
-						self:visible(false)
-					end
-				else
-					self:visible(true)
-				end
-			end,
-			Def.Quad {
-				InitCommand = function(self) self:zoomto(40, 40):diffusealpha(0) end,
-			},
-			LoadActor(THEME:GetPathG("", "mp_play")) .. {
-				InitCommand = function(self) self:diffuse(accentColor):zoom(0.8) end,
-			},
-			MouseDownCommand = function(self, params)
-				if isOver(self) then
-					local idx = (curPage - 1) * scoresPerPage + i
-					local s = scoreList[idx]
-					if s then
-						if isLocal then
-							if s:HasReplayData() then
-								SCREENMAN:GetTopScreen():SetPlayerStageStatsFromReplayData(s)
-								SCOREMAN:WatchReplay(s)
-							end
-						else
-							DLMAN:DownloadAndPlayReplay(steps:GetChartKey(), s:GetScoreKey())
-						end
-					end
-				end
-			end,
-		},
+
 		MouseDownCommand = function(self, params)
 			self:RunCommandsOnChildren(function(child) child:playcommand("MouseDown", params) end)
 		end,

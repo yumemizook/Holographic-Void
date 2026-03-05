@@ -661,7 +661,8 @@ local t = Def.ActorFrame {
 		-- The music wheel preview is already active, so the NoteField picks up the current position.
 		
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
-		self:visible(true):playcommand("Reload")
+		self:visible(true)
+		MESSAGEMAN:Broadcast("ReloadChartPreview")
 	end,
 	
 	ChartPreviewOffMessageCommand = function(self)
@@ -677,7 +678,12 @@ local t = Def.ActorFrame {
 		end
 	end,
 
-	ReloadChartPreviewMessageCommand = function(self) self:RunCommandsOnChildren(function(c) c:playcommand("Reload") end) end,
+	ReloadChartPreviewMessageCommand = function(self) 
+		song = GAMESTATE:GetCurrentSong()
+		steps = GAMESTATE:GetCurrentSteps()
+		if not song or not steps then return end
+		self:RunCommandsOnChildren(function(c) c:playcommand("Reload") end) 
+	end,
 	CurrentRateChangedMessageCommand = function(self) MESSAGEMAN:Broadcast("ReloadChartPreview") end,
 
 	-- Screen Dim & Input Guard

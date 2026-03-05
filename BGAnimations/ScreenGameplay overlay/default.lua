@@ -18,7 +18,7 @@ local t = Def.ActorFrame {
 		local modStr = miniPct .. "% mini"
 		
 		-- Apply Measure Lines (Beat Bars) mod
-		local showMeasure = ThemePrefs.Get("HV_ShowMeasureLines") == "true"
+		local showMeasure = (ThemePrefs.Get("HV_ShowMeasureLines") == "true" or ThemePrefs.Get("HV_ShowMeasureLines") == true)
 		local beatBarMod = showMeasure and "beatbars" or "nobeatbars"
 		
 		for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
@@ -27,7 +27,9 @@ local t = Def.ActorFrame {
 			po:FromString(modStr)
 			po:FromString(beatBarMod)
 		end
-	end
+	end,
+	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end,
+	PracticeModeReloadMessageCommand = function(self) self:playcommand("Init") end
 }
 
 local accentColor = HVColor.Accent
@@ -145,8 +147,19 @@ t[#t + 1] = Def.ActorFrame {
 				local ms = math.floor((curTime - math.floor(curTime)) * 100)
 				self:settext(string.format("%d:%02d.%02d", mins, secs, ms))
 			end
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:queuecommand("UpdateBars") end,
+		PracticeModeReloadMessageCommand = function(self) self:queuecommand("UpdateBars") end
 	}
+}
+
+-- Practice Mode Indicator
+t[#t + 1] = LoadFont("Common Normal") .. {
+	Name = "PracticeIndicator",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, barY + 15):zoom(0.35):diffuse(accentColor):diffusealpha(0.8)
+		self:settext("** Practice Mode **"):visible(GAMESTATE:IsPracticeMode())
+	end
 }
 
 -- ============================================================
@@ -228,7 +241,9 @@ t[#t + 1] = Def.ActorFrame {
 					self:settext(string.format("%.0f%%", lifeVal * 100))
 				end
 			end
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:playcommand("RefreshLifePct") end,
+		PracticeModeReloadMessageCommand = function(self) self:playcommand("RefreshLifePct") end
 	}
 }
 
@@ -254,7 +269,15 @@ t[#t + 1] = Def.ActorFrame {
 			else
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
-					wifePct = pss:GetWifeScore() * 100
+					local totalTaps = pss:GetTotalTaps()
+					local steps = GAMESTATE:GetCurrentSteps()
+					local pn = PLAYER_1
+					if totalTaps > 0 then
+						-- Correct accuracy so far: points / (events * 2)
+						wifePct = (pss:GetWifeScore() / (totalTaps * 2)) * 100
+					else
+						wifePct = 0
+					end
 				end
 			end
 			if not wifePct then return end
@@ -271,14 +294,16 @@ t[#t + 1] = Def.ActorFrame {
 			elseif wifePct >= 0       then gradeStr = "D"
 			end
 			self:diffuse(HVColor.GetGradeColor(gradeStr)):diffusealpha(0.7)
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
+		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
 	}
 }
 
 -- ============================================================
 -- TEXT PACEMAKER (TIL DEATH STYLE)
 -- ============================================================
-local showTextPacemaker = ThemePrefs.Get("HV_ShowTextPacemaker") == "true"
+local showTextPacemaker = (ThemePrefs.Get("HV_ShowTextPacemaker") == "true" or ThemePrefs.Get("HV_ShowTextPacemaker") == true)
 if showTextPacemaker then
 	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType") or "Target"
 	local targetGoalPct = tonumber(ThemePrefs.Get("HV_PacemakerTargetGoal")) or 93
@@ -291,12 +316,13 @@ if showTextPacemaker then
 	t[#t + 1] = Def.ActorFrame {
 		Name = "TextPacemaker",
 		InitCommand = function(self)
-			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70)
+			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 115)
 		end,
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
 				self:halign(0.5):zoom(0.35)
-				self:settext("")
+				self:settextf("%+5.2f (%5.2f%%)", 0, targetGoalPct)
+				self:diffuse(color("#00ff00"))
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				local tDiff = msg.WifeDifferential
@@ -314,7 +340,42 @@ if showTextPacemaker then
 					self:diffuse(HVColor.Negative or color("#ff0000"))
 				end
 				self:settextf("%+5.2f (%5.2f%%)", tDiff, displayTarget)
-			end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settextf("%+5.2f (%5.2f%%)", 0, targetGoalPct) end,
+			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
+		}
+	}
+end
+
+-- ============================================================
+-- NOTEFIELD MEAN DISPLAY (Dedicated Object)
+-- ============================================================
+local showMean = (ThemePrefs.Get("HV_ShowMean") == "true" or ThemePrefs.Get("HV_ShowMean") == true)
+if showMean then
+	t[#t + 1] = Def.ActorFrame {
+		Name = "NotefieldMean",
+		InitCommand = function(self)
+			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
+		end,
+		OnCommand = function(self)
+			self:linear(0.2):diffusealpha(0.8)
+		end,
+
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:zoom(0.35):diffuse(mainText):settext("0.00ms")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local dvt = pss:GetOffsetVector()
+					if dvt and #dvt > 0 then
+						self:settextf("%.2fms", wifeMean(dvt))
+					end
+				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00ms") end,
+			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
 		}
 	}
 end
@@ -404,7 +465,30 @@ t[#t + 1] = Def.ActorFrame {
 			graphic:visible(true):diffusealpha(0.5)
 			text:visible(false)
 		end
-	end
+	end,
+	PracticeModeResetMessageCommand = function(self)
+		missStreak = 0
+		local numActor = self:GetChild("ComboNumber")
+		local labelContainer = self:GetChild("ComboLabel")
+		numActor:settext("0"):diffuse(dimText)
+		labelContainer:GetChild("ComboGraphic"):visible(true):diffusealpha(0.5)
+		labelContainer:GetChild("MissesText"):visible(false)
+	end,
+	PracticeModeReloadMessageCommand = function(self) self:playcommand("PracticeModeReset") end
+}
+
+-- Practice CD Graph
+t[#t + 1] = Def.ActorFrame {
+	Name = "PracticeCDGraphContainer",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 80)
+		self:visible(GAMESTATE:IsPracticeMode())
+	end,
+	LoadActor("../_chorddensitygraph.lua") .. {
+		InitCommand = function(self)
+			self:zoom(0.7)
+		end
+	}
 }
 
 -- AccuracyDisplay removed (redundant with pacemaker and NPS graph, overlapping with avatar)
@@ -418,22 +502,54 @@ local ebCenterY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15
 local maxOffset = 180 -- ms
 local dotLife = 2.0  -- seconds
 
+-- EWMA state
+local ewmaValue = 0
+local ewmaAlpha = 0.1
+local showEWMA = (ThemePrefs.Get("HV_EWMAOffsetBar") == "true" or ThemePrefs.Get("HV_EWMAOffsetBar") == true)
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ErrorBar",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ThemePrefs.Get("HV_ShowJudgeOffsets") == "true")
+		self:xy(SCREEN_CENTER_X, ebCenterY):visible((ThemePrefs.Get("HV_ShowOffsetBar") == "true" or ThemePrefs.Get("HV_ShowOffsetBar") == true))
 	end,
 
 	-- Background line
 	Def.Quad {
 		InitCommand = function(self)
-			self:zoomto(ebW, ebH):diffuse(color("0.1,0.1,0.1,0.5"))
+			self:zoomto(ebW, ebH):visible(false)
 		end
 	},
-	-- Center marker
-	Def.Quad {
+	
+	-- Early Indicator (Left)
+	LoadFont("Common Normal") .. {
+		Text = "EARLY",
 		InitCommand = function(self)
-			self:zoomto(1, ebH + 4):diffuse(color("0.4,0.4,0.4,0.8"))
+			self:x(-ebW/2 - 5):y(-12):zoom(0.25):halign(0):diffusealpha(0)
+		end,
+		OnCommand = function(self)
+			self:sleep(0.5):linear(0.2):diffusealpha(0.6):sleep(1.2):linear(0.2):diffusealpha(0)
+		end
+	},
+	-- Late Indicator (Right)
+	LoadFont("Common Normal") .. {
+		Text = "LATE",
+		InitCommand = function(self)
+			self:x(ebW/2 + 5):y(-12):zoom(0.25):halign(1):diffusealpha(0)
+		end,
+		OnCommand = function(self)
+			self:sleep(0.5):linear(0.2):diffusealpha(0.6):sleep(1.2):linear(0.2):diffusealpha(0)
+		end
+	},
+
+	-- EWMA Moving Average Marker
+	Def.Quad {
+		Name = "EWMAMarker",
+		InitCommand = function(self)
+			self:zoomto(2, ebH + 8):diffuse(accentColor):visible(showEWMA)
+		end,
+		UpdateEWMACommand = function(self, offset)
+			ewmaValue = (1 - ewmaAlpha) * ewmaValue + ewmaAlpha * offset
+			self:x((ewmaValue / maxOffset) * (ebW / 2))
 		end
 	},
 
@@ -447,6 +563,12 @@ t[#t + 1] = Def.ActorFrame {
 
 		-- Clamp for visualization
 		local visualOffset = offset * 1000 -- to ms
+		
+		-- Update EWMA marker if enabled
+		if showEWMA then
+			self:GetChild("EWMAMarker"):playcommand("UpdateEWMA", visualOffset)
+		end
+
 		if math.abs(visualOffset) > maxOffset then return end
 
 		local xPos = (visualOffset / maxOffset) * (ebW / 2)
@@ -515,7 +637,9 @@ for i, label in ipairs(judgmentLabels) do
 				if pss then
 					self:settext(pss:GetTapNoteScores(judgmentTNS[i]))
 				end
-			end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0") end
 		}
 	}
 end
@@ -547,7 +671,9 @@ t[#t + 1] = Def.ActorFrame {
 				local ok = pss:GetHoldNoteScores("HoldNoteScore_Held")
 				self:settext(tostring(ok))
 			end
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+		PracticeModeReloadMessageCommand = function(self) self:settext("0") end
 	},
 
 	LoadFont("Common Normal") .. {
@@ -568,8 +694,11 @@ t[#t + 1] = Def.ActorFrame {
 				local ng = pss:GetHoldNoteScores("HoldNoteScore_LetGo")
 				self:settext(tostring(ng))
 			end
-		end
-	}
+		end,
+		PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+		PracticeModeReloadMessageCommand = function(self) self:settext("0") end
+	},
+	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end
 }
 
 -- Real-time Grade Display has been moved to the pacemaker panel.
@@ -605,15 +734,17 @@ t[#t + 1] = Def.ActorFrame {
 				local j4 = getRescoredWife3Judge(1, 4, rs)
 				self:settext(string.format("%.2f%%", j4))
 			end
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
+		PracticeModeReloadMessageCommand = function(self) self:settext("0.00%") end
 	},
 
-	-- Mean / SD
+	-- Mean / SD / Largest
 	LoadFont("Common Normal") .. {
 		Name = "MeanSDLabel",
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(16):zoom(0.26):diffuse(dimText)
-			self:settext(THEME:GetString("ScreenGameplay", "MeanSD"))
+			self:settext("SD / Largest")
 		end
 	},
 	LoadFont("Common Normal") .. {
@@ -627,12 +758,14 @@ t[#t + 1] = Def.ActorFrame {
 			if pss then
 				local dvt = pss:GetOffsetVector()
 				if dvt and #dvt > 0 then
-					local mean = wifeMean(dvt)
 					local sd = wifeSd(dvt)
-					self:settext(string.format("%.1f / %.1f", mean, sd))
+					local max = wifeMax(dvt)
+					self:settext(string.format("%.1f / %.1f", sd, max))
 				end
 			end
-		end
+		end,
+		PracticeModeResetMessageCommand = function(self) self:settext("0.0 / 0.0") end,
+		PracticeModeReloadMessageCommand = function(self) self:settext("0.0 / 0.0") end
 	}
 }
 
