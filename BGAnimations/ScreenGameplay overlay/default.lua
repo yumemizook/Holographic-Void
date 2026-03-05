@@ -498,7 +498,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local ebW = 240
 local ebH = 2
-local ebCenterY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15
+local ebCenterY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15 - 40
 local maxOffset = 180 -- ms
 local dotLife = 2.0  -- seconds
 
