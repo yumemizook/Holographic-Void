@@ -63,7 +63,9 @@ local function convertXToRow(x)
 end
 
 local function HighlightUpdaterThing(self)
-	self:GetChild("Background"):queuecommand("Highlight")
+	if self:IsVisible() then
+		self:GetChild("Background"):queuecommand("Highlight")
+	end
 end
 
 local baralpha = 0.4
@@ -154,17 +156,23 @@ t[#t+1] = Def.Quad{
 		local bg = self:GetParent():GetChild("PosBG")
 		local mx = INPUTFILTER:GetMouseX()
 		local my = INPUTFILTER:GetMouseY()
-		local ax = self:GetParent():GetX()
-		local ay = self:GetParent():GetY()
-		local isOver = mx >= ax and mx <= ax + setWidth and my >= ay and my <= ay + setHeight
-		if isOver then
-			local xpos = INPUTFILTER:GetMouseX() - self:GetParent():GetX()
+		local x = self:GetTrueX()
+		local y = self:GetTrueY()
+		local w = self:GetZoomedWidth()
+		local h = self:GetZoomedHeight()
+		local ha = self.GetHAlign and self:GetHAlign() or 0
+		local va = self.GetVAlign and self:GetVAlign() or 0
+		
+		if mx >= x - w * ha and mx <= x + w * (1 - ha) and my >= y - h * va and my <= y + h * (1 - va) then
+			local xpos = INPUTFILTER:GetMouseX() - self:GetTrueX()
 			bar:visible(true)
 			txt:visible(true)
 			bg:visible(true)
 			bar:x(xpos)
 			txt:x(xpos - 2)
+			txt:y(100)
 			bg:x(xpos)
+			bg:y(100)
 			bg:zoomto(txt:GetZoomedWidth() + 4, txt:GetZoomedHeight() + 4)
 
 			local row = convertXToRow(xpos)
@@ -277,18 +285,45 @@ t[#t+1] = LoadFont("Common Normal")..{
 
 -- Hand highlight info text
 t[#t+1] = LoadFont("Common Normal") .. {
-	InitCommand = function(self) self:zoom(0.25):diffuse(dimText):settext("") end,
+	InitCommand = function(self) self:zoom(0.35):diffuse(brightText):settext("") end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
-		self:xy(params.width / 2, params.height - 8)
+		self:xy(params.width / 2, 12)
 		if ntt ~= nil and #ntt > 0 then
 			if handspecific then
-				if left then self:settext("Left hand")
-				elseif middle then self:settext("Middle col")
-				else self:settext("Right hand") end
+				if left then self:settext("HIGHLIGHTING: LEFT HAND")
+				elseif middle then self:settext("HIGHLIGHTING: MIDDLE COLUMN")
+				else self:settext("HIGHLIGHTING: RIGHT HAND") end
+				self:diffuse(accentColor)
 			else
-				self:settext("Down toggles highlights")
+				self:settext("DOWN LANE: CYCLE HANDS")
+				self:diffuse(subText)
 			end
+		else
+			self:settext("")
+		end
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+-- Early/Late distribution indicator
+t[#t+1] = LoadFont("Common Normal") .. {
+	InitCommand = function(self) self:zoom(0.25):halign(1):valign(0):diffuse(dimText) end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 5, 5)
+		local early = 0
+		local late = 0
+		if params.dvt and #params.dvt > 0 then
+			for _, off in ipairs(params.dvt) do
+				if off < 0 then early = early + 1
+				elseif off > 0 then late = late + 1 end
+			end
+		end
+		if early + late > 0 then
+			self:settextf("Early: %d (%.1f%%) | Late: %d (%.1f%%)", 
+				early, early / (early + late) * 100,
+				late, late / (early + late) * 100)
 		else
 			self:settext("")
 		end

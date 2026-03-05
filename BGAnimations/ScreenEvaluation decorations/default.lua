@@ -94,12 +94,33 @@ local function scroller(event)
 			MESSAGEMAN:Broadcast("WheelUpSlow")
 		elseif event.DeviceInput.button == "DeviceButton_mousewheel down" then
 			MESSAGEMAN:Broadcast("WheelDownSlow")
+		elseif event.DeviceInput.button == "DeviceButton_left mouse button" then
+			MESSAGEMAN:Broadcast("MouseLeftClick", {event=event})
 		end
 	end
 end
 
+local function isOver(actor)
+	if not actor or not actor.GetVisible or not actor:GetVisible() then return false end
+	if actor.IsVisible and not actor:IsVisible() then return false end
+	local x = actor:GetTrueX()
+	local y = actor:GetTrueY()
+	local w = actor:GetZoomedWidth()
+	local h = actor:GetZoomedHeight()
+	local ha = actor.GetHAlign and actor:GetHAlign() or 0
+	local va = actor.GetVAlign and actor:GetVAlign() or 0
+	local mx = INPUTFILTER:GetMouseX()
+	local my = INPUTFILTER:GetMouseY()
+	return mx >= x - w * ha and mx <= x + w * (1 - ha) and my >= y - h * va and my <= y + h * (1 - va)
+end
+
+local showGraphs = false
+
 local t = Def.ActorFrame {
-	Name = "EvalDecorations"
+	Name = "EvalDecorations",
+	OnCommand = function(self)
+		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
+	end
 }
 
 -- Get rescore elements helper
@@ -147,7 +168,7 @@ local function calculateRatios(score)
 
 	local ra = marvRA > 0 and (ridic / marvRA) or -1
 	local la = ridicLA > 0 and (ludic / ridicLA) or -1
-	return ra, la, ridicLA, marvRA
+	return ra, la, ridic, marvRA, ludic, ridicLA
 end
 
 ------------------------------------------------------------
@@ -276,43 +297,76 @@ local function scoreBoard(pn)
 	}
 
 	-- ============================================================
-	-- GRADE + SCORE AREA (Including Graphs)
+	-- GRADE + SCORE AREA
 	-- ============================================================
 	board[#board + 1] = Def.ActorFrame {
 		Name = "GradeScore",
 		InitCommand = function(self) self:xy(pad, pad + 65) end,
-	}
 
-	-- ============================================================
-	-- GRAPHS AREA
-	-- ============================================================
-	board[#board + 1] = Def.ActorFrame {
-		Name = "Graphs",
-		InitCommand = function(self) self:xy(pad, pad + 120) end,
-
-		-- Life Graph BG
-		Def.GraphDisplay {
-			InitCommand = function(self) self:Load("GraphDisplay") end,
-			BeginCommand = function(self)
-				pcall(function()
-					local ss = SCREENMAN:GetTopScreen():GetStageStats()
-					self:Set(ss, pss)
-					self:diffusealpha(0.3)
-					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
-				end)
+		-- Grade
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, -5):zoom(0.85):diffuse(mainText) end,
+			OnCommand = function(self)
+				local grade = pss:GetWifeGrade()
+				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
+				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
+			end
+		},
+		-- SSR
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(5, 35):zoom(0.4):diffuse(subText) end,
+			OnCommand = function(self)
+				local ssr = curScore:GetSkillsetSSR("Overall")
+				self:settextf("%.2f", ssr)
+				self:diffuse(HVColor.GetMSDRatingColor(ssr))
 			end
 		},
 
-		-- Combo Graph
-		Def.ComboGraph {
-			InitCommand = function(self) self:Load("ComboGraph" .. ToEnumShortString(pn)) end,
-			BeginCommand = function(self)
-				pcall(function()
-					local ss = SCREENMAN:GetTopScreen():GetStageStats()
-					self:Set(ss, pss)
-				end)
+		-- Wife Score
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, -5):zoom(0.6):diffuse(mainText) end,
+			OnCommand = function(self)
+				local wife = pss:GetWifeScore()
+				if wife >= 0.99 then
+					self:settextf("%.4f%%", math.floor(wife * 1000000) / 10000)
+				else
+					self:settextf("%.2f%%", math.floor(wife * 10000) / 100)
+				end
+			end,
+			SetJudgeCommand = function(self)
+				if rescoredPercentage then
+					if rescoredPercentage >= 99 then
+						self:settextf("%.4f%%", math.floor(rescoredPercentage * 10000) / 10000)
+					else
+						self:settextf("%.2f%%", math.floor(rescoredPercentage * 100) / 100)
+					end
+				end
+			end,
+			ResetJudgeCommand = function(self) self:playcommand("On") end
+		},
+		-- DP
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, 32):zoom(0.35):diffuse(color("#55b0ff")) end,
+			OnCommand = function(self)
+				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (curScore:GetWifeScore() * totalTaps * 2)
+				self:settextf("%.2f", dp)
 			end
 		},
+		-- DP slash
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(160, 34):zoom(0.25):diffuse(subText) end,
+			OnCommand = function(self)
+				self:settextf("/")
+			end
+		},
+		-- Total DP
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(170, 34):zoom(0.25):diffuse(subText) end,
+			OnCommand = function(self)
+				local totalDp = curScore.GetTotalWifePoints and curScore:GetTotalWifePoints() or (totalTaps * 2)
+				self:settextf("%.2f", totalDp)
+			end
+		}
 	}
 
 	-- ============================================================
@@ -550,35 +604,91 @@ local function scoreBoard(pn)
 			OnCommand = function(self)
 				if ri == 1 then
 					-- LA (Ludicrous Attack)
-					local ra, la, ridicLA, marvRA = calculateRatios(curScore)
-					if la >= 0 then
-						self:settextf("%.2f:1", la):rainbow()
+					local ra, la, ridic, marvRA, ludic, ridicLA = calculateRatios(curScore)
+					if ridicLA == 0 then
+						if ludic > 0 then
+							self:settext("No Ridics"):rainbow()
+						else
+							self:settext("N/A"):diffuse(dimText)
+						end
 					else
-						self:settext("N/A"):diffuse(dimText)
+						self:settextf("%.2f:1", la):rainbow()
 					end
 				elseif ri == 2 then
 					-- RA (Ridiculous Attack)
-					local ra, la, ridicLA, marvRA = calculateRatios(curScore)
-					if ra >= 0 then
-						self:settextf("%.2f:1", ra):diffuse(ratioColors[2])
+					local ra, la, ridic, marvRA, ludic, ridicLA = calculateRatios(curScore)
+					if marvRA == 0 then
+						if ridic > 0 then
+							self:settext("No Marvs"):diffuse(ratioColors[2])
+						else
+							self:settext("N/A"):diffuse(dimText)
+						end
 					else
-						self:settext("N/A"):diffuse(dimText)
+						self:settextf("%.2f:1", ra):diffuse(ratioColors[2])
 					end
 				elseif ri == 3 then
-					-- MA (Marvelous Attack count)
-					local ma = pss:GetTapNoteScores("TapNoteScore_W1")
-					self:settext(ma):diffuse(ratioColors[3])
+					-- MA (Marvelous Attack ratio)
+					local w1 = pss:GetTapNoteScores("TapNoteScore_W1")
+					local w2 = pss:GetTapNoteScores("TapNoteScore_W2")
+					if w2 == 0 then
+						if w1 > 0 then self:settext("No Perfs"):rainbow() else self:settext("N/A"):diffuse(dimText) end
+					else
+						self:settextf("%.2f:1", w1 / w2):diffuse(ratioColors[3])
+					end
 				elseif ri == 4 then
-					-- PA (Perfect Attack count)
-					local pa = pss:GetTapNoteScores("TapNoteScore_W2")
-					self:settext(pa):diffuse(ratioColors[4])
+					-- PA (Perfect Attack ratio)
+					local w1 = pss:GetTapNoteScores("TapNoteScore_W1")
+					local w2 = pss:GetTapNoteScores("TapNoteScore_W2")
+					local w3 = pss:GetTapNoteScores("TapNoteScore_W3")
+					if w3 == 0 then
+						if w1 > 0 or w2 > 0 then self:settext("No Greats"):diffuse(color("#FFD700")) else self:settext("N/A"):diffuse(dimText) end
+					else
+						self:settextf("%.2f:1", w2 / w3):diffuse(ratioColors[4])
+					end
 				end
 			end,
 			SetJudgeCommand = function(self)
-				if ri == 3 then
-					self:settext(getRescoredJudge(dvt, judge, 1))
+				if ri == 1 then
+					-- LA (Ludicrous Attack)
+					local ra, la, ridic, marvRA, ludic, ridicLA = calculateRatios(curScore)
+					if ridicLA == 0 then
+						if ludic > 0 then
+							self:settext("No Ridics"):rainbow()
+						else
+							self:settext("N/A"):diffuse(dimText)
+						end
+					else
+						self:settextf("%.2f:1", la):rainbow()
+					end
+				elseif ri == 2 then
+					-- RA (Ridiculous Attack)
+					local ra, la, ridic, marvRA, ludic, ridicLA = calculateRatios(curScore)
+					if marvRA == 0 then
+						if ridic > 0 then
+							self:settext("No Marvs"):diffuse(ratioColors[2])
+						else
+							self:settext("N/A"):diffuse(dimText)
+						end
+					else
+						self:settextf("%.2f:1", ra):diffuse(ratioColors[2])
+					end
+				elseif ri == 3 then
+					local w1 = getRescoredJudge(dvt, judge, 1)
+					local w2 = getRescoredJudge(dvt, judge, 2)
+					if w2 == 0 then
+						if w1 > 0 then self:settext("No Perfs"):rainbow() else self:settext("N/A"):diffuse(dimText) end
+					else
+						self:settextf("%.2f:1", w1 / w2):diffuse(ratioColors[3])
+					end
 				elseif ri == 4 then
-					self:settext(getRescoredJudge(dvt, judge, 2))
+					local w1 = getRescoredJudge(dvt, judge, 1)
+					local w2 = getRescoredJudge(dvt, judge, 2)
+					local w3 = getRescoredJudge(dvt, judge, 3)
+					if w3 == 0 then
+						if w1 > 0 or w2 > 0 then self:settext("No Greats"):diffuse(color("#FFD700")) else self:settext("N/A"):diffuse(dimText) end
+					else
+						self:settextf("%.2f:1", w2 / w3):diffuse(ratioColors[4])
+					end
 				end
 			end,
 			ResetJudgeCommand = function(self) self:playcommand("On") end
@@ -661,7 +771,7 @@ t[#t + 1] = Def.ActorFrame {
 					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "PrevJudge"})
 				elseif event.button == "MenuUp" then
 					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ResetJudge"})
-				elseif event.button == "MenuDown" then
+				elseif event.button == "MenuDown" or event.DeviceInput.button == "DeviceButton_down" or event.button == "Down" then
 					MESSAGEMAN:Broadcast("OffsetPlotModification", {Name = "ToggleHands"})
 				end
 			end
@@ -675,36 +785,103 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
+	-- Toggle Offset Plot / Graphs
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(rightW, 20):zoomto(90, 20):halign(1):diffuse(accentColor):diffusealpha(0.2)
+		end,
+		UpdateToggleMessageCommand = function(self)
+			self:diffusealpha(showGraphs and 0.4 or 0.2)
+		end,
+		MouseLeftClickMessageCommand = function(self)
+			if isOver(self) then
+				showGraphs = not showGraphs
+				MESSAGEMAN:Broadcast("ToggleGraphs")
+				MESSAGEMAN:Broadcast("UpdateToggle")
+			end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:xy(rightW - 45, 20):zoom(0.25):settext("Toggle Graphs"):diffuse(brightText)
+		end
+	},
+
 	-- ============================================================
 	-- OFFSET PLOT
 	-- ============================================================
-	LoadActor(THEME:GetPathG("", "OffsetGraph")) .. {
-		InitCommand = function(self)
-			self:xy(10, 40) -- Adjusted down slightly
-		end,
-		OnCommand = function(self)
-			self:RunCommandsOnChildren(function(child)
-				child:playcommand("Update", {
-					width = rightW - 20,
-					height = offsetPlotHeight,
-					song = song,
-					steps = steps,
-					nrv = nrv,
-					dvt = dvt,
-					ctt = ctt,
-					ntt = ntt,
-					columns = steps and steps:GetNumColumns() or 4
-				})
-			end)
-		end,
+	Def.ActorFrame {
+		InitCommand = function(self) self:visible(not showGraphs) end,
+		ToggleGraphsMessageCommand = function(self) self:visible(not showGraphs) end,
+
+		LoadActor(THEME:GetPathG("", "OffsetGraph")) .. {
+			InitCommand = function(self)
+				self:xy(10, 40) -- Adjusted down slightly
+			end,
+			OnCommand = function(self)
+				self:RunCommandsOnChildren(function(child)
+					child:playcommand("Update", {
+						width = rightW - 20,
+						height = offsetPlotHeight,
+						song = song,
+						steps = steps,
+						nrv = nrv,
+						dvt = dvt,
+						ctt = ctt,
+						ntt = ntt,
+						columns = steps and steps:GetNumColumns() or 4
+					})
+				end)
+			end,
+		},
+		-- Offset Plot Label
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(20, 25):zoom(0.35):halign(0):diffuse(subText)
+				self:settext(THEME:GetString("ScreenEvaluation", "CategoryOffset"))
+			end,
+		},
 	},
 
-	-- Offset Plot Label
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(20, 25):zoom(0.35):halign(0):diffuse(subText)
-			self:settext(THEME:GetString("ScreenEvaluation", "CategoryOffset"))
-		end,
+	-- ============================================================
+	-- GRAPHS AREA
+	-- ============================================================
+	Def.ActorFrame {
+		Name = "Graphs",
+		InitCommand = function(self) self:xy(10, 40) self:visible(showGraphs) end,
+		ToggleGraphsMessageCommand = function(self) self:visible(showGraphs) end,
+
+		-- Graph Area Label
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(10, -15):zoom(0.35):halign(0):diffuse(subText)
+				self:settext("Combo & Life Graph")
+			end,
+		},
+
+		-- Life Graph BG
+		Def.GraphDisplay {
+			InitCommand = function(self) self:Load("GraphDisplay") end,
+			BeginCommand = function(self)
+				pcall(function()
+					local ss = SCREENMAN:GetTopScreen():GetStageStats()
+					self:Set(ss, pss)
+					self:diffusealpha(0.3)
+					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
+				end)
+			end
+		},
+
+		-- Combo Graph
+		Def.ComboGraph {
+			InitCommand = function(self) self:Load("ComboGraph" .. ToEnumShortString(pn)) end,
+			BeginCommand = function(self)
+				pcall(function()
+					local ss = SCREENMAN:GetTopScreen():GetStageStats()
+					self:Set(ss, pss)
+				end)
+			end
+		},
 	},
 }
 
@@ -713,7 +890,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local scoreboardFrame = Def.ActorFrame {
 	Name = "ScoreboardContainer",
-	InitCommand = function(self) self:xy(rightX + 10, offsetPlotHeight + 50) end,
+	InitCommand = function(self) self:xy(rightX + 10, offsetPlotHeight + 130) end,
 }
 
 if inMulti then

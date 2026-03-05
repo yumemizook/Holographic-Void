@@ -125,7 +125,7 @@ WifeTiers = {
 	Grade_Tier07 = 0.997,    Grade_Tier08 = 0.99,   Grade_Tier09 = 0.965,
 	Grade_Tier10 = 0.93,     Grade_Tier11 = 0.9,    Grade_Tier12 = 0.85,
 	Grade_Tier13 = 0.8,      Grade_Tier14 = 0.7,    Grade_Tier15 = 0.6,
-	Grade_Tier16 = 0.5,
+	Grade_Tier16 = 0.0,
 }
 
 WifeTierList = {
@@ -179,7 +179,7 @@ function getEtternaGrade(wifePct)
 	elseif pct >= 0.8 then return "Tier13"
 	elseif pct >= 0.7 then return "Tier14"
 	elseif pct >= 0.6 then return "Tier15"
-	elseif pct >= -99999 then return "Tier16" -- anything lower than C is D
+	elseif pct >= 0.0 then return "Tier16"
 	else return "Tier17" end
 end
 

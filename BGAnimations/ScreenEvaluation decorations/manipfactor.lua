@@ -9,8 +9,8 @@ end
 
 local aspectRatio = GetScreenAspectRatio()
 
-local mfDisplayX = 22
-local mfDisplayY = 360
+local mfDisplayX = 102
+local mfDisplayY = 61
 local mfDisplayZoom = 0.28
 
 local td = {} -- chart timing data

@@ -68,8 +68,9 @@ local function refreshScores(self)
 				local scoresByKey = SCOREMAN:GetScoresByKey(chartKey)
 				if scoresByKey then
 					for rateStr, rateScores in pairs(scoresByKey) do
-						for j = 1, #rateScores do
-							scoreList[#scoreList + 1] = rateScores[j]
+						local scores = rateScores:GetScores()
+						for j = 1, #scores do
+							scoreList[#scoreList + 1] = scores[j]
 						end
 					end
 				end
@@ -80,11 +81,12 @@ local function refreshScores(self)
 		else
 			scoreList = getScoreTable(pn, getCurRate()) or {}
 		end
-		-- Sort local scores by SSR
+		-- Sort local scores: SSR for All Rates, Wife% for Current Rate
 		table.sort(scoreList, function(a, b)
-			local sa = a:GetSkillsetSSR("Overall")
-			local sb = b:GetSkillsetSSR("Overall")
-			return sa > sb
+			local sa = showAllRates and (a:GetSkillsetSSR("Overall") or 0) or (a:GetWifeScore() or 0)
+			local sb = showAllRates and (b:GetSkillsetSSR("Overall") or 0) or (b:GetWifeScore() or 0)
+			if math.abs(sa - sb) > 0.000001 then return sa > sb end
+			return a:GetDate() > b:GetDate()
 		end)
 	else
 		scoreList = DLMAN:GetChartLeaderBoard(steps:GetChartKey(), currentCountry)
@@ -92,11 +94,12 @@ local function refreshScores(self)
 			updateLeaderBoardForCurrentChart()
 		end
 		if scoreList then
-			-- Sort online scores by SSR
+			-- Sort online scores: SSR for All Rates, Wife% for Current Rate
 			table.sort(scoreList, function(a, b)
-				local sa = a:GetSkillsetSSR("Overall")
-				local sb = b:GetSkillsetSSR("Overall")
-				return sa > sb
+				local sa = showAllRates and (a:GetSkillsetSSR("Overall") or 0) or (a:GetWifeScore() or 0)
+				local sb = showAllRates and (b:GetSkillsetSSR("Overall") or 0) or (b:GetWifeScore() or 0)
+				if math.abs(sa - sb) > 0.000001 then return sa > sb end
+				return a:GetDate() > b:GetDate()
 			end)
 		end
 	end
@@ -134,8 +137,8 @@ local function scoreItem(i)
 			SetScoreCommand = function(self, params)
 				self:diffuse(color("0,0,0,0.4"))
 			end,
-			WheelUpSlowMessageCommand = function(self) if self:IsOver() then movePage(-1) end end,
-			WheelDownSlowMessageCommand = function(self) if self:IsOver() then movePage(1) end end
+			WheelUpSlowMessageCommand = function(self) if isOver(self) then movePage(-1) end end,
+			WheelDownSlowMessageCommand = function(self) if isOver(self) then movePage(1) end end
 		},
 
 		-- Rank #
@@ -146,9 +149,26 @@ local function scoreItem(i)
 			end
 		},
 
+		-- Player name (online only) or date (local)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:xy(16, 8):zoom(0.28):halign(0):diffuse(brightText) end,
+			SetScoreCommand = function(self, params)
+				if isLocal then
+					self:settext(scoreList[params.index]:GetDate())
+				else
+					local name = scoreList[params.index]:GetDisplayName()
+					if name and name ~= "" then
+						self:settext(name)
+					else
+						self:settext("Unknown")
+					end
+				end
+			end
+		},
+
 		-- Grade
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 8):zoom(0.28):halign(0) end,
+			InitCommand = function(self) self:xy(16, 24):zoom(0.25):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				local grade = s:GetWifeGrade()
@@ -159,7 +179,7 @@ local function scoreItem(i)
 
 		-- Score %
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(55, 8):zoom(0.28):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(55, 24):zoom(0.25):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				local ws = scoreList[params.index]:GetWifeScore()
 				if ws >= 0.99 then
@@ -172,7 +192,7 @@ local function scoreItem(i)
 
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 8):zoom(0.24):halign(1) end,
+			InitCommand = function(self) self:xy(290, 8):zoom(0.28):halign(1) end,
 			SetScoreCommand = function(self, params)
 				local ssr = scoreList[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then
@@ -184,26 +204,9 @@ local function scoreItem(i)
 			end
 		},
 
-		-- Player name (online only) or date (local)
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 24):zoom(0.18):halign(1):diffuse(dimText) end,
-			SetScoreCommand = function(self, params)
-				if isLocal then
-					self:settext(scoreList[params.index]:GetDate())
-				else
-					local name = scoreList[params.index]:GetDisplayName()
-					if name and name ~= "" then
-						self:settext(name)
-					else
-						self:settext("")
-					end
-				end
-			end
-		},
-
 		-- Judgment tally (no labels)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 24):zoom(0.2):halign(0):diffuse(subText) end,
+			InitCommand = function(self) self:xy(290, 24):zoom(0.18):halign(1):diffuse(subText) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				self:settextf("%d / %d / %d / %d / %d / %d",
@@ -215,6 +218,62 @@ local function scoreItem(i)
 					s:GetTapNoteScore("TapNoteScore_Miss"))
 			end
 		},
+
+		-- Rate Display (only for All Rates)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:xy(135, 24):zoom(0.24):halign(0):diffuse(mainText) end,
+			SetScoreCommand = function(self, params)
+				if showAllRates then
+					local s = scoreList[params.index]
+					self:settextf("%.2fx", s:GetMusicRate()):visible(true)
+				else
+					self:visible(false)
+				end
+			end
+		},
+
+		-- Replay Button
+		Def.ActorFrame {
+			Name = "ReplayButton",
+			InitCommand = function(self) self:xy(315, 21):zoom(0.4) end,
+			SetScoreCommand = function(self, params)
+				local s = scoreList[params.index]
+				if isLocal then
+					if s and s.HasReplayData then
+						self:visible(s:HasReplayData())
+					else
+						self:visible(false)
+					end
+				else
+					self:visible(true)
+				end
+			end,
+			Def.Quad {
+				InitCommand = function(self) self:zoomto(40, 40):diffusealpha(0) end,
+			},
+			LoadActor(THEME:GetPathG("", "mp_play")) .. {
+				InitCommand = function(self) self:diffuse(accentColor):zoom(0.8) end,
+			},
+			MouseDownCommand = function(self, params)
+				if isOver(self) then
+					local idx = (curPage - 1) * scoresPerPage + i
+					local s = scoreList[idx]
+					if s then
+						if isLocal then
+							if s:HasReplayData() then
+								SCREENMAN:GetTopScreen():SetPlayerStageStatsFromReplayData(s)
+								SCOREMAN:WatchReplay(s)
+							end
+						else
+							DLMAN:DownloadAndPlayReplay(steps:GetChartKey(), s:GetScoreKey())
+						end
+					end
+				end
+			end,
+		},
+		MouseDownCommand = function(self, params)
+			self:RunCommandsOnChildren(function(child) child:playcommand("MouseDown", params) end)
+		end,
 	}
 end
 
@@ -225,9 +284,14 @@ local t = Def.ActorFrame {
 		refreshScores(self)
 		self:playcommand("RefreshUI")
 		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
+			if not self:GetVisible() then return end
 			if event.type == "InputEventType_FirstPress" then
-				if event.button == "MenuLeft" then movePage(-1)
-				elseif event.button == "MenuRight" then movePage(1) end
+				if event.button == "MenuLeft" or event.DeviceInput.button == "DeviceButton_left" or event.button == "Left" then movePage(-1)
+				elseif event.button == "MenuRight" or event.DeviceInput.button == "DeviceButton_right" or event.button == "Right" then movePage(1) end
+				
+				if event.DeviceInput.button == "DeviceButton_left mouse button" then
+					self:RunCommandsOnChildren(function(child) child:playcommand("MouseDown", {event = event}) end)
+				end
 			end
 		end)
 	end,
@@ -252,7 +316,7 @@ local t = Def.ActorFrame {
 			self:diffusealpha(isLocal and 0.4 or 0.1)
 		end,
 		MouseDownCommand = function(self)
-			if not isLocal then
+			if isOver(self) and not isLocal then
 				isLocal = true
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
@@ -273,7 +337,7 @@ local t = Def.ActorFrame {
 			self:diffusealpha(not isLocal and 0.4 or 0.1)
 		end,
 		MouseDownCommand = function(self)
-			if isLocal and DLMAN:IsLoggedIn() then
+			if isOver(self) and isLocal and DLMAN:IsLoggedIn() then
 				isLocal = false
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
@@ -294,10 +358,10 @@ local t = Def.ActorFrame {
 			self:diffuse(color("#555555")):diffusealpha(not showAllRates and 0.4 or 0.1)
 		end,
 		RefreshOnlineScoreboardMessageCommand = function(self)
-			self:diffusealpha(not showAllRates and 0.4 or 0.1)
+			self:diffusealpha(isLocal and 0 or (not showAllRates and 0.4 or 0.1))
 		end,
 		MouseDownCommand = function(self)
-			if showAllRates then
+			if isOver(self) and not isLocal and showAllRates then
 				showAllRates = false
 				pcall(function() DLMAN:ToggleRateFilter() end)
 				refreshScores(self:GetParent())
@@ -306,20 +370,21 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(195, -30):zoom(0.18):diffuse(brightText):settext("Current") end
+		InitCommand = function(self) self:xy(195, -30):zoom(0.18):diffuse(brightText):settext("Current") end,
+		RefreshOnlineScoreboardMessageCommand = function(self) self:visible(not isLocal) end
 	},
 
 	Def.Quad {
 		Name = "AllRatesTab",
 		InitCommand = function(self)
 			self:xy(234, -38):zoomto(60, 16):halign(0):valign(0)
-			self:diffuse(color("#555555")):diffusealpha(showAllRates and 0.4 or 0.1)
+			self:diffuse(color("#555555")):diffusealpha(isLocal and 0 or (showAllRates and 0.4 or 0.1))
 		end,
 		RefreshOnlineScoreboardMessageCommand = function(self)
-			self:diffusealpha(showAllRates and 0.4 or 0.1)
+			self:diffusealpha(isLocal and 0 or (showAllRates and 0.4 or 0.1))
 		end,
 		MouseDownCommand = function(self)
-			if not showAllRates then
+			if isOver(self) and not isLocal and not showAllRates then
 				showAllRates = true
 				pcall(function() DLMAN:ToggleRateFilter() end)
 				refreshScores(self:GetParent())
@@ -328,7 +393,8 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(264, -30):zoom(0.18):diffuse(brightText):settext("All") end
+		InitCommand = function(self) self:xy(264, -30):zoom(0.18):diffuse(brightText):settext("All") end,
+		RefreshOnlineScoreboardMessageCommand = function(self) self:visible(not isLocal) end
 	},
 
 	-- Page info

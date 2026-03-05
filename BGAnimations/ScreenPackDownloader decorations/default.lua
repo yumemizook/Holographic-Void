@@ -33,6 +33,7 @@ local selectedRow = 1
 local packsPerPage = 14
 local currentPacks = {}
 local installedFlags = {} -- cache installed status per row
+local isSearching = false
 
 -- Check if a pack is installed locally (same as Til Death)
 local function isPackInstalled(pack)
@@ -86,6 +87,12 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "SearchBar",
 	InitCommand = function(self) self:xy(SCREEN_WIDTH * 0.28, searchBarY) end,
 
+	Def.Sprite {
+		Texture = THEME:GetPathG("", "search.png"),
+		InitCommand = function(self)
+			self:halign(1):x(-searchBarW / 2 - 8):zoom(0.35):diffuse(mainText)
+		end
+	},
 	Def.Quad {
 		InitCommand = function(self)
 			self:zoomto(searchBarW, 20):diffuse(color("0.08,0.08,0.08,0.9"))
@@ -104,10 +111,10 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		UpdateSearchCommand = function(self)
 			if nameInput == "" then
-				self:settext("Type to search...")
+				self:settext(isSearching and "Type to search..." or "Click to search...")
 				self:diffuse(dimText)
 			else
-				self:settext(nameInput .. "_")
+				self:settext(nameInput .. (isSearching and "_" or ""))
 				self:diffuse(mainText)
 			end
 		end
@@ -131,9 +138,9 @@ t[#t + 1] = Def.ActorFrame {
 			local dls = DLMAN:GetDownloads()
 			if dls and #dls > 0 then
 				local dl = dls[1]
-				local mb = dl:GetKBDownloaded() / 1024
-				local total = dl:GetTotalKB() / 1024
-				statusText:settextf("DL: %.1f/%.1fMB", mb, total)
+				local kb = dl:GetKBDownloaded()
+				local total = dl:GetTotalKB()
+				statusText:settextf("DL: %d/%dKB", kb, total)
 				statusText:diffuse(accentColor)
 			else
 				local queued = DLMAN:GetQueuedPacks()
@@ -517,6 +524,22 @@ t[#t + 1] = Def.ActorFrame {
 			-- Mouse left click -> select/download row
 			if IsMouseLeftClick(btn) then
 				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+				
+				-- Check if click is on the search bar
+				local sbX = SCREEN_WIDTH * 0.28
+				local sbW = searchBarW
+				local sbH = 20
+				if mx >= sbX - sbW / 2 and mx <= sbX + sbW / 2 and my >= searchBarY - sbH / 2 and my <= searchBarY + sbH / 2 then
+					isSearching = true
+					self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+					return
+				else
+					if isSearching then
+						isSearching = false
+						self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+					end
+				end
+
 				-- Check if click is within the pack list area
 				for i = 1, math.min(#currentPacks, packsPerPage) do
 					local rowTopY = listY + 14 + (i - 1) * rowH
@@ -540,6 +563,32 @@ t[#t + 1] = Def.ActorFrame {
 					end
 				end
 				return
+			end
+
+			-- Text input — consume before checking navigation keys
+			if isSearching then
+				if btn == "DeviceButton_backspace" then
+					nameInput = nameInput:sub(1, -2)
+					self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+					self:stoptweening():sleep(0.5):queuecommand("DoSearch")
+					return
+				end
+
+				if btn == "DeviceButton_delete" then
+					nameInput = ""
+					self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+					packList:FilterAndSearch("", {}, true, packsPerPage)
+					self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
+					return
+				end
+
+				local char = inputToCharacter(event)
+				if char then
+					nameInput = nameInput .. char
+					self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+					self:stoptweening():sleep(0.5):queuecommand("DoSearch")
+					return
+				end
 			end
 
 			-- Arrow navigation
@@ -575,33 +624,6 @@ t[#t + 1] = Def.ActorFrame {
 					self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
 				end
 				return
-			end
-
-			-- Backspace
-			if btn == "DeviceButton_backspace" then
-				nameInput = nameInput:sub(1, -2)
-				self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
-				-- Auto-search after typing
-				self:stoptweening():sleep(0.5):queuecommand("DoSearch")
-				return
-			end
-
-			-- Delete = clear search and re-fetch all
-			if btn == "DeviceButton_delete" then
-				nameInput = ""
-				self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
-				packList:FilterAndSearch("", {}, true, packsPerPage)
-				self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
-				return
-			end
-
-			-- Text input — auto-search after short delay
-			local char = inputToCharacter(event)
-			if char then
-				nameInput = nameInput .. char
-				self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
-				-- Debounced auto-search: wait 0.5s after last keypress
-				self:stoptweening():sleep(0.5):queuecommand("DoSearch")
 			end
 		end)
 

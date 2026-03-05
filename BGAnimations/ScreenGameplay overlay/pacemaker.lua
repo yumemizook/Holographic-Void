@@ -31,12 +31,13 @@ local colour = {
 
 -- Grade table using HV's grade color system
 local percent2grade = {
+	{percent = 0,        grade = "D",     tier = "Tier16"},
 	{percent = 60,       grade = "C",     tier = "Tier15"},
 	{percent = 70,       grade = "B",     tier = "Tier14"},
 	{percent = 80,       grade = "A",     tier = "Tier13"},
 	{percent = 93,       grade = "AA",    tier = "Tier10"},
 	{percent = 99.70,    grade = "AAA",   tier = "Tier07"},
-	{percent = 99.995,   grade = "AAAA",  tier = "Tier04"},
+	{percent = 99.955,   grade = "AAAA",  tier = "Tier04"},
 	{percent = 99.9935,  grade = "AAAAA", tier = "Tier01"},
 }
 

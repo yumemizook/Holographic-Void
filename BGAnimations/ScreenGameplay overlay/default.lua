@@ -262,13 +262,13 @@ t[#t + 1] = Def.ActorFrame {
 			-- Color based on wife%
 			local gradeStr = "F"
 			if     wifePct >= 99.9935 then gradeStr = "AAAAA"
-			elseif wifePct >= 99.995 then gradeStr = "AAAA"
-			elseif wifePct >= 99.70 then gradeStr = "AAA"
-			elseif wifePct >= 93.00 then gradeStr = "AA"
-			elseif wifePct >= 80.00 then gradeStr = "A"
-			elseif wifePct >= 70.00 then gradeStr = "B"
-			elseif wifePct >= 60.00 then gradeStr = "C"
-			elseif wifePct >= 0 then gradeStr = "D"
+			elseif wifePct >= 99.955  then gradeStr = "AAAA"
+			elseif wifePct >= 99.70   then gradeStr = "AAA"
+			elseif wifePct >= 93.00   then gradeStr = "AA"
+			elseif wifePct >= 80.00   then gradeStr = "A"
+			elseif wifePct >= 70.00   then gradeStr = "B"
+			elseif wifePct >= 60.00   then gradeStr = "C"
+			elseif wifePct >= 0       then gradeStr = "D"
 			end
 			self:diffuse(HVColor.GetGradeColor(gradeStr)):diffusealpha(0.7)
 		end

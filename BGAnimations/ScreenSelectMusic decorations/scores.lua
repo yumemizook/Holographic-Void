@@ -351,7 +351,31 @@ for i = 1, pageSize do
 		LoadFont("Common Normal") .. { Name = "Grade", InitCommand = function(self) self:halign(0):valign(0.5):x(345):y(rowH/2):zoom(0.38) end },
 		LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:halign(0):valign(0.5):x(415):y(rowH/2):zoom(0.38):diffuse(mainText) end },
 		LoadFont("Common Normal") .. { Name = "Clear", InitCommand = function(self) self:halign(0):valign(0.5):x(485):y(rowH/2):zoom(0.35) end },
-		LoadFont("Common Normal") .. { Name = "Date", InitCommand = function(self) self:halign(1):valign(0.5):x(overlayW - 50):y(rowH/2):zoom(0.32):diffuse(subText) end },
+		LoadFont("Common Normal") .. { Name = "Date", InitCommand = function(self) self:halign(1):valign(0.5):x(overlayW - 90):y(rowH/2):zoom(0.32):diffuse(subText) end },
+		
+		-- Replay Button
+		Def.ActorFrame {
+			Name = "ReplayButton",
+			InitCommand = function(self) self:xy(overlayW - 60, rowH / 2):zoom(0.32) end,
+			RefreshScoresCommand = function(self)
+				local idx = (currentPage - 1) * pageSize + i
+				local s = displayedScores[idx]
+				if s then
+					local ss = s.score or s
+					if currentView == VIEW_LOCAL then
+						self:visible(ss:HasReplayData())
+					else
+						self:visible(true)
+					end
+				else
+					self:visible(false)
+				end
+			end,
+			Def.Quad { Name = "Hit", InitCommand = function(self) self:zoomto(60, 60):diffusealpha(0) end },
+			LoadActor(THEME:GetPathG("", "mp_play")) .. {
+				InitCommand = function(self) self:diffuse(accentColor) end,
+			},
+		},
 
 		RefreshScoresCommand = function(self)
 			local idx = (currentPage - 1) * pageSize + i
@@ -546,6 +570,41 @@ t[#t + 1] = Def.ActorFrame {
 					SortScores(onlineScores)
 					-- UpdateDisplayedScores will handle the final subset and re-sort displayedScores
 					scoresActor:playcommand("RefreshScores")
+					return true
+				end
+
+				-- Replay Buttons (check each row)
+				local replayX = SCREEN_CENTER_X + 305
+				for ri = 1, pageSize do
+					local ry = SCREEN_CENTER_Y + rowsStartY + (ri - 1) * rowH + rowH / 2
+					if IsMouseOverCentered(replayX, ry, 30, 30) then
+						local idx = (currentPage - 1) * pageSize + ri
+						local s = displayedScores[idx]
+						if s then
+							local ss = s.score or s
+							if currentView == VIEW_LOCAL then
+								if ss:HasReplayData() then
+									SCOREMAN:WatchReplay(ss)
+								end
+							else
+								local steps = GAMESTATE:GetCurrentSteps()
+								if steps then
+									DLMAN:DownloadAndPlayReplay(steps:GetChartKey(), ss:GetScoreKey())
+								end
+							end
+						end
+						return true
+					end
+				end
+			end
+
+			-- Paging handling
+			if isPress then
+				if btn == "MenuLeft" or event.button == "Left" or event.DeviceInput.button == "DeviceButton_left" then
+					MESSAGEMAN:Broadcast("TabNavigation", {dir = -1})
+					return true
+				elseif btn == "MenuRight" or event.button == "Right" or event.DeviceInput.button == "DeviceButton_right" then
+					MESSAGEMAN:Broadcast("TabNavigation", {dir = 1})
 					return true
 				end
 			end
