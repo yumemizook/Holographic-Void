@@ -76,10 +76,10 @@ local baralpha = 0.4
 
 -- HV color scheme
 local frameBG = color("0.06,0.06,0.06,0.95")
+local brightText = color("1,1,1,1")
 local dimText = brightText
 local accentColor = HVColor.Accent
 local subText = brightText
-local brightText = color("1,1,1,1")
 
 local t = Def.ActorFrame{
 	InitCommand = function(self)
@@ -325,9 +325,35 @@ t[#t+1] = LoadFont("Common Normal") .. {
 		self:xy(params.width / 2, -48)
 		if ntt ~= nil and #ntt > 0 then
 			if handspecific then
-				if left then self:settext("HIGHLIGHTING: LEFT HAND")
-				elseif middle then self:settext("HIGHLIGHTING: MIDDLE COLUMN")
-				else self:settext("HIGHLIGHTING: RIGHT HAND") end
+				local leftPts, rightPts, midPts = 0, 0, 0
+				local leftTaps, rightTaps, midTaps = 0, 0, 0
+				local tso = tst[judge] or 1
+				
+				for i = 1, #dvt do
+					local pts = wife3(math.abs(dvt[i]), tso)
+					if ctt[i] < middleColumn then
+						leftPts = leftPts + pts
+						leftTaps = leftTaps + 1
+					elseif ctt[i] > middleColumn then
+						rightPts = rightPts + pts
+						rightTaps = rightTaps + 1
+					else
+						midPts = midPts + pts
+						midTaps = midTaps + 1
+					end
+				end
+				
+				local score = 0
+				if left then
+					score = leftTaps > 0 and (leftPts / (leftTaps * 2)) * 100 or 0
+					self:settextf("Left hand: %.2f%%", score)
+				elseif middle then
+					score = midTaps > 0 and (midPts / (midTaps * 2)) * 100 or 0
+					self:settextf("Middle: %.2f%%", score)
+				else
+					score = rightTaps > 0 and (rightPts / (rightTaps * 2)) * 100 or 0
+					self:settextf("Right hand: %.2f%%", score)
+				end
 				self:diffuse(accentColor)
 			else
 				self:settext("DOWN TOGGLE HIGHLIGHTS")
