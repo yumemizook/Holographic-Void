@@ -12,6 +12,7 @@ local t = Def.ActorFrame {
 	Name = "PackDownloaderUI"
 }
 
+
 local accentColor = HVColor.Accent
 local installedColor = color("0.35,0.65,0.35,1")
 local dimText = color("0.45,0.45,0.45,1")
@@ -34,6 +35,23 @@ local packsPerPage = 14
 local currentPacks = {}
 local installedFlags = {} -- cache installed status per row
 local isSearching = false
+
+-- Bundle Selector State
+local availableBundles = {"All"}
+local currentBundleIndex = 1
+local isBundleListOpen = false
+
+local function updateAvailableBundles()
+	local alltags = DLMAN:GetPackTags()
+	local bundles = alltags["pack_bundle"]
+	availableBundles = {"All"}
+	if bundles then
+		for _, b in ipairs(bundles) do
+			table.insert(availableBundles, b:sub(1,1):upper() .. b:sub(2))
+		end
+	end
+end
+updateAvailableBundles()
 
 -- Check if a pack is installed locally (same as Til Death)
 local function isPackInstalled(pack)
@@ -122,6 +140,57 @@ t[#t + 1] = Def.ActorFrame {
 	Def.Quad {
 		InitCommand = function(self)
 			self:y(10):zoomto(searchBarW, 1):diffuse(accentColor):diffusealpha(0.2)
+		end
+	}
+}
+
+-- ============================================================
+-- BUNDLE SELECTOR
+-- ============================================================
+local bundleBtnW = 100
+local bundleBtnX = SCREEN_WIDTH * 0.28 + searchBarW / 2 + 10 + bundleBtnW / 2
+local bundleListW = 140
+local bundleItemH = 20
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "BundleSelector",
+	InitCommand = function(self) self:xy(bundleBtnX, searchBarY) end,
+
+	-- Button background
+	Def.Quad {
+		Name = "BundleBtnBG",
+		InitCommand = function(self)
+			self:zoomto(bundleBtnW, 20):diffuse(color("0.12,0.12,0.12,0.9"))
+		end,
+		UpdateCommand = function(self)
+			if isBundleListOpen then
+				self:diffuse(accentColor):diffusealpha(0.4)
+			else
+				self:diffuse(color("0.12,0.12,0.12,0.9"))
+			end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "BundleLabel",
+		InitCommand = function(self)
+			self:zoom(0.26):diffuse(subText):settext("BUNDLE:")
+			self:x(-bundleBtnW / 2 + 5):halign(0)
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "CurrentBundleText",
+		InitCommand = function(self)
+			self:zoom(0.28):diffuse(brightText)
+			self:x(-bundleBtnW / 2 + 45):halign(0)
+		end,
+		UpdateCommand = function(self)
+			self:settext(availableBundles[currentBundleIndex]:upper())
+		end
+	},
+	-- Dropdown arrow
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:x(bundleBtnW / 2 - 10):zoom(0.3):diffuse(dimText):settext("▼")
 		end
 	}
 }
@@ -460,6 +529,65 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	end
 }
 
+-- Bundle List Overlay (Moved here for higher Z-order)
+local bundleListFrame = Def.ActorFrame {
+	Name = "BundleListOverlay",
+	InitCommand = function(self) 
+		self:xy(bundleBtnX - bundleBtnW / 2 + bundleListW / 2, searchBarY + 12 + (bundleItemH * #availableBundles / 2))
+		self:visible(false)
+	end,
+	UpdateCommand = function(self)
+		self:visible(isBundleListOpen)
+		-- Re-center based on number of items
+		self:y(searchBarY + 12 + (bundleItemH * #availableBundles / 2))
+	end
+}
+
+-- List Background
+bundleListFrame[#bundleListFrame + 1] = Def.Quad {
+	InitCommand = function(self)
+		self:zoomto(bundleListW, bundleItemH * #availableBundles)
+		self:diffuse(color("0.05,0.05,0.05,0.95")):strokeColor(borderColor):strokeWidth(1)
+	end
+}
+
+for i, bundleName in ipairs(availableBundles) do
+	bundleListFrame[#bundleListFrame + 1] = Def.ActorFrame {
+		Name = "BundleItem" .. i,
+		InitCommand = function(self)
+			self:y((i - 1 - (#availableBundles - 1) / 2) * bundleItemH)
+		end,
+
+		Def.Quad {
+			Name = "ItemBG",
+			InitCommand = function(self)
+				self:zoomto(bundleListW - 2, bundleItemH - 2):diffusealpha(0)
+			end,
+			UpdateCommand = function(self)
+				if i == currentBundleIndex then
+					self:diffuse(accentColor):diffusealpha(0.2)
+				else
+					self:diffusealpha(0)
+				end
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:zoom(0.28):diffuse(mainText):settext(bundleName:upper())
+			end,
+			UpdateCommand = function(self)
+				if i == currentBundleIndex then
+					self:diffuse(brightText)
+				else
+					self:diffuse(mainText)
+				end
+			end
+		}
+	}
+end
+
+t[#t + 1] = bundleListFrame
+
 -- ============================================================
 -- FOOTER
 -- ============================================================
@@ -524,6 +652,36 @@ t[#t + 1] = Def.ActorFrame {
 			-- Mouse left click -> select/download row
 			if IsMouseLeftClick(btn) then
 				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+
+				-- Check if bundle list is open and click is inside
+				if isBundleListOpen then
+					for i = 1, #availableBundles do
+						local itemY = searchBarY + 12 + (i - 0.5) * bundleItemH
+						if mx >= bundleBtnX - bundleBtnW / 2 and mx <= bundleBtnX - bundleBtnW / 2 + bundleListW
+							and my >= itemY - bundleItemH / 2 and my <= itemY + bundleItemH / 2 then
+							currentBundleIndex = i
+							isBundleListOpen = false
+							self:GetParent():GetChild("BundleSelector"):playcommand("Update")
+							self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+							self:playcommand("DoSearch")
+							return
+						end
+					end
+					-- Clicked outside bundle list
+					isBundleListOpen = false
+					self:GetParent():GetChild("BundleSelector"):playcommand("Update")
+					self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+					return
+				end
+
+				-- Check if click is on bundle selector button
+				if mx >= bundleBtnX - bundleBtnW / 2 and mx <= bundleBtnX + bundleBtnW / 2
+					and my >= searchBarY - 10 and my <= searchBarY + 10 then
+					isBundleListOpen = not isBundleListOpen
+					self:GetParent():GetChild("BundleSelector"):playcommand("Update")
+					self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+					return
+				end
 				
 				-- Check if click is on the search bar
 				local sbX = SCREEN_WIDTH * 0.28
@@ -632,7 +790,11 @@ t[#t + 1] = Def.ActorFrame {
 
 	-- Auto-search triggered after typing debounce
 	DoSearchCommand = function(self)
-		packList:FilterAndSearch(nameInput, {}, true, packsPerPage)
+		local tags = {}
+		if availableBundles[currentBundleIndex] ~= "All" then
+			table.insert(tags, availableBundles[currentBundleIndex]:lower())
+		end
+		packList:FilterAndSearch(nameInput, tags, true, packsPerPage)
 		self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
 	end,
 
@@ -651,5 +813,8 @@ t[#t + 1] = Def.ActorFrame {
 		end)
 	end
 }
+
+-- Load custom mouse cursor (highest Z-order)
+t[#t + 1] = LoadActor("../_cursor")
 
 return t
