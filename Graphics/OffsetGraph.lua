@@ -29,6 +29,8 @@ local finalSecond = 1
 local td
 local oddColumns = false
 local middleColumn = 1.5
+local cbl, cbr, cbm = 0, 0, 0
+local showMiddle = false
 
 local handspecific = false
 local left = false
@@ -74,9 +76,9 @@ local baralpha = 0.4
 
 -- HV color scheme
 local frameBG = color("0.06,0.06,0.06,0.95")
-local dimText = color("0.45,0.45,0.45,1")
+local dimText = brightText
 local accentColor = HVColor.Accent
-local subText = color("0.65,0.65,0.65,1")
+local subText = brightText
 local brightText = color("1,1,1,1")
 
 local t = Def.ActorFrame{
@@ -168,6 +170,10 @@ t[#t+1] = Def.Quad{
 		ctt = params.ctt or {}
 		ntt = params.ntt or {}
 		columns = params.columns or 4
+		cbl = params.cbl or 0
+		cbr = params.cbr or 0
+		cbm = params.cbm or 0
+		showMiddle = params.showMiddle or false
 		if params.song then
 			finalSecond = params.song:GetLastSecond()
 		end
@@ -294,16 +300,16 @@ t[#t+1] = Def.Quad {
 
 -- Late ms text
 t[#t+1] = LoadFont("Common Normal")..{
-	InitCommand = function(self) self:zoom(0.25):halign(0):valign(0):diffuse(dimText) end,
+	InitCommand = function(self) self:zoom(0.35):halign(0):valign(1):diffuse(dimText) end,
 	UpdateCommand = function(self)
-		self:xy(5, 5):settextf("Late (+%d ms)", maxOffset)
+		self:xy(5, -5):settextf("Late (+%d ms)", maxOffset)
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
 
 -- Early ms text
 t[#t+1] = LoadFont("Common Normal")..{
-	InitCommand = function(self) self:zoom(0.25):halign(0):valign(1):diffuse(dimText) end,
+	InitCommand = function(self) self:zoom(0.35):halign(0):valign(1):diffuse(dimText) end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
 		self:xy(5, params.height - 5):settextf("Early (-%d ms)", maxOffset)
@@ -336,10 +342,10 @@ t[#t+1] = LoadFont("Common Normal") .. {
 
 -- Early/Late distribution indicator
 t[#t+1] = LoadFont("Common Normal") .. {
-	InitCommand = function(self) self:zoom(0.25):halign(1):valign(0):diffuse(dimText) end,
+	InitCommand = function(self) self:zoom(0.35):halign(1):valign(1):diffuse(dimText) end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
-		self:xy(params.width - 5, 5)
+		self:xy(params.width - 5, -5)
 		local early = 0
 		local late = 0
 		if params.dvt and #params.dvt > 0 then
@@ -355,6 +361,20 @@ t[#t+1] = LoadFont("Common Normal") .. {
 		else
 			self:settext("")
 		end
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+-- CB Display (Stacked above Distribution on Right)
+t[#t+1] = LoadFont("Common Normal") .. {
+	InitCommand = function(self) self:zoom(0.4):halign(1):valign(1):diffuse(brightText) end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 5, -5 - 15)
+		local totalCBs = cbl + cbr + cbm
+		local text = string.format("CB: %d (L:%d  R:%d", totalCBs, cbl, cbr)
+		if showMiddle then text = text .. string.format("  M:%d", cbm) end
+		self:settext(text .. ")")
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }

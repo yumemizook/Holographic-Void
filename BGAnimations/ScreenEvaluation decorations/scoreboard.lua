@@ -2,7 +2,7 @@
 -- Displays paginated local high-scores for the chart at the current rate.
 -- Features: SSR, Judgment tally (no labels), ClearType lamp, sort by SSR.
 
-local lines = 5
+local lines = 4
 local pn = GAMESTATE:GetEnabledPlayers()[1]
 local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 local steps = GAMESTATE:GetCurrentSteps()
@@ -45,10 +45,10 @@ end
 
 -- HV Color palette
 local accentColor = HVColor.Accent
-local dimText = color("0.45,0.45,0.45,1")
-local subText = color("0.65,0.65,0.65,1")
-local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
+local dimText = brightText
+local subText = brightText
+local mainText = brightText
 local bgCard = color("0.06,0.06,0.06,0.95")
 
 -- Judgment colors (same as main eval for tally coloring)
@@ -136,7 +136,7 @@ local function scoreItem(i)
 
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 8):zoom(0.3):halign(1) end,
+			InitCommand = function(self) self:xy(290, 8):zoom(0.45):halign(1) end,
 			SetScoreCommand = function(self, params)
 				local ssr = hsTable[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then

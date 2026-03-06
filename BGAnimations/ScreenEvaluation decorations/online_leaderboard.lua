@@ -12,16 +12,16 @@ local hsTable = getScoreTable(pn, getCurRate()) or {}
 
 -- HV Color palette
 local accentColor = HVColor.Accent
-local dimText = color("0.45,0.45,0.45,1")
-local subText = color("0.65,0.65,0.65,1")
-local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
+local dimText = brightText
+local subText = brightText
+local mainText = brightText
 local bgCard = color("0.06,0.06,0.06,0.95")
 
 local lbActor
 local isLocal = true
 local currentCountry = "Global"
-local scoresPerPage = 5
+local scoresPerPage = 4
 local maxPages = math.max(1, math.ceil(#hsTable / scoresPerPage))
 local curPage = 1
 local alreadyPulled = false
@@ -132,7 +132,7 @@ local function scoreItem(i)
 		-- Row BG
 		Def.Quad {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(300, 42):diffuse(color("0,0,0,0.4"))
+				self:halign(0):valign(0):zoomto(SCREEN_CENTER_X - 40, 42):diffuse(color("0,0,0,0.4"))
 			end,
 			SetScoreCommand = function(self, params)
 				self:diffuse(color("0,0,0,0.4"))
@@ -143,7 +143,7 @@ local function scoreItem(i)
 
 		-- Rank #
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(-10, 12):zoom(0.28):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(-15, 12):zoom(0.45):diffuse(accentColor) end,
 			SetScoreCommand = function(self, params)
 				self:settext(params.index)
 			end
@@ -151,7 +151,7 @@ local function scoreItem(i)
 
 		-- Player name (online only) or date (local)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 8):zoom(0.35):halign(0):diffuse(brightText) end,
+			InitCommand = function(self) self:xy(16, 8):zoom(0.4):halign(0):diffuse(brightText) end,
 			SetScoreCommand = function(self, params)
 				if isLocal then
 					self:settext(scoreList[params.index]:GetDate())
@@ -168,7 +168,7 @@ local function scoreItem(i)
 
 		-- Grade
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 24):zoom(0.45):halign(0) end,
+			InitCommand = function(self) self:xy(16, 26):zoom(0.5):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				local grade = s:GetWifeGrade()
@@ -179,7 +179,7 @@ local function scoreItem(i)
 
 		-- Score %
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(60, 24):zoom(0.45):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(70, 26):zoom(0.5):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				local ws = scoreList[params.index]:GetWifeScore()
 				if ws >= 0.99 then
@@ -192,7 +192,7 @@ local function scoreItem(i)
 
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 8):zoom(0.35):halign(1) end,
+			InitCommand = function(self) self:xy(SCREEN_CENTER_X - 50, 8):zoom(0.55):halign(1) end,
 			SetScoreCommand = function(self, params)
 				local ssr = scoreList[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then
@@ -206,7 +206,7 @@ local function scoreItem(i)
 
 		-- Judgment tally (no labels)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 24):zoom(0.3):halign(1):diffuse(subText) end,
+			InitCommand = function(self) self:xy(SCREEN_CENTER_X - 50, 26):zoom(0.35):halign(1):diffuse(subText) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				self:settextf("%d / %d / %d / %d / %d / %d",

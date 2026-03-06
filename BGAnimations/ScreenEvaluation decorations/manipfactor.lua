@@ -9,9 +9,9 @@ end
 
 local aspectRatio = GetScreenAspectRatio()
 
-local mfDisplayX = 102
-local mfDisplayY = 61
-local mfDisplayZoom = 0.35
+local mfDisplayX = 0
+local mfDisplayY = 0
+local mfDisplayZoom = 0.45
 
 local td = {} -- chart timing data
 local dvt = {} -- offset vector
@@ -321,7 +321,7 @@ t[#t + 1] = Def.ActorFrame {
             self:xy(mfDisplayX, mfDisplayY)
             self:zoom(mfDisplayZoom)
             self:halign(0)
-            self:settext(THEME:GetString("ScreenEvaluation", "ManipulationFactor"))
+            self:settext("MF:")
             self:diffuse(HVColor.TextSub)
         end,
         MouseOverCommand = function(self)
@@ -340,7 +340,7 @@ t[#t + 1] = Def.ActorFrame {
     LoadFont("Common Normal") .. {
         Name = "ManipFactor",
         InitCommand = function(self)
-            self:xy(mfDisplayX + 115, mfDisplayY)
+            self:xy(mfDisplayX + 35, mfDisplayY)
             self:zoom(mfDisplayZoom)
             self:halign(0)
             self:maxwidth(480)
