@@ -739,9 +739,13 @@ function getRescoredWife3Judge(version, judgeScale, rst)
 	p = p + (rst["minesHit"] * -7)
 	
 	local totalTaps = rst["totalTaps"] or rst["totalNotes"] or #dvt
+	if totalTaps == 0 or totalTaps < #dvt then 
+		totalTaps = #dvt 
+	end
 	if totalTaps == 0 then return 0 end
 	
-	return (p / (totalTaps * 2)) * 100.0
+	local finalPoints = math.min(totalTaps * 2, p)
+	return (finalPoints / (totalTaps * 2)) * 100.0
 end
 
 function getRescoreElements(pss, score)

@@ -91,18 +91,11 @@ local HVPrefRows = {
 		Values = {1, 2, 3, 4, 5},
 	},
 
-	-- Show Offset Bar
-	HV_ShowOffsetBar = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true},
-	},
-
-	-- EWMA Smoothing
-	HV_EWMAOffsetBar = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true},
+	-- Error Bar Mode
+	HV_ErrorBarMode = {
+		Default = "Standard",
+		Choices = {"Off", "Standard", "EWMA Only", "Both"},
+		Values  = {"Off", "Standard", "EWMAOnly", "Both"},
 	},
 
 	-- Show Full Pacemaker Graph
@@ -204,6 +197,13 @@ local HVPrefRows = {
 		Choices = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"},
 		Values  = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"},
 	},
+
+	-- Title Screen Text Mode
+	HV_QuotesMode = {
+		Default = "Quotes",
+		Choices = {"Off", "Quotes", "Tips"},
+		Values  = {"Off", "Quotes", "Tips"},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -246,7 +246,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_ShowOffsetBar,HV_EWMAOffsetBar,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
 	return l
 end
 
@@ -283,12 +283,8 @@ function OptionRowLaneCover()
 	return HVThemePrefRow("HV_LaneCover", "Lane Cover")
 end
 
-function OptionRowShowOffsetBar()
-	return HVThemePrefRow("HV_ShowOffsetBar", "Offset Bar")
-end
-
-function OptionRowEWMAOffsetBar()
-	return HVThemePrefRow("HV_EWMAOffsetBar", "EWMA Smoothing")
+function OptionRowErrorBarMode()
+	return HVThemePrefRow("HV_ErrorBarMode", "Error Bar Mode")
 end
 
 -- Listen for pref changes and refresh accent color

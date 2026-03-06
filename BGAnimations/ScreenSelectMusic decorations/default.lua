@@ -1139,24 +1139,7 @@ t[#t + 1] = Def.ActorFrame {
 		end)()
 	},
 
-	LoadFont("Common Normal") .. {
-		Name = "PBCBs",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(panelW - 32):y(52):zoom(0.24):diffuse(subText)
-		end,
-		SetCommand = function(self)
-			local score = HV.CurrentSongData.pbScore
-			if score then
-				local good = score:GetTapNoteScore("TapNoteScore_W4")
-				local bad = score:GetTapNoteScore("TapNoteScore_W5")
-				local miss = score:GetTapNoteScore("TapNoteScore_Miss")
-				self:settextf(THEME:GetString("ScreenSelectMusic", "CBsFormatted"), good + bad + miss)
-			else
-				self:settext("")
-			end
-		end,
-		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
-	}
+
 }
 
 -- ============================================================

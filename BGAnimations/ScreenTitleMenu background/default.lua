@@ -696,6 +696,19 @@ t[#t + 1] = Def.Actor {
 	end
 }
 
+-- Quotes Display (Toggleable)
+t[#t + 1] = Def.ActorFrame {
+	Name = "QuotesOverlay",
+	InitCommand = function(self)
+		self:xy(SCREEN_LEFT, mpBarY - mpBarH/2 - 15)
+	end,
+	BeginCommand = function(self)
+		local mode = ThemePrefs.Get("HV_QuotesMode")
+		self:visible(mode ~= "Off")
+	end,
+	LoadActor("quotes.lua")
+}
+
 -- Media Player Bar
 t[#t + 1] = Def.ActorFrame {
 	Name = "MediaPlayer",

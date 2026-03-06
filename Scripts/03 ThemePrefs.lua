@@ -77,18 +77,11 @@ local HVPrefs = {
 		Values = {1, 2, 3, 4, 5}
 	},
 
-	-- Gameplay: Toggle Timing Offset Bar
-	HV_ShowOffsetBar = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true}
-	},
-
-	-- Gameplay: EWMA Smoothing for Offset Bar
-	HV_EWMAOffsetBar = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true}
+	-- Gameplay: Error Bar Mode (Off, Standard, EWMA Only, Both)
+	HV_ErrorBarMode = {
+		Default = "Standard",
+		Choices = {"Off", "Standard", "EWMA Only", "Both"},
+		Values = {"Off", "Standard", "EWMAOnly", "Both"}
 	},
 
 	-- Gameplay: Toggle Full Pacemaker Graph
@@ -195,6 +188,13 @@ local HVPrefs = {
 		Default = "Grid",
 		Choices = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"},
 		Values = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"}
+	},
+
+	-- Visual: Show scrolling quotes/tips on Title Screen
+	HV_QuotesMode = {
+		Default = "Quotes",
+		Choices = {"Off", "Quotes", "Tips"},
+		Values = {"Off", "Quotes", "Tips"}
 	},
 
 }

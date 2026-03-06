@@ -124,14 +124,32 @@ local t = Def.ActorFrame {
 		end
 	},
 
-	-- Judge info
+	-- Life % counter
 	LoadFont("Common Normal") .. {
+		Name = "LifePct",
 		InitCommand = function(self)
-			self:xy(avatarSize + 8, 52):halign(0):zoom(fontZoomSmall * 0.9)
-			self:diffuse(dimText)
+			self:xy(avatarSize + 6, 52):halign(0):zoom(fontZoomSmall * 1.1)
 		end,
-		BeginCommand = function(self)
-			self:settextf("J%d", GetTimingDifficulty())
+		JudgmentMessageCommand = function(self)
+			self:playcommand("UpdateLife")
+		end,
+		UpdateLifeCommand = function(self)
+			local life = PLife()
+			self:settextf("%.0f%%", life * 100)
+			
+			-- Coloring based on Life Difficulty (Range 1-7)
+			local diff = GetLifeDifficulty()
+			if diff <= 2 then
+				self:diffuse(color("#A0CFAB")) -- Green
+			elseif diff <= 4 then
+				self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+			elseif diff == 5 then
+				self:diffuse(color("#CFD198")) -- Yellow
+			elseif diff == 6 then
+				self:diffuse(color("#E0B080")) -- Orange
+			else
+				self:diffuse(color("#CF9898")) -- Red
+			end
 		end
 	},
 

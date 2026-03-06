@@ -10,14 +10,14 @@ local brightText = color("1,1,1,1")
 local bgCard = color("0.04,0.04,0.04,0.97")
 
 local overlayW = 680
-local overlayH = 420
+local overlayH = 400
 local filtersActor = nil
 local whee = nil
 local active = false
 
 local hoverAlpha = 0.6
-local textzoom = 0.32
-local spacingY = 24
+local textzoom = 0.40
+local spacingY = 25
 local numbershers = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"}
 
 -- Active numeric input state
@@ -96,7 +96,7 @@ end
 -- Layout constants
 local cellW = 50
 local cellH = 20
-local rowStartY = 70
+local rowStartY = 55
 local labelColX = 20
 local minColX = overlayW / 2 + 20
 local maxColX = minColX + cellW + 16
@@ -161,21 +161,21 @@ local t = Def.ActorFrame {
 	-- Title
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 12):zoom(0.5)
+			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 12):zoom(0.55)
 				:diffuse(accentColor):settext(THEME:GetString("Filters", "Title"))
 		end,
 	},
 
-	-- Instructions
+	-- Instructions (Top Right)
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 34):zoom(0.24):diffuse(dimText)
+			self:halign(1):valign(0):xy(overlayW / 2 - 20, -overlayH / 2 + 15):zoom(0.32):diffuse(dimText)
 				:settext(THEME:GetString("Filters", "Instructions"))
 		end,
 	},
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW / 2 + 20, -overlayH / 2 + 48):zoom(0.24):diffuse(dimText)
+			self:halign(1):valign(0):xy(overlayW / 2 - 20, -overlayH / 2 + 30):zoom(0.32):diffuse(dimText)
 				:settext(THEME:GetString("Filters", "Hint"))
 		end,
 	},
@@ -187,17 +187,17 @@ local t = Def.ActorFrame {
 		end,
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "SkillsetColumn"))
+				self:halign(0):zoom(0.35):diffuse(dimText):settext(THEME:GetString("Filters", "SkillsetColumn"))
 			end,
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0.5):x(minColX):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "MinColumn"))
+				self:halign(0.5):x(minColX):zoom(0.35):diffuse(dimText):settext(THEME:GetString("Filters", "MinColumn"))
 			end,
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0.5):x(maxColX):zoom(0.28):diffuse(dimText):settext(THEME:GetString("Filters", "MaxColumn"))
+				self:halign(0.5):x(maxColX):zoom(0.35):diffuse(dimText):settext(THEME:GetString("Filters", "MaxColumn"))
 			end,
 		},
 	},
@@ -231,7 +231,7 @@ local function CreateFilterInputBox(i)
 		-- Row label
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):valign(0.5):y(spacingY / 2):zoom(0.28):diffuse(mainText):settext(label)
+				self:halign(0):valign(0.5):y(spacingY / 2):zoom(0.38):diffuse(mainText):settext(label)
 			end,
 		},
 
@@ -274,7 +274,7 @@ local function CreateFilterInputBox(i)
 		LoadFont("Common Normal") .. {
 			Name = "LowerVal",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(minColX):y(spacingY / 2):zoom(0.30):maxwidth(cellW / 0.30 - 4)
+				self:halign(0.5):valign(0.5):x(minColX):y(spacingY / 2):zoom(0.38):maxwidth(cellW / 0.38 - 4)
 			end,
 			SetCommand = function(self)
 				local fval = notShit.round(FILTERMAN:GetSSFilter(i, 0), numbersafterthedecimal)
@@ -338,7 +338,7 @@ local function CreateFilterInputBox(i)
 		LoadFont("Common Normal") .. {
 			Name = "UpperVal",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(maxColX):y(spacingY / 2):zoom(0.30):maxwidth(cellW / 0.30 - 4)
+				self:halign(0.5):valign(0.5):x(maxColX):y(spacingY / 2):zoom(0.38):maxwidth(cellW / 0.38 - 4)
 			end,
 			SetCommand = function(self)
 				local fval = notShit.round(FILTERMAN:GetSSFilter(i, 1), numbersafterthedecimal)
@@ -374,7 +374,8 @@ for i = 1, totalRows do
 end
 
 -- Controls section (below the rows)
-local controlsY = -overlayH / 2 + rowStartY + totalRows * spacingY + 12
+local ctrlSpacing = 22
+local controlsY = -overlayH / 2 + rowStartY + totalRows * spacingY + 8
 
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
@@ -418,7 +419,7 @@ t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 -- Min Rate (left-click +, right-click -)
 t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + spacingY):zoom(textzoom)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + ctrlSpacing):zoom(textzoom)
 			:diffuse(accentColor)
 	end,
 	SetCommand = function(self)
@@ -431,8 +432,8 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 }
 t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + spacingY)
-			:zoomto(140, spacingY - 2):diffusealpha(0)
+		self:halign(0):valign(0):xy(-overlayW / 2 + labelColX, controlsY + 6 + ctrlSpacing)
+			:zoomto(140, ctrlSpacing - 2):diffusealpha(0)
 	end,
 	MouseDownCommand = function(self, params)
 		if params.event == "DeviceButton_left mouse button" and active then
@@ -487,7 +488,7 @@ t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 -- Highest Skillsets Only toggle (greyed when AND mode)
 t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY):zoom(textzoom)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + ctrlSpacing):zoom(textzoom)
 			:maxwidth((overlayW / 2 - 40) / textzoom)
 	end,
 	SetCommand = function(self)
@@ -517,8 +518,8 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 }
 t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY)
-			:zoomto(180, spacingY - 2):diffusealpha(0)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + ctrlSpacing)
+			:zoomto(180, ctrlSpacing - 2):diffusealpha(0)
 	end,
 	MouseDownCommand = function(self, params)
 		if params.event == "DeviceButton_left mouse button" and active and not FILTERMAN:GetFilterMode() then
@@ -533,7 +534,7 @@ t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 -- Highest Difficulty Only toggle (greyed when AND mode)
 t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 2):zoom(textzoom)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + ctrlSpacing * 2):zoom(textzoom)
 			:maxwidth((overlayW / 2 - 40) / textzoom)
 	end,
 	SetCommand = function(self)
@@ -563,8 +564,8 @@ t[#t + 1] = UIElements.TextToolTip(1, 1, "Common Normal") .. {
 }
 t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 2)
-			:zoomto(180, spacingY - 2):diffusealpha(0)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + ctrlSpacing * 2)
+			:zoomto(180, ctrlSpacing - 2):diffusealpha(0)
 	end,
 	MouseDownCommand = function(self, params)
 		if params.event == "DeviceButton_left mouse button" and active and not FILTERMAN:GetFilterMode() then
@@ -580,7 +581,7 @@ t[#t + 1] = UIElements.QuadButton(1, 1) .. {
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "FilterResults",
 	InitCommand = function(self)
-		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + spacingY * 3):zoom(textzoom)
+		self:halign(0):valign(0):xy(-overlayW / 2 + rightColX, controlsY + 6 + ctrlSpacing * 3):zoom(textzoom)
 			:diffuse(subText):settext("")
 	end,
 	FilterResultsMessageCommand = function(self, msg)
@@ -599,8 +600,8 @@ t[#t + 1] = UIElements.TextButton(1, 1, "Common Normal") .. {
 		self:xy(overlayW / 2 - 80, bottomY)
 		local txt = self:GetChild("Text")
 		local bg = self:GetChild("BG")
-		txt:zoom(0.30):settext(THEME:GetString("Filters", "ResetAll")):diffuse(color("1,0.4,0.4,1"))
-		bg:zoomto(90, 22):diffuse(color("0.15,0,0,0.8"))
+		txt:zoom(0.38):settext(THEME:GetString("Filters", "ResetAll")):diffuse(color("1,0.4,0.4,1"))
+		bg:zoomto(110, 22):diffuse(color("0.15,0,0,0.8"))
 	end,
 	RolloverUpdateCommand = function(self, params)
 		if params.update == "in" then

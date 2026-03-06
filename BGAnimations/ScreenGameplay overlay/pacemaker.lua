@@ -20,7 +20,7 @@ local maxcombo = 0
 local percent = 0
 local passflag = 0
 local target1 = 0
-local target2 = 93 -- Default Target Goal (AA)
+local target2 = tonumber(ThemePrefs.Get("HV_PacemakerTargetGoal")) or 93 -- Default Target Goal (AA)
 
 -- HV-themed colors
 local colour = {
@@ -35,7 +35,7 @@ local percent2grade = {
 	{percent = 60,       grade = "C",     tier = "Tier15"},
 	{percent = 70,       grade = "B",     tier = "Tier14"},
 	{percent = 80,       grade = "A",     tier = "Tier13"},
-	{percent = 93,       grade = "AA",    tier = "Tier10"},
+	{percent = 93.00,    grade = "AA",    tier = "Tier10"},
 	{percent = 99.70,    grade = "AAA",   tier = "Tier07"},
 	{percent = 99.955,   grade = "AAAA",  tier = "Tier04"},
 	{percent = 99.9935,  grade = "AAAAA", tier = "Tier01"},
@@ -393,7 +393,9 @@ local t = Def.ActorFrame {
 }
 
 -- Grade tier markers along the meter
-for i = 1, 5 do
+-- Displaying C, B, A, AA, AAA, AAAA, AAAAA (Indices 2 to 8 in percent2grade)
+-- Static grade tier markers (C, B, A, AA)
+for i = 2, 5 do
 	t[#t + 1] = Def.ActorFrame {
 		Def.Quad {
 			InitCommand = function(self)
@@ -417,7 +419,7 @@ for i = 1, 5 do
 				self:diffusealpha(0.3)
 			end,
 			UpdateGradeCommand = function(self)
-				if passflag == i or (i == 5 and passflag > 5) then
+				if passflag == i then
 					self:diffusealpha(0.7)
 					local g = percent2grade[passflag]
 					self:settext(g.grade)
@@ -425,22 +427,68 @@ for i = 1, 5 do
 				end
 			end
 		},
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(0, baseline - (meterheight * percent2grade[i].percent / 100) - 3)
-				self:align(0.5, 1):zoom(fontZoom)
-				self:diffusealpha(0)
-			end,
-			UpdateGradeCommand = function(self)
-				if passflag == i or (i == 5 and passflag > 5) then
-					self:stoptweening()
-					self:settext("Rank " .. percent2grade[passflag].grade .. " Pass")
-					self:diffusealpha(0):x(panelWidth * panelPos):linear(0.2):diffusealpha(1):x(0)
-					self:sleep(1):linear(0.2):x(panelWidth * panelPos):diffusealpha(0)
-				end
-			end
-		},
 	}
 end
+
+-- Dynamic high-tier marker (AAA -> AAAA -> AAAAA)
+t[#t + 1] = Def.ActorFrame {
+	Name = "DynamicHighTier",
+	Def.Quad {
+		Name = "Line",
+		InitCommand = function(self)
+			self:zoomto(panelWidth, SCREEN_HEIGHT / 300)
+			self:align(0.5, 1)
+			self:diffusealpha(0.3)
+			self:playcommand("UpdateGrade")
+		end,
+		UpdateGradeCommand = function(self)
+			local targetIdx = math.max(6, math.min(8, passflag))
+			local g = percent2grade[targetIdx]
+			self:y(baseline - (meterheight * g.percent / 100))
+			if passflag >= targetIdx then
+				self:diffuse(color("#00CFFF66"))
+			else
+				self:diffuse(color("#FFFFFF4D"))
+			end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "Label",
+		InitCommand = function(self)
+			self:align((1 - panelPos) / 2, 1)
+			self:zoom(fontZoomSmall)
+			self:diffusealpha(0.3)
+			self:playcommand("UpdateGrade")
+		end,
+		UpdateGradeCommand = function(self)
+			local targetIdx = math.max(6, math.min(8, passflag))
+			local g = percent2grade[targetIdx]
+			self:xy(-panelWidth * 0.5 * panelPos, baseline - (meterheight * g.percent / 100) - 2)
+			self:settext(g.grade)
+			
+			if passflag >= targetIdx then
+				self:diffusealpha(0.7)
+				self:diffuse(HVColor.GetGradeColor(g.grade))
+			else
+				self:diffuse(color("#FFFFFF4D"))
+			end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:align(0.5, 1):zoom(fontZoom)
+			self:diffusealpha(0)
+		end,
+		UpdateGradeCommand = function(self)
+			if passflag >= 6 then
+				self:stoptweening()
+				local g = percent2grade[passflag]
+				self:settext("Rank " .. g.grade .. " Pass")
+				self:diffusealpha(0):x(panelWidth * panelPos):linear(0.2):diffusealpha(1):x(0)
+				self:sleep(1):linear(0.2):x(panelWidth * panelPos):diffusealpha(0)
+			end
+		end
+	},
+}
 
 return t

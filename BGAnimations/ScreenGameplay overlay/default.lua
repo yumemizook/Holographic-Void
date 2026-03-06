@@ -173,7 +173,7 @@ local lifeBarY = SCREEN_CENTER_Y
 t[#t + 1] = Def.ActorFrame {
 	Name = "VerticalLifeBar",
 	InitCommand = function(self)
-		self:xy(lifeBarX, lifeBarY)
+		self:xy(lifeBarX, lifeBarY):visible(false)
 	end,
 
 	Def.Quad {
@@ -248,7 +248,7 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- CENTERED SCORE % (REAL-TIME)
+-- SCORE % (REAL-TIME)
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
@@ -305,8 +305,11 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local showTextPacemaker = (ThemePrefs.Get("HV_ShowTextPacemaker") == "true" or ThemePrefs.Get("HV_ShowTextPacemaker") == true)
 if showTextPacemaker then
-	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType") or "Target"
-	local targetGoalPct = tonumber(ThemePrefs.Get("HV_PacemakerTargetGoal")) or 93
+	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType")
+	if not pacemakerMode or pacemakerMode == "" then pacemakerMode = "Target" end
+
+	local targetGoalPref = ThemePrefs.Get("HV_PacemakerTargetGoal")
+	local targetGoalPct = tonumber(targetGoalPref) or 93
 	local targetGoal = targetGoalPct / 100
 
 	-- Set the engine-side target goal and replay mode
@@ -394,8 +397,8 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("combo/_mochiy pop one 24px") .. {
 		Name = "ComboNumber",
 		InitCommand = function(self)
-			self:zoom(0.65):diffuse(dimText):y(-4)
-			self:settext("0")
+			self:zoom(0.75):diffuse(brightText):y(-4)
+			self:settext("0"):shadowlength(1.5):shadowcolor(color("0,0,0,1"))
 		end
 	},
 
@@ -457,11 +460,29 @@ t[#t + 1] = Def.ActorFrame {
 		local text = labelContainer:GetChild("MissesText")
 
 		if combo > 0 then
+			local totalNotes = getMaxNotes(PLAYER_1) or 1
+			local threshold = math.floor(totalNotes * 0.25)
+			local ct = getDetailedClearType(pss)
+			local ctColor = getClearTypeColor(ct)
+			
 			numActor:settext(tostring(combo)):diffuse(brightText)
+			
+			-- Shadow display logic: 25% threshold + Full Combo or better
+			local ctLevel = getClearTypeLevel(getClearType(PLAYER_1, GAMESTATE:GetCurrentSteps(), pss))
+			-- MFC=1, WF=2, SDP=3, PFC=4, BF=5, SDG=6, FC=7
+			local isFC = ctLevel <= 7
+			
+			if combo >= threshold and isFC then
+				numActor:shadowcolor(ctColor)
+				numActor:shadowlength(1)
+			else
+				numActor:shadowlength(0)
+			end
+			
 			graphic:visible(true):diffusealpha(1)
 			text:visible(false)
 		elseif missStreak < 5 then
-			numActor:settext("0"):diffuse(dimText)
+			numActor:settext("0"):diffuse(dimText):shadowlength(0)
 			graphic:visible(true):diffusealpha(0.5)
 			text:visible(false)
 		end
@@ -491,8 +512,6 @@ t[#t + 1] = Def.ActorFrame {
 	}
 }
 
--- AccuracyDisplay removed (redundant with pacemaker and NPS graph, overlapping with avatar)
-
 -- ============================================================
 -- ERROR BAR (TIMING BAR)
 -- ============================================================
@@ -504,13 +523,15 @@ local dotLife = 2.0  -- seconds
 
 -- EWMA state
 local ewmaValue = 0
-local ewmaAlpha = 0.1
-local showEWMA = (ThemePrefs.Get("HV_EWMAOffsetBar") == "true" or ThemePrefs.Get("HV_EWMAOffsetBar") == true)
+local ewmaAlpha = 0.07
+local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
+local showEWMA = (ebMode == "EWMAOnly" or ebMode == "Both")
+local showStandard = (ebMode == "Standard" or ebMode == "Both")
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "ErrorBar",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, ebCenterY):visible((ThemePrefs.Get("HV_ShowOffsetBar") == "true" or ThemePrefs.Get("HV_ShowOffsetBar") == true))
+		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off")
 	end,
 
 	-- Background line
@@ -541,13 +562,13 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	},
 
-	-- EWMA Moving Average Marker
 	Def.Quad {
 		Name = "EWMAMarker",
 		InitCommand = function(self)
 			self:zoomto(2, ebH + 8):diffuse(accentColor):visible(showEWMA)
 		end,
-		UpdateEWMACommand = function(self, offset)
+		UpdateEWMACommand = function(self, params)
+			local offset = params.offset
 			ewmaValue = (1 - ewmaAlpha) * ewmaValue + ewmaAlpha * offset
 			self:x((ewmaValue / maxOffset) * (ebW / 2))
 		end
@@ -566,9 +587,10 @@ t[#t + 1] = Def.ActorFrame {
 		
 		-- Update EWMA marker if enabled
 		if showEWMA then
-			self:GetChild("EWMAMarker"):playcommand("UpdateEWMA", visualOffset)
+			self:GetChild("EWMAMarker"):playcommand("UpdateEWMA", {offset = visualOffset})
 		end
 
+		if not showStandard then return end
 		if math.abs(visualOffset) > maxOffset then return end
 
 		local xPos = (visualOffset / maxOffset) * (ebW / 2)
@@ -601,171 +623,287 @@ t[#t + 1] = Def.ActorFrame {
 }
 
 -- ============================================================
--- COMPACT JUDGMENT TALLY + OK/NG + REAL-TIME GRADE
+-- TWO-COLUMN JUDGMENT TALLY + PERFORMANCE METRICS
 -- ============================================================
-local tallyX = SCREEN_CENTER_X + 250
+local tallyX = SCREEN_CENTER_X + 150
 local tallyY = SCREEN_BOTTOM - 200
+local colSpacing = 70
 
 t[#t + 1] = Def.ActorFrame {
-	Name = "JudgmentTally",
+	Name = "TallyAndMetrics",
 	InitCommand = function(self)
 		self:xy(tallyX, tallyY):diffusealpha(0.8)
-	end
-}
+	end,
 
-for i, label in ipairs(judgmentLabels) do
-	t[#t + 1] = Def.ActorFrame {
+	-- COLUMN 1: Judgments + OK/NG
+	Def.ActorFrame {
+		Name = "Column1_Judgments",
+		
+		-- Loop through standard judgments (W1-Miss)
+		(function()
+			local g = Def.ActorFrame{}
+			for i, label in ipairs(judgmentLabels) do
+				g[#g+1] = Def.ActorFrame {
+					InitCommand = function(self)
+						self:y((i - 1) * 16)
+					end,
+
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:halign(0):valign(0):zoom(0.34):diffuse(judgmentColors[i]):diffusealpha(0.8)
+							self:settext(label)
+						end
+					},
+
+					LoadFont("Common Normal") .. {
+						Name = "TallyCount_" .. label,
+						InitCommand = function(self)
+							self:halign(1):valign(0):x(60):zoom(0.34):diffuse(mainText):diffusealpha(0.8)
+							self:settext("0")
+						end,
+						JudgmentMessageCommand = function(self)
+							local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+							if pss then
+								self:settext(pss:GetTapNoteScores(judgmentTNS[i]))
+							end
+						end,
+						PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+						PracticeModeReloadMessageCommand = function(self) self:settext("0") end
+					}
+				}
+			end
+			return g
+		end)(),
+
+		-- OK / NG counters
+		Def.ActorFrame {
+			Name = "OKNGDisplay",
+			InitCommand = function(self)
+				self:y(#judgmentLabels * 16 + 4)
+			end,
+
+			LoadFont("Common Normal") .. {
+				InitCommand = function(self)
+					self:halign(0):valign(0):zoom(0.34):diffuse(color("#A0E0A0")):diffusealpha(0.8)
+					self:settext(THEME:GetString("HoldNoteScore", "OK"))
+				end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "OKCount",
+				InitCommand = function(self)
+					self:halign(1):valign(0):x(60):zoom(0.34):diffuse(mainText):diffusealpha(0.8)
+					self:settext("0")
+				end,
+				JudgmentMessageCommand = function(self)
+					local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+					if pss then
+						local ok = pss:GetHoldNoteScores("HoldNoteScore_Held")
+						self:settext(tostring(ok))
+					end
+				end,
+				PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+				PracticeModeReloadMessageCommand = function(self) self:settext("0") end
+			},
+
+			LoadFont("Common Normal") .. {
+				InitCommand = function(self)
+					self:halign(0):valign(0):y(16):zoom(0.34):diffuse(color("#E0A0A0")):diffusealpha(0.8)
+					self:settext(THEME:GetString("HoldNoteScore", "NG"))
+				end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "NGCount",
+				InitCommand = function(self)
+					self:halign(1):valign(0):x(60):y(16):zoom(0.34):diffuse(mainText):diffusealpha(0.8)
+					self:settext("0")
+				end,
+				JudgmentMessageCommand = function(self)
+					local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+					if pss then
+						local ng = pss:GetHoldNoteScores("HoldNoteScore_LetGo")
+						self:settext(tostring(ng))
+					end
+				end,
+				PracticeModeResetMessageCommand = function(self) self:settext("0") end,
+				PracticeModeReloadMessageCommand = function(self) self:settext("0") end
+			}
+		}
+	},
+
+	-- COLUMN 2: Performance Metrics (aligned to the right of Column 1)
+	Def.ActorFrame {
+		Name = "Column2_Metrics",
 		InitCommand = function(self)
-			self:xy(tallyX, tallyY + (i - 1) * 16)
+			self:x(colSpacing)
 		end,
 
+		-- Rescored % (J4)
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoom(0.26):diffuse(judgmentColors[i]):diffusealpha(0.8)
-				self:settext(label)
+				self:halign(0):valign(0):zoom(0.34):diffuse(dimText)
+				self:settext("J4")
 			end
 		},
-
 		LoadFont("Common Normal") .. {
-			Name = "TallyCount_" .. label,
+			Name = "RescoreValue",
 			InitCommand = function(self)
-				self:halign(1):valign(0):x(60):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
+				self:halign(1):valign(0):x(65):zoom(0.34):diffuse(subText)
+				self:settext("0.00%")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local rs = getRescoreElements(pss, pss)
+					local j4 = getRescoredWife3Judge(1, 4, rs)
+					self:settext(string.format("%.2f%%", j4))
+				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0.00%") end
+		},
+
+		-- MA Ratio (W1/W2)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):y(16):zoom(0.34):diffuse(dimText)
+				self:settext("MA Ratio")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "MARatioValue",
+			InitCommand = function(self)
+				self:halign(1):valign(0):x(65):y(16):zoom(0.34):diffuse(subText)
+				self:settext("0.00:1")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local w1 = pss:GetTapNoteScores("TapNoteScore_W1")
+					local w2 = pss:GetTapNoteScores("TapNoteScore_W2")
+					local ratio = 0
+					if w2 > 0 then
+						ratio = w1 / w2
+						self:settext(string.format("%.2f:1", ratio))
+					elseif w1 > 0 then
+						self:settext("inf:1")
+					else
+						self:settext("0.00:1")
+					end
+				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00:1") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0.00:1") end
+		},
+
+		-- PA Ratio (W2/W3)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):y(32):zoom(0.34):diffuse(dimText)
+				self:settext("PA Ratio")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "PARatioValue",
+			InitCommand = function(self)
+				self:halign(1):valign(0):x(65):y(32):zoom(0.34):diffuse(subText)
+				self:settext("0.00:1")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local w2 = pss:GetTapNoteScores("TapNoteScore_W2")
+					local w3 = pss:GetTapNoteScores("TapNoteScore_W3")
+					local ratio = 0
+					if w3 > 0 then
+						ratio = w2 / w3
+						self:settext(string.format("%.2f:1", ratio))
+					elseif w2 > 0 then
+						self:settext("inf:1")
+					else
+						self:settext("0.00:1")
+					end
+				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00:1") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0.00:1") end
+		},
+
+		-- Longest Combo
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):y(48):zoom(0.34):diffuse(dimText)
+				self:settext("Longest")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "MaxComboValue",
+			InitCommand = function(self)
+				self:halign(1):valign(0):x(65):y(48):zoom(0.34):diffuse(subText)
 				self:settext("0")
 			end,
 			JudgmentMessageCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
-					self:settext(pss:GetTapNoteScores(judgmentTNS[i]))
+					self:settext(tostring(pss:MaxCombo()))
 				end
 			end,
 			PracticeModeResetMessageCommand = function(self) self:settext("0") end,
 			PracticeModeReloadMessageCommand = function(self) self:settext("0") end
-		}
-	}
-end
+		},
 
--- OK / NG counters (below judgment tally)
-local okngY = tallyY + #judgmentLabels * 16 + 4
-
-t[#t + 1] = Def.ActorFrame {
-	Name = "OKNGDisplay",
-	InitCommand = function(self)
-		self:xy(tallyX, okngY)
-	end,
-
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(0.26):diffuse(color("#A0E0A0")):diffusealpha(0.8)
-			self:settext(THEME:GetString("HoldNoteScore", "OK"))
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "OKCount",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(60):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
-			self:settext("0")
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local ok = pss:GetHoldNoteScores("HoldNoteScore_Held")
-				self:settext(tostring(ok))
+		-- Std Dev
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):y(64):zoom(0.34):diffuse(dimText)
+				self:settext("SD")
 			end
-		end,
-		PracticeModeResetMessageCommand = function(self) self:settext("0") end,
-		PracticeModeReloadMessageCommand = function(self) self:settext("0") end
-	},
-
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:halign(0):valign(0):y(16):zoom(0.26):diffuse(color("#E0A0A0")):diffusealpha(0.8)
-			self:settext(THEME:GetString("HoldNoteScore", "NG"))
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "NGCount",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(60):y(16):zoom(0.26):diffuse(mainText):diffusealpha(0.8)
-			self:settext("0")
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local ng = pss:GetHoldNoteScores("HoldNoteScore_LetGo")
-				self:settext(tostring(ng))
-			end
-		end,
-		PracticeModeResetMessageCommand = function(self) self:settext("0") end,
-		PracticeModeReloadMessageCommand = function(self) self:settext("0") end
-	},
-	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end
-}
-
--- Real-time Grade Display has been moved to the pacemaker panel.
-
-
--- ============================================================
--- JUDGE RESCORING & MEAN/SD
--- ============================================================
-t[#t + 1] = Def.ActorFrame {
-	Name = "RescoreStats",
-	InitCommand = function(self)
-		self:xy(tallyX, okngY + 40)
-	end,
-
-	-- Rescored % (J4)
-	LoadFont("Common Normal") .. {
-		Name = "RescoreLabel",
-		InitCommand = function(self)
-			self:halign(0):valign(0):zoom(0.26):diffuse(dimText)
-			self:settext("J4")
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "RescoreValue",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(60):zoom(0.26):diffuse(subText)
-			self:settext("0.00%")
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local rs = getRescoreElements(pss, pss) -- Use pss as proxy for score
-				local j4 = getRescoredWife3Judge(1, 4, rs)
-				self:settext(string.format("%.2f%%", j4))
-			end
-		end,
-		PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
-		PracticeModeReloadMessageCommand = function(self) self:settext("0.00%") end
-	},
-
-	-- Mean / SD / Largest
-	LoadFont("Common Normal") .. {
-		Name = "MeanSDLabel",
-		InitCommand = function(self)
-			self:halign(0):valign(0):y(16):zoom(0.26):diffuse(dimText)
-			self:settext("SD / Largest")
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "MeanSDValue",
-		InitCommand = function(self)
-			self:halign(1):valign(0):x(60):y(16):zoom(0.24):diffuse(subText)
-			self:settext("0.0 / 0.0")
-		end,
-		JudgmentMessageCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local dvt = pss:GetOffsetVector()
-				if dvt and #dvt > 0 then
-					local sd = wifeSd(dvt)
-					local max = wifeMax(dvt)
-					self:settext(string.format("%.1f / %.1f", sd, max))
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SDValue",
+			InitCommand = function(self)
+				self:halign(1):valign(0):x(65):y(64):zoom(0.34):diffuse(subText)
+				self:settext("0.00")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local dvt = pss:GetOffsetVector()
+					if dvt and #dvt > 0 then
+						local sd = wifeSd(dvt)
+						self:settext(string.format("%.2f", sd))
+					end
 				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0.00") end
+		},
+
+		-- Largest Offset
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):valign(0):y(80):zoom(0.34):diffuse(dimText)
+				self:settext("Max")
 			end
-		end,
-		PracticeModeResetMessageCommand = function(self) self:settext("0.0 / 0.0") end,
-		PracticeModeReloadMessageCommand = function(self) self:settext("0.0 / 0.0") end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "LargestValue",
+			InitCommand = function(self)
+				self:halign(1):valign(0):x(65):y(80):zoom(0.34):diffuse(subText)
+				self:settext("0.00")
+			end,
+			JudgmentMessageCommand = function(self)
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss then
+					local dvt = pss:GetOffsetVector()
+					if dvt and #dvt > 0 then
+						local max = wifeMax(dvt)
+						self:settext(string.format("%.2f", max))
+					end
+				end
+			end,
+			PracticeModeResetMessageCommand = function(self) self:settext("0.00") end,
+			PracticeModeReloadMessageCommand = function(self) self:settext("0.00") end
+		}
 	}
 }
 
