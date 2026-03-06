@@ -1,11 +1,5 @@
---- Holographic Void: ScreenGameplay Overlay
--- Overhauled HUD:
---   - Clean vertical life bar with % counter (per-note update)
---   - Per-note score%, combo, and 4-digit accuracy tracker
---   - Progress bar at TOP, song title at BOTTOM
---   - Compact judgment tally with OK/NG and real-time grade
---   - Centered combo (no duplicate judgment display, no animations)
---   - Toasty animation preserved
+-- the main stuff in-game
+
 
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
@@ -782,7 +776,7 @@ t[#t + 1] = Def.ActorFrame {
 			Name = "RescoreValue",
 			InitCommand = function(self)
 				self:halign(1):valign(0):x(65):zoom(0.34):diffuse(subText)
-				self:settext("0.00%")
+				self:settext("0.0000%")
 			end,
 			JudgmentMessageCommand = function(self)
 				self:queuecommand("Update")
@@ -792,7 +786,7 @@ t[#t + 1] = Def.ActorFrame {
 				if pss then
 					local rs = getRescoreElements(pss, pss)
 					local j4 = getRescoredWife3Judge(1, 4, rs)
-					self:settext(string.format("%.2f%%", j4))
+					self:settext(string.format("%.4f%%", j4))
 				end
 			end,
 			PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,

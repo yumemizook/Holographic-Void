@@ -460,9 +460,9 @@ local function scoreBoard(pn)
 		-- Rate
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(1):valign(0):xy(frameW - pad, pad + 100):zoom(0.45):diffuse(brightText)
+				self:halign(1):valign(0):xy(frameW - pad, pad + 100):zoom(0.65):diffuse(brightText)
 			end,
-			OnCommand = function(self) self:settextf("Rate: %s", rate) end
+			OnCommand = function(self) self:settextf(rate) end
 		},
 		-- Timing judge display
 		LoadFont("Common Normal") .. {
