@@ -114,7 +114,7 @@ function HV.GetGradeName(grade)
 		Tier05 = "AAA:", Tier06 = "AAA.", Tier07 = "AAA", Tier08 = "AA:",
 		Tier09 = "AA.", Tier10 = "AA", Tier11 = "A:", Tier12 = "A.",
 		Tier13 = "A", Tier14 = "B", Tier15 = "C", Tier16 = "D",
-		Failed = "Failed", None = "None"
+		Failed = "F", None = "None"
 	}
 	return fallbacks[s] or s
 end
