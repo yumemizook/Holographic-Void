@@ -100,7 +100,7 @@ local function scoreItem(i)
 
 		-- Rank #
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(-10, 12):zoom(0.22):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(-10, 12):zoom(0.28):diffuse(dimText) end,
 			SetScoreCommand = function(self, params)
 				self:settext(params.index)
 				if params.index == scoreIndex then
@@ -113,7 +113,7 @@ local function scoreItem(i)
 
 		-- Grade
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 8):zoom(0.28):halign(0) end,
+			InitCommand = function(self) self:xy(16, 8):zoom(0.45):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local grade = hsTable[params.index]:GetWifeGrade()
 				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
@@ -123,7 +123,7 @@ local function scoreItem(i)
 
 		-- Score %
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(55, 8):zoom(0.28):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(60, 8):zoom(0.45):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				local ws = hsTable[params.index]:GetWifeScore()
 				if ws >= 0.99 then
@@ -136,7 +136,7 @@ local function scoreItem(i)
 
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 8):zoom(0.24):halign(1) end,
+			InitCommand = function(self) self:xy(290, 8):zoom(0.3):halign(1) end,
 			SetScoreCommand = function(self, params)
 				local ssr = hsTable[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then
@@ -150,7 +150,7 @@ local function scoreItem(i)
 
 		-- Judgment tally (colored, no labels)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 24):zoom(0.2):halign(0) end,
+			InitCommand = function(self) self:xy(16, 24):zoom(0.25):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local s = hsTable[params.index]
 				local counts = {
@@ -169,7 +169,7 @@ local function scoreItem(i)
 
 		-- Date
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 24):zoom(0.18):halign(1):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(290, 24):zoom(0.3):halign(1):diffuse(dimText) end,
 			SetScoreCommand = function(self, params)
 				self:settext(hsTable[params.index]:GetDate())
 			end
@@ -201,7 +201,7 @@ local t = Def.ActorFrame {
 
 	-- Header
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(0, -18):zoom(0.22):halign(0):diffuse(accentColor) end,
+		InitCommand = function(self) self:xy(0, -18):zoom(0.35):halign(0):diffuse(accentColor) end,
 		OnCommand = function(self)
 			self:settextf("Local Scores (sorted by SSR) — %d total", #hsTable)
 		end
@@ -210,7 +210,7 @@ local t = Def.ActorFrame {
 	-- Page info
 	LoadFont("Common Normal") .. {
 		Name = "PageInfo",
-		InitCommand = function(self) self:xy(150, lines * 46 + 8):zoom(0.2):diffuse(dimText) end,
+		InitCommand = function(self) self:xy(150, lines * 46 + 8):zoom(0.28):diffuse(dimText) end,
 		OnCommand = function(self) self:playcommand("UpdateText") end,
 		UpdateLocalScoreboardMessageCommand = function(self) self:playcommand("UpdateText") end,
 		UpdateTextCommand = function(self)

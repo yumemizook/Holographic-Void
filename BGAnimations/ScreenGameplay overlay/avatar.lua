@@ -183,14 +183,26 @@ local t = Def.ActorFrame {
 			self:smooth(0.1)
 			local barMaxW = panelW - avatarSize - 44
 			self:zoomx(PLife() * barMaxW)
-			-- Color shift for low life
+			-- Color shift based on Life Difficulty and low life
 			local life = PLife()
 			if life < 0.3 and life > 0 then
 				self:diffuse(color("#FF4444"))
 			elseif life <= 0 then
 				self:diffuse(color("#440000"))
 			else
-				self:diffuse(accentColor)
+				-- Unified Difficulty-based tinting
+				local diff = GetLifeDifficulty()
+				if diff <= 2 then
+					self:diffuse(color("#A0CFAB")) -- Green
+				elseif diff <= 4 then
+					self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+				elseif diff == 5 then
+					self:diffuse(color("#CFD198")) -- Yellow
+				elseif diff == 6 then
+					self:diffuse(color("#E0B080")) -- Orange
+				else
+					self:diffuse(color("#CF9898")) -- Red
+				end
 			end
 		end
 	},

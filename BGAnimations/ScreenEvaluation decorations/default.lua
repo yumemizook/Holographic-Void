@@ -154,6 +154,7 @@ local t = Def.ActorFrame {
 	OnCommand = function(self)
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
 		SCREENMAN:SetSystemCursorVisible(true)
+		INPUTFILTER:SetMouseVisible(true)
 	end,
 	ScoreChangedMessageCommand = function(self)
 		pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
@@ -386,48 +387,65 @@ local function scoreBoard(pn)
 		-- Song Title
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):valign(0):xy(pad + 150, pad):zoom(0.5):diffuse(brightText)
-				self:maxwidth((frameW - pad - 160) / 0.5)
+				self:halign(0):valign(0):xy(pad + 150, pad):zoom(0.6):diffuse(brightText)
+				self:maxwidth((frameW - pad - 160) / 0.6)
 			end,
 			OnCommand = function(self) if song then self:settext(song:GetDisplayMainTitle()) end end
 		},
 		-- Artist
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(0):valign(0):xy(pad + 150, pad + 20):zoom(0.3):diffuse(subText)
-				self:maxwidth((frameW - pad - 160) / 0.3)
+				self:halign(0):valign(0):xy(pad + 150, pad + 20):zoom(0.4):diffuse(subText)
+				self:maxwidth((frameW - pad - 160) / 0.4)
 			end,
 			OnCommand = function(self) if song then self:settext("// " .. song:GetDisplayArtist()) end end
 		},
-		-- Difficulty + Rate + MSD
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:halign(1):valign(0):xy(frameW - pad, pad):zoom(0.35)
-			end,
-			OnCommand = function(self)
-				if steps and (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) then
-					local diff = ToEnumShortString(steps:GetDifficulty())
-					local stype = ToEnumShortString(steps:GetStepsType()):gsub("_", " ")
-					local meter = steps:GetMSD(getCurRateValue(), 1)
-					meter = meter == 0 and steps:GetMeter() or meter
-					self:settextf("%s %s %.1f", stype, diff, meter)
-					self:diffuse(HVColor.GetDifficultyColor(diff))
-				else
-					self:settext("")
+		-- Compact Difficulty + MSD
+		Def.ActorFrame {
+			InitCommand = function(self) self:xy(frameW - pad, pad) end,
+			
+			-- Shorthand (colored by difficulty type)
+			LoadFont("Common Normal") .. {
+				InitCommand = function(self)
+					self:halign(1):valign(1):xy(-34, 10):zoom(0.35)
+				end,
+				OnCommand = function(self)
+					if steps then
+						local diff = ToEnumShortString(steps:GetDifficulty())
+						local diffShort = {
+							Beginner = "BG", Easy = "EZ", Medium = "IN", Hard = "HD", Challenge = "CH", Edit = "ED"
+						}
+						self:settext(diffShort[diff] or diff:sub(1,2):upper())
+						self:diffuse(HVColor.GetDifficultyColor(diff))
+					end
 				end
-			end
+			},
+			-- MSD (Common Large, 2 decimal points)
+			LoadFont("Common Large") .. {
+				InitCommand = function(self)
+					self:halign(1):valign(0):xy(0, -2):zoom(0.4)
+				end,
+				OnCommand = function(self)
+					if steps then
+						local meter = steps:GetMSD(getCurRateValue(), 1)
+						meter = meter == 0 and steps:GetMeter() or meter
+						self:settextf("%.2f", meter)
+						self:diffuse(HVColor.GetMSDRatingColor(meter))
+					end
+				end
+			}
 		},
 		-- Rate
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(1):valign(0):xy(frameW - pad, pad + 18):zoom(0.28):diffuse(dimText)
+				self:halign(1):valign(0):xy(frameW - pad, pad + 24):zoom(0.35):diffuse(color("0.45,0.45,0.45,1"))
 			end,
 			OnCommand = function(self) self:settextf("Rate: %s", rate) end
 		},
 		-- Timing judge display
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:halign(1):valign(0):xy(frameW - pad, pad + 32):zoom(0.22):diffuse(dimText)
+				self:halign(1):valign(0):xy(frameW - pad, pad + 38):zoom(0.3):diffuse(dimText)
 			end,
 			OnCommand = function(self) self:settextf("Judge: %d", judge) end,
 			SetJudgeCommand = function(self) self:settextf("Judge: %d", judge) end,
@@ -450,9 +468,9 @@ local function scoreBoard(pn)
 		InitCommand = function(self) self:xy(pad, pad + 65) end,
 
 		-- Grade
-		LoadFont("Common Normal") .. {
+		LoadFont("Common Large") .. {
 			Name = "GradeScoreLabel",
-			InitCommand = function(self) self:halign(0):valign(0):xy(0, -5):zoom(0.85):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, -5):zoom(0.5):diffuse(mainText) end,
 			OnCommand = function(self)
 				local grade = pss:GetWifeGrade()
 				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
@@ -461,7 +479,7 @@ local function scoreBoard(pn)
 		},
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(5, 35):zoom(0.4):diffuse(subText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(5, 35):zoom(0.5):diffuse(subText) end,
 			OnCommand = function(self)
 				local ssr = curScore:GetSkillsetSSR("Overall")
 				self:settextf("%.2f", ssr)
@@ -470,9 +488,9 @@ local function scoreBoard(pn)
 		},
 
 		-- Wife Score
-		LoadFont("Common Normal") .. {
+		LoadFont("Common Large") .. {
 			Name = "WifeScoreLabel",
-			InitCommand = function(self) self:halign(0):valign(0):xy(100, -5):zoom(0.6):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, -5):zoom(0.4):diffuse(mainText) end,
 			OnCommand = function(self)
 				local wife = pss:GetWifeScore()
 				-- In Etterna, GetWifeScore() is already absolute (song-wide) percentage.
@@ -507,7 +525,7 @@ local function scoreBoard(pn)
 		},
 		-- DP
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(100, 32):zoom(0.35):diffuse(color("#55b0ff")) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, 32):zoom(0.45):diffuse(color("#55b0ff")) end,
 			OnCommand = function(self)
 				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (pss:GetWifeScore() * songMaxPoints)
 				self:settextf("%.2f", dp)
@@ -535,7 +553,7 @@ local function scoreBoard(pn)
 		},
 		-- Personal Best / Record Comparison (Pacemaker Text)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(100, 48):zoom(0.28):diffuse(subText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(100, 48):zoom(0.35):diffuse(subText) end,
 			OnCommand = function(self)
 				if recScore then
 					local pbDp = recScore.GetWifePoints and recScore:GetWifePoints() or (recScore:GetWifeScore() * songMaxPoints)
@@ -608,13 +626,13 @@ local function scoreBoard(pn)
 		},
 		-- Label
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(0, 8):zoom(0.28)						:diffuse(subText)
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, 8):zoom(0.35)						:diffuse(subText)
 						:settext(THEME:GetString("ScreenEvaluation", "CategoryClearType"))
 				end,
 		},
 		-- Current clear type
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(0, 26):zoom(0.45) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(0, 26):zoom(0.55) end,
 			OnCommand = function(self)
 				self:settext(getClearTypeText(clearType)):diffuse(getClearTypeColor(clearType))
 			end
@@ -659,7 +677,7 @@ local function scoreBoard(pn)
 		end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0):valign(0):xy(pad, judgY + 8):zoom(0.28)						:diffuse(subText)
+		InitCommand = function(self) self:halign(0):valign(0):xy(pad, judgY + 8):zoom(0.35)						:diffuse(subText)
 						:settext(THEME:GetString("ScreenEvaluation", "CategoryJudgment"))
 				end,
 	}
@@ -670,7 +688,7 @@ local function scoreBoard(pn)
 		-- Label
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(jx, judgY + 28):zoom(0.28):diffuse(judgmentColors[k])
+				self:xy(jx, judgY + 28):zoom(0.35):diffuse(judgmentColors[k])
 				self:settext(getJudgeStrings(v))
 			end,
 			LoadedCustomWindowMessageCommand = function(self)
@@ -684,7 +702,7 @@ local function scoreBoard(pn)
 		}
 		-- Count
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(jx, judgY + 48):zoom(0.45):diffuse(brightText) end,
+			InitCommand = function(self) self:xy(jx, judgY + 48):zoom(0.55):diffuse(brightText) end,
 			OnCommand = function(self) self:settext(pss:GetTapNoteScores(v)) end,
 			SetJudgeCommand = function(self) 
 				local count = getRescoredJudge(dvt, judge, k)
@@ -701,7 +719,7 @@ local function scoreBoard(pn)
 		}
 		-- Percentage
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(jx, judgY + 66):zoom(0.24):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(jx, judgY + 66):zoom(0.30):diffuse(dimText) end,
 			OnCommand = function(self)
 				local pct = pss:GetPercentageOfTaps(v)
 				if tostring(pct) == tostring(0/0) then pct = 0 end
@@ -732,10 +750,10 @@ local function scoreBoard(pn)
 	for i, label in ipairs(holdLabels) do
 		local hx = holdX + (i - 1) * (frameW - pad*2) / 6
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 8):zoom(0.26):diffuse(subText):settext(label) end
+			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 8):zoom(0.32):diffuse(subText):settext(label) end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 24):zoom(0.38):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(hx, statsY + 24):zoom(0.45):diffuse(mainText) end,
 			OnCommand = function(self)
 				if i == 1 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_Held"))
 				elseif i == 2 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_LetGo"))
@@ -749,10 +767,10 @@ local function scoreBoard(pn)
 	for i, label in ipairs(mLabels) do
 		local mx = holdX + (i - 1 + 3) * (frameW - pad*2) / 6
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 8):zoom(0.26):diffuse(subText):settext(label) end
+			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 8):zoom(0.32):diffuse(subText):settext(label) end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 24):zoom(0.34):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0):valign(0):xy(mx, statsY + 24):zoom(0.4):diffuse(mainText) end,
 			OnCommand = function(self)
 				if i == 1 then self:settextf("%.2fms", wifeMean(dvt))
 				elseif i == 2 then self:settextf("%.2fms", wifeSd(dvt))
@@ -774,10 +792,10 @@ local function scoreBoard(pn)
 
 	-- CB Breakdown (Merged Miss Count + CBs, Centered)
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 8):zoom(0.26):diffuse(subText):settext("Combo Breaks") end
+		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 8):zoom(0.32):diffuse(subText):settext("Combo Breaks") end
 	}
 	board[#board + 1] = LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 24):zoom(0.32):diffuse(mainText) end,
+		InitCommand = function(self) self:halign(0.5):xy(frameW / 2, miscY + 24):zoom(0.4):diffuse(mainText) end,
 		OnCommand = function(self)
 			local totalCBs = getScoreComboBreaks(curScore)
 			local text = string.format("%d (L:%d  R:%d", totalCBs, cbl, cbr)
@@ -1025,7 +1043,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- Toggle Offset Plot / Graphs
 	Def.Quad {
 		InitCommand = function(self)
-			self:xy(rightW, 20):zoomto(90, 20):halign(1):diffuse(accentColor):diffusealpha(0.2)
+			self:xy(rightW, 20):zoomto(110, 24):halign(1):diffuse(accentColor):diffusealpha(0.2)
 		end,
 		UpdateToggleMessageCommand = function(self)
 			self:diffusealpha(showGraphs and 0.4 or 0.2)
@@ -1040,7 +1058,7 @@ t[#t + 1] = Def.ActorFrame {
 	},
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(rightW - 45, 20):zoom(0.25):settext("Toggle Graphs"):diffuse(brightText)
+			self:xy(rightW - 55, 20):zoom(0.32):settext("Toggle Graphs"):diffuse(brightText)
 		end
 	},
 
@@ -1145,5 +1163,6 @@ end
 
 t[#t + 1] = scoreboardFrame
 t[#t + 1] = LoadActor("manipfactor")
+t[#t + 1] = LoadActor("../_cursor")
 
 return t

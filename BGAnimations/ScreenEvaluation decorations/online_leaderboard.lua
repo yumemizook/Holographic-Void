@@ -143,7 +143,7 @@ local function scoreItem(i)
 
 		-- Rank #
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(-10, 12):zoom(0.22):diffuse(dimText) end,
+			InitCommand = function(self) self:xy(-10, 12):zoom(0.28):diffuse(dimText) end,
 			SetScoreCommand = function(self, params)
 				self:settext(params.index)
 			end
@@ -151,7 +151,7 @@ local function scoreItem(i)
 
 		-- Player name (online only) or date (local)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 8):zoom(0.28):halign(0):diffuse(brightText) end,
+			InitCommand = function(self) self:xy(16, 8):zoom(0.35):halign(0):diffuse(brightText) end,
 			SetScoreCommand = function(self, params)
 				if isLocal then
 					self:settext(scoreList[params.index]:GetDate())
@@ -168,7 +168,7 @@ local function scoreItem(i)
 
 		-- Grade
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 24):zoom(0.25):halign(0) end,
+			InitCommand = function(self) self:xy(16, 24):zoom(0.45):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				local grade = s:GetWifeGrade()
@@ -179,7 +179,7 @@ local function scoreItem(i)
 
 		-- Score %
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(55, 24):zoom(0.25):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(60, 24):zoom(0.45):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				local ws = scoreList[params.index]:GetWifeScore()
 				if ws >= 0.99 then
@@ -192,7 +192,7 @@ local function scoreItem(i)
 
 		-- SSR
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 8):zoom(0.28):halign(1) end,
+			InitCommand = function(self) self:xy(290, 8):zoom(0.35):halign(1) end,
 			SetScoreCommand = function(self, params)
 				local ssr = scoreList[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then
@@ -206,7 +206,7 @@ local function scoreItem(i)
 
 		-- Judgment tally (no labels)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(290, 24):zoom(0.18):halign(1):diffuse(subText) end,
+			InitCommand = function(self) self:xy(290, 24):zoom(0.3):halign(1):diffuse(subText) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				self:settextf("%d / %d / %d / %d / %d / %d",
@@ -221,7 +221,7 @@ local function scoreItem(i)
 
 		-- Rate Display (only for All Rates)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(135, 24):zoom(0.24):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(135, 24):zoom(0.3):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				if showAllRates then
 					local s = scoreList[params.index]
@@ -286,7 +286,7 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(30, -30):zoom(0.2):diffuse(brightText):settext("Local") end
+		InitCommand = function(self) self:xy(30, -30):zoom(0.32):diffuse(brightText):settext("Local") end
 	},
 
 	Def.Quad {
@@ -307,7 +307,7 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(94, -30):zoom(0.2):diffuse(brightText):settext("Online") end
+		InitCommand = function(self) self:xy(94, -30):zoom(0.32):diffuse(brightText):settext("Online") end
 	},
 
 	-- ============================================================
@@ -332,7 +332,7 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(195, -30):zoom(0.18):diffuse(brightText):settext("Current") end,
+		InitCommand = function(self) self:xy(195, -30):zoom(0.3):diffuse(brightText):settext("Current") end,
 		RefreshOnlineScoreboardMessageCommand = function(self) self:visible(not isLocal) end
 	},
 
@@ -355,14 +355,14 @@ local t = Def.ActorFrame {
 		end
 	},
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self) self:xy(264, -30):zoom(0.18):diffuse(brightText):settext("All") end,
+		InitCommand = function(self) self:xy(264, -30):zoom(0.3):diffuse(brightText):settext("All") end,
 		RefreshOnlineScoreboardMessageCommand = function(self) self:visible(not isLocal) end
 	},
 
 	-- Page info
 	LoadFont("Common Normal") .. {
 		Name = "PageInfo",
-		InitCommand = function(self) self:xy(150, scoresPerPage * 46 + 8):zoom(0.2):diffuse(dimText) end,
+		InitCommand = function(self) self:xy(150, scoresPerPage * 46 + 8):zoom(0.28):diffuse(dimText) end,
 		OnCommand = function(self) self:playcommand("UpdateText") end,
 		UpdateOnlineListMessageCommand = function(self) self:playcommand("UpdateText") end,
 		RefreshOnlineScoreboardMessageCommand = function(self) self:playcommand("UpdateText") end,

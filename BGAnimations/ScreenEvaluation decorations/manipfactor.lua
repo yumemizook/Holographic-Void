@@ -11,7 +11,7 @@ local aspectRatio = GetScreenAspectRatio()
 
 local mfDisplayX = 102
 local mfDisplayY = 61
-local mfDisplayZoom = 0.28
+local mfDisplayZoom = 0.35
 
 local td = {} -- chart timing data
 local dvt = {} -- offset vector

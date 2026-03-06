@@ -135,7 +135,7 @@ end
 
 -- Clear Type colors (muted variants of classic schemes)
 HVColor.ClearType = {
-	MFC     = color("#FFFFFF"), -- Pure White (Marvelous Full Combo)
+	MFC     = color("#E0F8FF"), -- Slightly cyan white (Marvelous Full Combo)
 	WF      = color("#E0E0E0"), -- Muted White (White Flag - 1xW2 FC)
 	SDP     = color("#CFD198"), -- Muted Yellow (Single Digit Perfects)
 	PFC     = color("#CFD198"), -- Muted Yellow (Perfect Full Combo)

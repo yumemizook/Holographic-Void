@@ -190,7 +190,7 @@ t[#t + 1] = Def.ActorFrame {
 				:diffuse(accentColor):diffusealpha(0.8)
 		end,
 		JudgmentMessageCommand = function(self)
-			self:playcommand("RefreshLife")
+			self:queuecommand("RefreshLife")
 		end,
 		PlayingUpdateMessageCommand = function(self)
 			self:playcommand("RefreshLife")
@@ -202,13 +202,21 @@ t[#t + 1] = Def.ActorFrame {
 				if lifeVal then
 					local fillH = lifeBarH * lifeVal
 					self:zoomto(lifeBarW, fillH)
-					if lifeVal > 0.5 then
-						self:diffuse(accentColor):diffusealpha(0.8)
-					elseif lifeVal > 0.25 then
-						self:diffuse(color("#FFD060")):diffusealpha(0.8)
+
+					-- Coloring based on Life Difficulty (consistent with avatar.lua)
+					local diff = GetLifeDifficulty()
+					if diff <= 2 then
+						self:diffuse(color("#A0CFAB")) -- Green
+					elseif diff <= 4 then
+						self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+					elseif diff == 5 then
+						self:diffuse(color("#CFD198")) -- Yellow
+					elseif diff == 6 then
+						self:diffuse(color("#E0B080")) -- Orange
 					else
-						self:diffuse(color("#FF5050")):diffusealpha(0.9)
+						self:diffuse(color("#CF9898")) -- Red
 					end
+					self:diffusealpha(0.8)
 				end
 			end
 		end
@@ -228,7 +236,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:y(-lifeBarH / 2 - 10):zoom(0.25):diffuse(subText)
 		end,
 		JudgmentMessageCommand = function(self)
-			self:playcommand("RefreshLifePct")
+			self:queuecommand("RefreshLifePct")
 		end,
 		PlayingUpdateMessageCommand = function(self)
 			self:playcommand("RefreshLifePct")
@@ -263,6 +271,12 @@ t[#t + 1] = Def.ActorFrame {
 			self:settext("0.00%")
 		end,
 		JudgmentMessageCommand = function(self, params)
+			self.params = params
+			self:queuecommand("Update")
+		end,
+		UpdateCommand = function(self)
+			local params = self.params
+			if not params then return end
 			local wifePct
 			if params and params.WifePercent then
 				wifePct = params.WifePercent
@@ -270,8 +284,6 @@ t[#t + 1] = Def.ActorFrame {
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local totalTaps = pss:GetTotalTaps()
-					local steps = GAMESTATE:GetCurrentSteps()
-					local pn = PLAYER_1
 					if totalTaps > 0 then
 						-- Correct accuracy so far: points / (events * 2)
 						wifePct = (pss:GetWifeScore() / (totalTaps * 2)) * 100
@@ -328,6 +340,12 @@ if showTextPacemaker then
 				self:diffuse(color("#00ff00"))
 			end,
 			JudgmentMessageCommand = function(self, msg)
+				self.msg = msg
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
+				local msg = self.msg
+				if not msg then return end
 				local tDiff = msg.WifeDifferential
 				local displayTarget = targetGoalPct
 
@@ -337,12 +355,12 @@ if showTextPacemaker then
 					displayTarget = msg.WifePBGoal * 100
 				end
 
-				if tDiff >= 0 then
+				if tDiff and tDiff >= 0 then
 					self:diffuse(color("#00ff00"))
 				else
 					self:diffuse(HVColor.Negative or color("#ff0000"))
 				end
-				self:settextf("%+5.2f (%5.2f%%)", tDiff, displayTarget)
+				self:settextf("%+5.2f (%5.2f%%)", tDiff or 0, displayTarget)
 			end,
 			PracticeModeResetMessageCommand = function(self) self:settextf("%+5.2f (%5.2f%%)", 0, targetGoalPct) end,
 			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
@@ -369,6 +387,9 @@ if showMean then
 				self:zoom(0.35):diffuse(mainText):settext("0.00ms")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local dvt = pss:GetOffsetVector()
@@ -428,6 +449,12 @@ t[#t + 1] = Def.ActorFrame {
 	},
 
 	JudgmentMessageCommand = function(self, params)
+		self.params = params
+		self:queuecommand("Update")
+	end,
+	UpdateCommand = function(self)
+		local params = self.params
+		if not params then return end
 		if params.TapNoteScore == "TapNoteScore_Miss" or params.TapNoteScore == "TapNoteScore_W5" then
 			missStreak = missStreak + 1
 		else
@@ -467,14 +494,12 @@ t[#t + 1] = Def.ActorFrame {
 			
 			numActor:settext(tostring(combo)):diffuse(brightText)
 			
-			-- Shadow display logic: 25% threshold + Full Combo or better
-			local ctLevel = getClearTypeLevel(getClearType(PLAYER_1, GAMESTATE:GetCurrentSteps(), pss))
-			-- MFC=1, WF=2, SDP=3, PFC=4, BF=5, SDG=6, FC=7
-			local isFC = ctLevel <= 7
+			-- Shadow display logic: 25% threshold + No combo breaks (FC status so far)
+			local isFC = (ct ~= "MF" and ct ~= "SDCB" and ct ~= "Clear" and ct ~= "Failed")
 			
 			if combo >= threshold and isFC then
 				numActor:shadowcolor(ctColor)
-				numActor:shadowlength(1)
+				numActor:shadowlength(1.5) -- Improved visibility
 			else
 				numActor:shadowlength(0)
 			end
@@ -662,6 +687,9 @@ t[#t + 1] = Def.ActorFrame {
 							self:settext("0")
 						end,
 						JudgmentMessageCommand = function(self)
+							self:queuecommand("Update")
+						end,
+						UpdateCommand = function(self)
 							local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 							if pss then
 								self:settext(pss:GetTapNoteScores(judgmentTNS[i]))
@@ -695,6 +723,9 @@ t[#t + 1] = Def.ActorFrame {
 					self:settext("0")
 				end,
 				JudgmentMessageCommand = function(self)
+					self:queuecommand("Update")
+				end,
+				UpdateCommand = function(self)
 					local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 					if pss then
 						local ok = pss:GetHoldNoteScores("HoldNoteScore_Held")
@@ -718,6 +749,9 @@ t[#t + 1] = Def.ActorFrame {
 					self:settext("0")
 				end,
 				JudgmentMessageCommand = function(self)
+					self:queuecommand("Update")
+				end,
+				UpdateCommand = function(self)
 					local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 					if pss then
 						local ng = pss:GetHoldNoteScores("HoldNoteScore_LetGo")
@@ -751,6 +785,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.00%")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local rs = getRescoreElements(pss, pss)
@@ -776,6 +813,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.00:1")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local w1 = pss:GetTapNoteScores("TapNoteScore_W1")
@@ -809,6 +849,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.00:1")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local w2 = pss:GetTapNoteScores("TapNoteScore_W2")
@@ -842,6 +885,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					self:settext(tostring(pss:MaxCombo()))
@@ -865,6 +911,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.00")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local dvt = pss:GetOffsetVector()
@@ -892,6 +941,9 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.00")
 			end,
 			JudgmentMessageCommand = function(self)
+				self:queuecommand("Update")
+			end,
+			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local dvt = pss:GetOffsetVector()
