@@ -197,6 +197,16 @@ local HVPrefs = {
 		Values = {"Off", "Quotes", "Tips"}
 	},
 
+	-- Alarm System Preferences
+	HV_AlarmActive = { Default = false },
+	HV_AlarmType = {
+		Default = "Timer",
+		Choices = {"Time", "Timer"},
+		Values = {"Time", "Timer"}
+	},
+	HV_AlarmTime = { Default = "12:00" },
+	HV_AlarmTimerDuration = { Default = 5 },
+	HV_AlarmShowInGameplay = { Default = true },
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.

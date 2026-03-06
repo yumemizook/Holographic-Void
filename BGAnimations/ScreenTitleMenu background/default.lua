@@ -4,6 +4,7 @@ HV.TitleState.player = HV.TitleState.player or { song = nil, paused = true, offs
 HV.TitleState.mouse = HV.TitleState.mouse or { lastHovered = nil }
 HV.TitleState.selectedProfile = HV.TitleState.selectedProfile or 0
 HV.TitleState.showEffectsPopup = HV.TitleState.showEffectsPopup or false
+HV.TitleState.showAlarmPopup = HV.TitleState.showAlarmPopup or false
 
 local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
@@ -16,6 +17,9 @@ local PREF_DEFS = {
 	HV_BackgroundEffect = { Values = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"}, Choices = {"Grid", "Hex", "Scanlines", "Flow", "Rays", "None"} },
 	HV_EnableGlow = { Values = {"false", "true"}, Choices = {"Off", "On"} },
 	HV_Particles = { Values = {"false", "true"}, Choices = {"Off", "On"} },
+	HV_AlarmActive = { Values = {"false", "true"}, Choices = {"Off", "On"} },
+	HV_AlarmType = { Values = {"Time", "Timer"}, Choices = {"Time", "Timer"} },
+	HV_AlarmShowInGameplay = { Values = {"false", "true"}, Choices = {"Off", "On"} },
 }
 
 local rows = {
@@ -23,6 +27,12 @@ local rows = {
 	{ Name = "Style", Pref = "HV_BackgroundEffect" },
 	{ Name = "Glow", Pref = "HV_EnableGlow" },
 	{ Name = "Particles", Pref = "HV_Particles" },
+}
+
+local alarmRows = {
+	{ Name = "ACTIVE", Pref = "HV_AlarmActive" },
+	{ Name = "MODE", Pref = "HV_AlarmType" },
+	{ Name = "GAMEPLAY ALERT", Pref = "HV_AlarmShowInGameplay" },
 }
 
 local function cyclePref(name)
@@ -37,6 +47,24 @@ local function cyclePref(name)
 	ThemePrefs.Set(name, pref.Values[idx])
 	ThemePrefs.Save()
 	MESSAGEMAN:Broadcast("ThemePrefChanged", {Name = name})
+
+	-- Special logic for Alarm Timer
+	if name == "HV_AlarmActive" then
+		local active = ThemePrefs.Get("HV_AlarmActive")
+		if (active == "true" or active == true) and ThemePrefs.Get("HV_AlarmType") == "Timer" then
+			local duration = tonumber(ThemePrefs.Get("HV_AlarmTimerDuration")) or 5
+			HV.AlarmTimerEndTime = os.clock() + (duration * 60)
+			HV.AlarmTimerSeconds = duration * 60
+		end
+	elseif name == "HV_AlarmType" then
+		-- If switching TO Timer while active, start it
+		local active = ThemePrefs.Get("HV_AlarmActive")
+		if (active == "true" or active == true) and ThemePrefs.Get("HV_AlarmType") == "Timer" then
+			local duration = tonumber(ThemePrefs.Get("HV_AlarmTimerDuration")) or 5
+			HV.AlarmTimerEndTime = os.clock() + (duration * 60)
+			HV.AlarmTimerSeconds = duration * 60
+		end
+	end
 end
 
 -- Visual Elements State
@@ -214,7 +242,7 @@ local function jukeboxPlaySong(song)
 	p.duration = song:MusicLengthSeconds()
 	local start = 0
 	SOUND:PlayMusicPart(mp, start, p.duration)
-	p.lastStart = GetTimeSinceStart()
+	p.lastStart = os.clock()
 	p.paused = false
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
 end
@@ -222,7 +250,7 @@ end
 local function jukeboxPause()
 	local p = HV.TitleState.player
 	if p.paused or not p.song then return end
-	p.offset = p.offset + (GetTimeSinceStart() - p.lastStart)
+	p.offset = p.offset + (os.clock() - p.lastStart)
 	SOUND:StopMusic()
 	p.paused = true
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
@@ -237,7 +265,7 @@ local function jukeboxResume()
 	local len = p.duration - p.offset
 	if len <= 0 then len = p.duration; p.offset = 0; start = 0 end
 	SOUND:PlayMusicPart(mp, start, len)
-	p.lastStart = GetTimeSinceStart()
+	p.lastStart = os.clock()
 	p.paused = false
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
 end
@@ -511,10 +539,29 @@ t[#t + 1] = Def.ActorFrame {
 		else
 			srv:settext(THEME:GetString("ScreenTitleMenu", "Server") .. " · " .. THEME:GetString("ScreenTitleMenu", "Offline")):diffuse(dimText)
 		end
+
+		local alrm = af:GetChild("A")
+		local active = ThemePrefs.Get("HV_AlarmActive")
+		if active == "true" or active == true then
+			local type = ThemePrefs.Get("HV_AlarmType")
+			if type == "Time" then
+				alrm:settext("ALARM · " .. (ThemePrefs.Get("HV_AlarmTime") or "12:00")):diffuse(accentColor)
+			else
+				local s = HV.AlarmTimerSeconds or 0
+				if s > 0 then
+					alrm:settext("TIMER · " .. SecondsToMSS(s)):diffuse(accentColor)
+				else
+					alrm:settext("TIMER · " .. (ThemePrefs.Get("HV_AlarmTimerDuration") or 5) .. "M"):diffuse(accentColor)
+				end
+			end
+		else
+			alrm:settext("ALARM · OFF"):diffuse(dimText)
+		end
 	end) end,
 	LoadFont("Common Normal") .. { Name="D", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+14):halign(0):zoom(0.5):diffuse(subText) end },
 	LoadFont("Common Normal") .. { Name="T", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+30):halign(0):zoom(0.35):diffuse(subText) end },
-	LoadFont("Common Normal") .. { Name="S", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+44):halign(0):zoom(0.3):diffuse(dimText) end }
+	LoadFont("Common Normal") .. { Name="S", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+44):halign(0):zoom(0.3):diffuse(dimText) end },
+	LoadFont("Common Normal") .. { Name="A", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+58):halign(0):zoom(0.3):diffuse(dimText) end }
 }
 
 -- Profile chip (Top right) + Inline Profile List
@@ -733,7 +780,7 @@ t[#t + 1] = Def.ActorFrame {
 			local timeTxt = af:GetChild("ElapsedTime")
 			if timeTxt then
 				if p.song and not p.paused then
-					local elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
+					local elapsed = p.offset + (os.clock() - p.lastStart)
 					timeTxt:settext(SecondsToMSS(elapsed))
 					timeTxt:diffuse(subText)
 				elseif p.song and p.paused then
@@ -750,7 +797,7 @@ t[#t + 1] = Def.ActorFrame {
 				if p.song and p.duration > 0 then
 					local elapsed = p.offset
 					if not p.paused then
-						elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
+						elapsed = p.offset + (os.clock() - p.lastStart)
 					end
 					local percent = math.max(0, math.min(1, elapsed / p.duration))
 					bar:zoomto(SCREEN_WIDTH * percent, 2)
@@ -965,6 +1012,150 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "BtnText",
 		Text = "EFFECTS",
 		InitCommand = function(self) self:halign(1):zoom(0.4):diffuse(subText) end
+	}
+}
+
+-- Standalone Alarm Button (Bottom Left)
+t[#t + 1] = Def.ActorFrame {
+	Name = "AlarmButton",
+	InitCommand = function(self) self:xy(SCREEN_LEFT + 20, mpBarY - 60) end,
+	
+	-- Alarm Settings Panel
+	Def.ActorFrame {
+		Name = "AlarmPopup",
+		InitCommand = function(self) self:y(-50):visible(false):diffusealpha(0) end,
+		ShowAlarmPopupMessageCommand = function(self)
+			if self:GetVisible() then self:playcommand("Hide")
+			else self:visible(true):stoptweening():decelerate(0.2):diffusealpha(1):y(-70) end
+		end,
+		HideAlarmPopupMessageCommand = function(self) self:playcommand("Hide") end,
+		HideCommand = function(self) self:stoptweening():accelerate(0.2):diffusealpha(0):y(-50):sleep(0):queuecommand("Off") end,
+		OffCommand = function(self) self:visible(false) end,
+		
+		Def.Quad {
+			InitCommand = function(self) self:halign(0):zoomto(260, 180):diffuse(color("0.05,0.05,0.05,0.98")):diffusebottomedge(color("0,0,0,1")) end
+		},
+		LoadFont("Common Normal") .. {
+			Text = "ALARM SETTINGS",
+			InitCommand = function(self) self:xy(130, -75):zoom(0.4):diffuse(accentColor) end
+		},
+		
+		-- Mode Rows
+		(function()
+			local r = Def.ActorFrame { InitCommand = function(self) self:y(-40) end }
+			for i, row in ipairs(alarmRows) do
+				local ry = (i - 1) * 30
+				r[#r+1] = Def.ActorFrame {
+					InitCommand = function(self) self:y(ry) end,
+					LoadFont("Common Normal") .. {
+						Text = row.Name,
+						InitCommand = function(self) self:x(10):halign(0):zoom(0.35):diffuse(subText) end
+					},
+					LoadFont("Common Normal") .. {
+						Name = "Val",
+						InitCommand = function(self) self:x(250):halign(1):zoom(0.35) end,
+						ThemePrefChangedMessageCommand = function(self, params) if params.Name == row.Pref then self:playcommand("Refresh") end end,
+						RefreshCommand = function(self)
+							local val = tostring(ThemePrefs.Get(row.Pref))
+							local def = PREF_DEFS[row.Pref]
+							local display = val
+							for j, v in ipairs(def.Values) do if tostring(v) == val then display = def.Choices[j] break end end
+							self:settext(display:upper())
+						end,
+						OnCommand = function(self) self:playcommand("Refresh") end
+					},
+					UIElements.QuadButton(1) .. {
+						InitCommand = function(self) self:x(130):zoomto(250, 24):diffusealpha(0) end,
+						MouseDownCommand = function(self, params)
+							if params.event == "DeviceButton_left mouse button" then
+								cyclePref(row.Pref)
+								SOUND:PlayOnce(THEME:GetPathS("Common", "value"))
+							end
+						end
+					}
+				}
+			end
+			return r
+		end)(),
+		
+		-- Value Row (Time or Timer)
+		Def.ActorFrame {
+			InitCommand = function(self) 
+				self:y(50) 
+				self:SetUpdateFunction(function(af)
+					local type = ThemePrefs.Get("HV_AlarmType")
+					local valText = af:GetChild("Val")
+					if valText then
+						if type == "Time" then valText:settext(ThemePrefs.Get("HV_AlarmTime") or "12:00")
+						else
+							local s = HV.AlarmTimerSeconds or 0
+							if s > 0 then valText:settext(SecondsToMSS(s))
+							else valText:settext((ThemePrefs.Get("HV_AlarmTimerDuration") or 5) .. " MINUTES") end
+						end
+					end
+				end)
+			end,
+			LoadFont("Common Normal") .. {
+				Text = "VALUE",
+				InitCommand = function(self) self:x(10):halign(0):zoom(0.35):diffuse(subText) end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "Val",
+				InitCommand = function(self) self:x(250):halign(1):zoom(0.35):diffuse(brightText) end
+			},
+			UIElements.QuadButton(1) .. {
+				InitCommand = function(self) self:x(130):zoomto(250, 24):diffusealpha(0) end,
+				MouseDownCommand = function(self, params)
+					if params.event == "DeviceButton_left mouse button" then
+						local type = ThemePrefs.Get("HV_AlarmType")
+						if type == "Time" then
+							easyInputStringOKCancel("Enter Alarm Time (HH:MM):", 5, false, function(s)
+								if s:match("%d%d:%d%d") then ThemePrefs.Set("HV_AlarmTime", s); ThemePrefs.Save() end
+							end)
+						elseif type == "Timer" then
+							easyInputStringOKCancel("Enter Timer Duration (Minutes):", 3, false, function(s)
+								local m = tonumber(s)
+								if m then 
+									ThemePrefs.Set("HV_AlarmTimerDuration", m)
+									ThemePrefs.Set("HV_AlarmActive", false) -- Reset active so user has to turn it back on to start
+									ThemePrefs.Save()
+									HV.AlarmTimerEndTime = 0
+									HV.AlarmTimerSeconds = m * 60
+								end
+							end)
+						end
+						 SOUND:PlayOnce(THEME:GetPathS("Common", "value"))
+					end
+				end
+			}
+		}
+	},
+	
+	-- Interactive Button
+	UIElements.QuadButton(1) .. {
+		InitCommand = function(self) self:zoomto(100, 30):halign(0):diffusealpha(0) end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				MESSAGEMAN:Broadcast("ShowAlarmPopup")
+				SOUND:PlayOnce(THEME:GetPathS("Common", "value"))
+			end
+		end,
+		MouseOverCommand = function(self) 
+			local txt = self:GetParent():GetChild("BtnText")
+			if txt then 
+				txt:stoptweening():linear(0.1):diffuse(accentColor)
+				if isGlowEnabled then txt:glow(accentColor) end
+			end
+		end,
+		MouseOutCommand = function(self) 
+			local txt = self:GetParent():GetChild("BtnText")
+			if txt then txt:stoptweening():linear(0.1):diffuse(subText):glow(color("0,0,0,0")) end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "BtnText",
+		Text = "ALARM",
+		InitCommand = function(self) self:halign(0):zoom(0.4):diffuse(subText) end
 	}
 }
 
