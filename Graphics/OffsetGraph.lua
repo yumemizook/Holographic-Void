@@ -346,13 +346,13 @@ t[#t+1] = LoadFont("Common Normal") .. {
 				local score = 0
 				if left then
 					score = leftTaps > 0 and (leftPts / (leftTaps * 2)) * 100 or 0
-					self:settextf("Left hand: %.2f%%", score)
+					self:settextf("Left hand: %.4f%%", score)
 				elseif middle then
 					score = midTaps > 0 and (midPts / (midTaps * 2)) * 100 or 0
-					self:settextf("Middle: %.2f%%", score)
+					self:settextf("Middle: %.4f%%", score)
 				else
 					score = rightTaps > 0 and (rightPts / (rightTaps * 2)) * 100 or 0
-					self:settextf("Right hand: %.2f%%", score)
+					self:settextf("Right hand: %.4f%%", score)
 				end
 				self:diffuse(accentColor)
 			else
