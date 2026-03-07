@@ -173,7 +173,7 @@ local t = Def.ActorFrame {
 	Name = "ScoresOverlay",
 	InitCommand = function(self)
 		scoresActor = self
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false):diffusealpha(0)
 	end,
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
@@ -183,6 +183,7 @@ local t = Def.ActorFrame {
 		if params.Tab == "SCORES" then
 			self:visible(not self:GetVisible())
 			if self:GetVisible() then
+				self:stoptweening():diffusealpha(0):linear(0.2):diffusealpha(1)
 				HV.ActiveTab = "SCORES"
 				currentPage = 1
 				currentView = VIEW_LOCAL
@@ -355,7 +356,7 @@ for i = 1, pageSize do
 	t[#t + 1] = Def.ActorFrame {
 		Name = "ScoreRow_" .. i,
 		InitCommand = function(self)
-			self:xy(-overlayW/2 + 25, rowsStartY + (i-1) * rowH)
+			self:xy(-overlayW/2 + 25, rowsStartY + (i-1) * rowH):diffusealpha(0)
 		end,
 
 		Def.Quad { Name = "Bg", InitCommand = function(self) self:halign(0):valign(0):zoomto(overlayW - 50, rowH - 4):diffuse(color("0,0,0,0.2")) end },
@@ -399,6 +400,7 @@ for i = 1, pageSize do
 
 			if idx <= #scores then
 				self:visible(true)
+				self:stoptweening():diffusealpha(0):sleep(i * 0.04):linear(0.15):diffusealpha(1)
 				self:GetChild("Rank"):settext(tostring(idx))
 
 				if currentView == VIEW_LOCAL then

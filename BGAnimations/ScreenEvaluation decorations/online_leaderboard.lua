@@ -115,7 +115,7 @@ end
 local function scoreItem(i)
 	return Def.ActorFrame {
 		Name = "OnlineRow" .. i,
-		InitCommand = function(self) self:y((i - 1) * 46) end,
+		InitCommand = function(self) self:y((i - 1) * 46):diffusealpha(0) end,
 		OnCommand = function(self) self:playcommand("UpdateRow") end,
 		UpdateOnlineListMessageCommand = function(self) self:playcommand("UpdateRow") end,
 		RefreshOnlineScoreboardMessageCommand = function(self) self:playcommand("UpdateRow") end,
@@ -123,6 +123,7 @@ local function scoreItem(i)
 			local idx = (curPage - 1) * scoresPerPage + i
 			if scoreList and scoreList[idx] then
 				self:visible(true)
+				self:stoptweening():diffusealpha(0):sleep(i * 0.05):linear(0.15):diffusealpha(1)
 				self:RunCommandsOnChildren(function(child) child:playcommand("SetScore", {index = idx}) end)
 			else
 				self:visible(false)
@@ -241,8 +242,9 @@ end
 
 local t = Def.ActorFrame {
 	Name = "OnlineLeaderboard",
-	InitCommand = function(self) lbActor = self end,
+	InitCommand = function(self) lbActor = self self:diffusealpha(0) end,
 	OnCommand = function(self)
+		self:sleep(0.6):linear(0.2):diffusealpha(1)
 		refreshScores(self)
 		self:playcommand("RefreshUI")
 		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
