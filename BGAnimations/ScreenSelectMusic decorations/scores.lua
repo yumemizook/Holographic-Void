@@ -149,6 +149,22 @@ local function FetchOnlineScores()
 	)
 end
 
+local function ViewScore(score)
+	if not score then return end
+	local ss = score.score or score
+	local screen = SCREENMAN:GetTopScreen()
+	-- ShowEvalScreenForScore is a standard Etterna ScreenSelectMusic method for viewing historical scores
+	if screen and screen.ShowEvalScreenForScore then
+		screen:ShowEvalScreenForScore(ss)
+	else
+		-- Fallback if engine method behaves unexpectedly
+		if STATSMAN:GetCurStageStats() then
+			STATSMAN:GetCurStageStats():GetPlayerStageStats():SetHighScore(ss)
+			SCREENMAN:SetNewScreen("ScreenEvaluation")
+		end
+	end
+end
+
 -- ============================================================
 -- UI
 -- ============================================================
@@ -516,26 +532,22 @@ t[#t + 1] = Def.ActorFrame {
 			if not event or not event.DeviceInput then return false end
 			
 			local btn = event.DeviceInput.button
-			local isPress = event.type == "InputEventType_FirstPress" or event.type == "InputEventType_Repeat"
+			local isPress = event.type == "InputEventType_FirstPress"
 
-			if event.type ~= "InputEventType_FirstPress" then 
-				if btn == "DeviceButton_left mouse button" or btn == "Back" or btn == "DeviceButton_escape" then
-					return true
-				end
-				return false 
-			end
-
-			-- Click handling
-			if btn == "DeviceButton_left mouse button" then
-				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-
+			if isPress and btn == "DeviceButton_left mouse button" then
 				-- Close on outside click
 				if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
 					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 					return true
 				end
 
-				-- Toggle View button (Local/Online)
+				-- Close button
+				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 16, SCREEN_CENTER_Y - overlayH/2 + 16, 24, 24) then
+					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+					return true
+				end
+
+				-- Mode toggle
 				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 55, SCREEN_CENTER_Y - overlayH/2 + 18, 100, 18) then
 					if currentView == VIEW_LOCAL then
 						currentView = VIEW_ONLINE
@@ -556,7 +568,6 @@ t[#t + 1] = Def.ActorFrame {
 					if currentView == VIEW_LOCAL then
 						GetLocalScores()
 					end
-					-- No need to re-fetch online, UpdateDisplayedScores will filter cached onlineScores
 					scoresActor:playcommand("RefreshScores")
 					return true
 				end
@@ -565,19 +576,19 @@ t[#t + 1] = Def.ActorFrame {
 				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 215, SCREEN_CENTER_Y - overlayH/2 + 18, 65, 18) then
 					currentSort = (currentSort == SORT_SSR) and SORT_WIFE or SORT_SSR
 					currentPage = 1
-					-- Re-sort the source tables to be safe
 					SortScores(localScores)
 					SortScores(onlineScores)
-					-- UpdateDisplayedScores will handle the final subset and re-sort displayedScores
 					scoresActor:playcommand("RefreshScores")
 					return true
 				end
 
-				-- Replay Buttons (check each row)
+				-- Row interaction
 				local replayX = SCREEN_CENTER_X + 305
 				for ri = 1, pageSize do
 					local ry = SCREEN_CENTER_Y + rowsStartY + (ri - 1) * rowH + rowH / 2
-					if IsMouseOverCentered(replayX, ry, 30, 30) then
+					
+					-- 1. Check Replay Button first (higher priority)
+					if IsMouseOverCentered(replayX, ry, 35, 30) then
 						local idx = (currentPage - 1) * pageSize + ri
 						local s = displayedScores[idx]
 						if s then
@@ -587,11 +598,28 @@ t[#t + 1] = Def.ActorFrame {
 									SCREENMAN:GetTopScreen():PlayReplay(ss)
 								end
 							else
-								local steps = GAMESTATE:GetCurrentSteps()
-								if steps and DLMAN.DownloadAndPlayReplay then
-									DLMAN:DownloadAndPlayReplay(steps:GetChartKey(), ss:GetScoreKey())
-								end
+								-- Online Replay: Request data first, then play
+								DLMAN:RequestOnlineScoreReplayData(
+									ss,
+									function()
+										if ss:GetReplay():HasReplayData() then
+											SCREENMAN:GetTopScreen():PlayReplay(ss)
+										else
+											ms.ok("Replay not available")
+										end
+									end
+								)
 							end
+						end
+						return true
+					end
+
+					-- 2. Check Row Click (View Score)
+					if IsMouseOverCentered(SCREEN_CENTER_X, ry, overlayW - 50, rowH) then
+						local idx = (currentPage - 1) * pageSize + ri
+						local s = displayedScores[idx]
+						if s then
+							ViewScore(s)
 						end
 						return true
 					end
