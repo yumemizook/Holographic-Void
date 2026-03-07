@@ -44,6 +44,14 @@ function HV.Clamp(val, low, high)
 	return math.max(low, math.min(high, val))
 end
 
+--- Capitalize the first letter of a string.
+-- @param str String to capitalize
+-- @return string Capitalized string
+function HV.Capitalize(str)
+	if not str or str == "" then return "" end
+	return str:sub(1, 1):upper() .. str:sub(2)
+end
+
 --- Linear interpolation between two values.
 -- @param a Start value
 -- @param b End value

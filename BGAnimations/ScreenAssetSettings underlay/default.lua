@@ -295,7 +295,9 @@ t[#t+1] = Def.Actor {
 				end
 			end
 		end)
-	end
+	end,
+	-- Custom mouse cursor
+	LoadActor("../_cursor")
 }
 
 return t
