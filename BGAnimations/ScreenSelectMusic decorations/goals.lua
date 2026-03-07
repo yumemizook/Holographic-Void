@@ -170,7 +170,7 @@ local t = Def.ActorFrame {
 }
 
 -- Row drawing
-local rowsStartY = -overlayH/2 + 65
+local rowStartY = -overlayH/2 + 65
 
 local function makeGoalRow(i)
 	local sg, ck, goalsong, goalsteps
