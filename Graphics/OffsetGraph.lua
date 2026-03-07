@@ -391,16 +391,47 @@ t[#t+1] = LoadFont("Common Normal") .. {
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
 
--- CB Display (Stacked above Distribution on Right)
+-- CB Display (Stacked above Delta Hand on Right)
 t[#t+1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self) self:zoom(0.4):halign(1):valign(1):diffuse(brightText) end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
-		self:xy(params.width - 5, -5 - 15)
+		self:xy(params.width - 5, -5 - 20)
 		local totalCBs = cbl + cbr + cbm
 		local text = string.format("CB: %d (L:%d  R:%d", totalCBs, cbl, cbr)
 		if showMiddle then text = text .. string.format("  M:%d", cbm) end
 		self:settext(text .. ")")
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+-- Delta Hand Display (Stacked above Distribution on Right)
+t[#t+1] = LoadFont("Common Normal") .. {
+	InitCommand = function(self) self:zoom(0.4):halign(1):valign(1):diffuse(brightText) end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 5, -5 - 10)
+		if params.dvt and #params.dvt > 0 and params.ctt and #params.ctt > 0 then
+			local leftPts, rightPts = 0, 0
+			local leftTaps, rightTaps = 0, 0
+			local tso = tst[judge] or 1
+			for i = 1, #params.dvt do
+				local pts = wife3(math.abs(params.dvt[i]), tso)
+				if params.ctt[i] < middleColumn then
+					leftPts = leftPts + pts
+					leftTaps = leftTaps + 1
+				elseif params.ctt[i] > middleColumn then
+					rightPts = rightPts + pts
+					rightTaps = rightTaps + 1
+				end
+			end
+			local leftScore = leftTaps > 0 and (leftPts / (leftTaps * 2)) or 0
+			local rightScore = rightTaps > 0 and (rightPts / (rightTaps * 2)) or 0
+			local delta = math.abs(leftScore - rightScore) * 100
+			self:settextf("Δ Hand: %.4f%%", delta)
+		else
+			self:settext("")
+		end
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
