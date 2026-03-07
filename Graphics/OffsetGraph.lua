@@ -428,7 +428,13 @@ t[#t+1] = LoadFont("Common Normal") .. {
 			local leftScore = leftTaps > 0 and (leftPts / (leftTaps * 2)) or 0
 			local rightScore = rightTaps > 0 and (rightPts / (rightTaps * 2)) or 0
 			local delta = math.abs(leftScore - rightScore) * 100
-			self:settextf("Δ Hand: %.4f%%", delta)
+			local symbol = ""
+			if leftScore > rightScore then
+				symbol = "> "
+			elseif leftScore < rightScore then
+				symbol = "< "
+			end
+			self:settextf("Δ Hand: %s%.4f%%", symbol, delta)
 		else
 			self:settext("")
 		end
