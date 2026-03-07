@@ -21,8 +21,13 @@ local allTags = {} -- List of unique tag names
 local songTags = {} -- Tags for current song
 local currentChartkey = ""
 
+-- Filtering State
+local isFiltering = false
+local filterTags = {} -- Tags currently used for filtering (AND logic)
+local filterChanged = false
+
 -- ============================================================
--- DATA FETCHING
+-- DATA FETCHING & FILTERING
 -- ============================================================
 
 local function RefreshData()
@@ -32,19 +37,56 @@ local function RefreshData()
 	-- Get all unique tags from TAGMAN
 	allTags = {}
 	local tagData = TAGMAN:get_data().playerTags
-	for tagName, charts in pairs(tagData) do
-		allTags[#allTags+1] = tagName
+	if tagData then
+		for tagName, _ in pairs(tagData) do
+			allTags[#allTags+1] = tagName
+		end
+		table.sort(allTags)
 	end
-	table.sort(allTags)
 	
 	-- Identify which tags the current song has
 	songTags = {}
-	if currentChartkey ~= "" then
+	if currentChartkey ~= "" and tagData then
 		for tagName, charts in pairs(tagData) do
 			if charts[currentChartkey] then
 				songTags[tagName] = true
 			end
 		end
+	end
+
+	-- Apply Filtering to Music Wheel
+	if filterChanged then
+		local charts = {}
+		local oCharts = {}
+		local whee = nil
+		local screen = SCREENMAN:GetTopScreen()
+		if screen and screen.GetMusicWheel then whee = screen:GetMusicWheel() end
+
+		if whee and tagData then
+			-- Simplified Filtering: Filter by ALL tags in filterTags if isFiltering is true
+			if isFiltering and next(filterTags) then
+				local selected = {}
+				local first = true
+				for tag, _ in pairs(filterTags) do
+					local tagCharts = tagData[tag] or {}
+					if first then
+						for ck, _ in pairs(tagCharts) do selected[ck] = true end
+						first = false
+					else
+						for ck, _ in pairs(selected) do
+							if not tagCharts[ck] then selected[ck] = nil end
+						end
+					end
+				end
+				for ck, _ in pairs(selected) do table.insert(charts, ck) end
+			end
+
+			whee:FilterByAndAgainstStepKeys(charts, oCharts)
+			-- Selection might change, so re-refresh
+			local ssong = GAMESTATE:GetCurrentSong()
+			if ssong then whee:SelectSong(ssong) end
+		end
+		filterChanged = false
 	end
 end
 
@@ -55,6 +97,7 @@ end
 local function ToggleTag(tagName)
 	if currentChartkey == "" then return end
 	local tagData = TAGMAN:get_data().playerTags
+	if not tagData then return end
 	
 	if not tagData[tagName] then tagData[tagName] = {} end
 	
@@ -72,10 +115,11 @@ end
 
 local function AddNewTag()
 	easyInputStringOKCancel(
-		THEME:GetString("Tags", "NewTagPrompt"), 32, false,
+		THEME:GetString("TabTags", "NewTagPrompt"), 32, false,
 		function(name)
 			if name and name ~= "" then
 				local tagData = TAGMAN:get_data().playerTags
+				if not tagData then tagData = {}; TAGMAN:get_data().playerTags = tagData end
 				if not tagData[name] then
 					tagData[name] = {}
 					TAGMAN:set_dirty()
@@ -91,9 +135,16 @@ end
 
 local function DeleteTag(tagName)
 	local tagData = TAGMAN:get_data().playerTags
+	if not tagData then return end
 	tagData[tagName] = nil
 	TAGMAN:set_dirty()
 	TAGMAN:save()
+	-- If tag was in filters, remove it
+	if filterTags[tagName] then
+		filterTags[tagName] = nil
+		if not next(filterTags) then isFiltering = false end
+		filterChanged = true
+	end
 	RefreshData()
 	if tagsActor then tagsActor:playcommand("RefreshTags") end
 end
@@ -138,8 +189,28 @@ local t = Def.ActorFrame {
 	-- Title
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor):settext(THEME:GetString("Tags", "Title"))
+			self:halign(0):valign(0):xy(-overlayW/2 + 20, -overlayH/2 + 15):zoom(0.5):diffuse(accentColor):settext(THEME:GetString("TabTags", "Title"))
 		end,
+	},
+
+	-- Filter Toggle Button
+	Def.ActorFrame {
+		Name = "FilterToggle",
+		InitCommand = function(self) self:xy(-overlayW/2 + 150, -overlayH/2 + 23) end,
+		
+		Def.Quad { 
+			InitCommand = function(self) self:zoomto(100, 22) end,
+			RefreshTagsCommand = function(self) 
+				self:diffuse(isFiltering and accentColor or color("0.2,0.2,0.2,1")):diffusealpha(isFiltering and 0.8 or 0.4) 
+			end,
+		},
+		LoadFont("Common Normal") .. { 
+			InitCommand = function(self) self:zoom(0.28) end,
+			RefreshTagsCommand = function(self) 
+				self:settext(THEME:GetString("TabTags", "TagFilter"))
+				self:diffuse(isFiltering and brightText or subText) 
+			end,
+		},
 	},
 
 	-- Add Tag Button
@@ -150,7 +221,7 @@ local t = Def.ActorFrame {
 			InitCommand = function(self) self:zoomto(90, 20):diffuse(accentColor):diffusealpha(0.15) end,
 		},
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext(THEME:GetString("Tags", "AddTag")) end,
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText):settext(THEME:GetString("TabTags", "AddTag")) end,
 		},
 	},
 
@@ -162,17 +233,23 @@ local t = Def.ActorFrame {
 		end,
 	},
 
+	-- Delete hint
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:halign(0.5):valign(0):y(-overlayH/2 + 40):zoom(0.22):diffuse(dimText) end,
+		RefreshTagsCommand = function(self) self:settext(THEME:GetString("TabTags", "HowToDelete")):visible(true) end,
+	},
+
 	-- Hint
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0.5):valign(1):xy(0, overlayH/2 - 12):zoom(0.28):diffuse(dimText)
-				:settext(THEME:GetString("Tags", "Hint"))
+				:settext(THEME:GetString("TabTags", "Hint"))
 		end,
 	},
 }
 
 -- Tag rows
-local rowsStartY = -overlayH/2 + 60
+local rowsStartY = -overlayH/2 + 65
 for i = 1, pageSize do
 	t[#t + 1] = Def.ActorFrame {
 		Name = "TagRow_" .. i,
@@ -187,7 +264,7 @@ for i = 1, pageSize do
 		-- Toggle marker (Dot)
 		Def.Quad {
 			Name = "Marker",
-			InitCommand = function(self) self:x(-overlayW/2 + 30):zoomto(4, 4) end,
+			InitCommand = function(self) self:x(-overlayW/2 + 30):zoomto(6, 6) end,
 		},
 		LoadFont("Common Normal") .. { 
 			Name = "TagName", 
@@ -199,9 +276,23 @@ for i = 1, pageSize do
 			if idx <= #allTags then
 				self:visible(true)
 				local name = allTags[idx]
-				self:GetChild("TagName"):settext(name):diffuse(songTags[name] and brightText or subText)
-				self:GetChild("Marker"):diffuse(songTags[name] and accentColor or color("0.1,0.1,0.1,1"))
-				self:GetChild("Bg"):diffusealpha(songTags[name] and 0.4 or 0.2)
+				local tagName = self:GetChild("TagName")
+				local marker = self:GetChild("Marker")
+				local bg = self:GetChild("Bg")
+
+				tagName:settext(name)
+				
+				-- If current tag is being filtered for, highlight it
+				if isFiltering and filterTags[name] then
+					tagName:diffuse(color("0.5,1,0.5,1")) -- Green
+					marker:diffuse(color("0.5,1,0.5,1"))
+					bg:diffuse(color("0,0.3,0,0.4"))
+				else
+					tagName:diffuse(songTags[name] and brightText or subText)
+					marker:diffuse(songTags[name] and accentColor or color("0.1,0.1,0.1,1"))
+					bg:diffusealpha(songTags[name] and 0.4 or 0.2)
+					bg:diffuse(color("0,0,0,1"))
+				end
 			else
 				self:visible(false)
 			end
@@ -216,13 +307,17 @@ t.RefreshTagsCommand = function(self)
 	
 	local pageInfo = self:GetChild("PageInfo")
 	if pageInfo then
-		pageInfo:settextf(THEME:GetString("Tags", "PageInfoFormatted"), #allTags, currentPage, totalPages)
+		pageInfo:settextf(THEME:GetString("TabTags", "PageInfoFormatted"), #allTags, currentPage, totalPages)
 	end
 	
 	for i = 1, pageSize do
 		local row = self:GetChild("TagRow_" .. i)
 		if row then row:playcommand("RefreshTags") end
 	end
+	
+	-- Update filter toggle
+	local ft = self:GetChild("FilterToggle")
+	if ft then ft:playcommand("RefreshTags") end
 end
 
 -- Input handler
@@ -253,15 +348,40 @@ t[#t + 1] = Def.ActorFrame {
 			-- 2. Mouse Clicks
 			if btn == "DeviceButton_left mouse button" or btn == "DeviceButton_right mouse button" then
 				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+				local isRight = btn == "DeviceButton_right mouse button"
 
 				-- Close on outside click
 				if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+					if HV.ActiveTab == "TAGS" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+					end
+					return true
+				end
+
+				-- Filter Toggle Button
+				local ftY = SCREEN_CENTER_Y - overlayH/2 + 23
+				if IsMouseOverCentered(SCREEN_CENTER_X - overlayW/2 + 150, ftY, 100, 22) then
+					if isFiltering then
+						isFiltering = false
+						filterTags = {}
+					else
+						-- Filter by the current song's tags
+						isFiltering = true
+						filterTags = {}
+						for tag, _ in pairs(songTags) do
+							filterTags[tag] = true
+						end
+						-- If the song has no tags, don't enable filtering
+						if not next(filterTags) then isFiltering = false end
+					end
+					filterChanged = true
+					RefreshData()
+					tagsActor:playcommand("RefreshTags")
 					return true
 				end
 
 				-- New Tag button
-				if btn == "DeviceButton_left mouse button" and IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 60, SCREEN_CENTER_Y - overlayH/2 + 20, 90, 20) then
+				if not isRight and IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 60, SCREEN_CENTER_Y - overlayH/2 + 20, 90, 20) then
 					AddNewTag()
 					return true
 				end
@@ -272,10 +392,11 @@ t[#t + 1] = Def.ActorFrame {
 					if IsMouseOverCentered(SCREEN_CENTER_X, rowY, overlayW - 32, rowH - 4) then
 						local idx = (currentPage - 1) * pageSize + i
 						if idx <= #allTags then
-							if btn == "DeviceButton_left mouse button" then
-								ToggleTag(allTags[idx])
+							local name = allTags[idx]
+							if not isRight then
+								ToggleTag(name)
 							else
-								DeleteTag(allTags[idx])
+								DeleteTag(name)
 							end
 						end
 						return true

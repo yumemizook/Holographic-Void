@@ -4,6 +4,9 @@
 local accentColor = HVColor.Accent
 local brightText = color("1,1,1,1")
 
+-- Load grade counter data (initializes GRADECOUNTERSTORAGE)
+LoadActor("../gradecounter.lua")
+
 -- Compact Profile Login Button Bounds
 local panelX = 20
 local panelW = SCREEN_WIDTH * 0.36
@@ -15,9 +18,18 @@ local btnCY = compactProfileY - 22
 local btnW, btnH = 80, 24
 
 -- Profile Overlay Constants
-local overlayW, overlayH = SCREEN_WIDTH * 0.8, SCREEN_HEIGHT * 0.7
+local overlayW, overlayH = SCREEN_WIDTH * 0.94, SCREEN_HEIGHT * 0.75
 local colW, scorePageSize = overlayW / 3, 10
 local skillsets = {"Overall", "Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
+
+-- New Column Constants
+local gradeSidebarW = 70
+local profileSidebarW = 160
+local mainPartW = overlayW - gradeSidebarW - profileSidebarW
+local sidebarW = gradeSidebarW + profileSidebarW
+local skillsetTabH = 26
+local rowH = 28
+local rowsYStart = 60
 
 local subText = color("0.65,0.65,0.65,1")
 local mainText = color("0.85,0.85,0.85,1")
@@ -191,18 +203,47 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			end
 
 			-- 2. Mouse Click
-			-- Right-click to pause/unpause sample music
 			if btn == "DeviceButton_right mouse button" and evType == "InputEventType_FirstPress" then
-				local screen = SCREENMAN:GetTopScreen()
-				if screen and screen.PauseSampleMusic then
-					screen:PauseSampleMusic()
-					MESSAGEMAN:Broadcast("MusicPauseToggled")
+				-- A. Handle Score Validation if over a row
+				if HV.ActiveTab == "PROFILE" then
+					local profileSidebarX = (SCREEN_CENTER_X - overlayW/2) + gradeSidebarW
+					local scoreAreaX = profileSidebarX + profileSidebarW
+					local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
+					for i = 1, scorePageSize do
+						if IsMouseOver(scoreAreaX + 10, absRowsYStart + (i-1)*rowH - rowH/2, mainPartW - 20, rowH) then
+							MESSAGEMAN:Broadcast("OverlayRowRightClicked", {index = i})
+							return true
+						end
+					end
 				end
-				return true
+
+				-- B. Fallback: Pause sample music (ONLY if no tab is open)
+				if HV.ActiveTab == "" then
+					local screen = SCREENMAN:GetTopScreen()
+					if screen and screen.PauseSampleMusic then
+						screen:PauseSampleMusic()
+						MESSAGEMAN:Broadcast("MusicPauseToggled")
+					end
+					return true
+				end
+
+				-- Skip general overlay buttons and fallback traps if a decoration tab is busy
+				if HV.ActiveTab ~= "" and HV.ActiveTab ~= "PROFILE" then return false end
 			end
 			if btn == "DeviceButton_left mouse button" and evType == "InputEventType_FirstPress" then
+				local virtualX = INPUTFILTER:GetMouseX()
+				local virtualY = INPUTFILTER:GetMouseY()
+
+				-- If PROFILE tab is open, handle click-outside to close
+				if HV.ActiveTab == "PROFILE" then
+					if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+						return true
+					end
+				end
+
 				-- Skip general overlay buttons (Login, etc.) if a tab is busy
-				if HV.ActiveTab ~= "" then return false end
+				if HV.ActiveTab ~= "" and HV.ActiveTab ~= "PROFILE" then return false end
 
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()
@@ -253,7 +294,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					local tx = 10 + (i - 1) * tabW
 					if virtualX >= tx and virtualX <= tx + tabW and virtualY >= footerY and virtualY <= SCREEN_HEIGHT then
 						local target = tabName:upper()
-						if target == "PROFILE" then target = "SOCIAL" end -- Map profile to SOCIAL internally for theme parity? (Wait, I used PROFILE in decorations)
+						if target == "PROFILE" then target = "SOCIAL" end 
 						
 						-- Close if the SAME tab is clicked
 						if HV.ActiveTab == tabName:upper() then
@@ -265,33 +306,63 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					end
 				end
 
-				-- 2.5 Music Wheel Click Selection
-				-- BLOCKED if an overlay tab is open
-				local mwX = SCREEN_WIDTH - 180
-				if HV.ActiveTab == "" and virtualX >= mwX - 180 and virtualX <= SCREEN_WIDTH then
-					local mw = screen:GetMusicWheel()
-					if mw then
-						local diffY = virtualY - SCREEN_CENTER_Y
-						if math.abs(diffY) <= 20 then
-							return false -- Let center click pass to engine for Start
-						else
-							if evType == "InputEventType_FirstPress" then
-								local offset = math.floor(diffY / 40 + 0.5)
-								if offset ~= 0 then
-									mw:Move(offset)
-									mw:Move(0)
-								end
-							end
-							return true
+
+
+				-- --- PROFILE TAB SPECIFIC CLICKS ---
+				if HV.ActiveTab == "PROFILE" then
+					local profileSidebarX = (SCREEN_CENTER_X - overlayW/2) + gradeSidebarW
+					local scoreAreaX = profileSidebarX + profileSidebarW
+					local headerY = SCREEN_CENTER_Y - overlayH/2 + 35
+
+					-- 1. Mode Toggle (TOP / RECENT)
+					if IsMouseOverCentered(scoreAreaX + mainPartW - 250, headerY, 100, 24) then
+						profileOverlayActor.isRecentMode = not profileOverlayActor.isRecentMode
+						profileOverlayActor.topPage = 1; profileOverlayActor.recentPage = 1
+						MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
+					end
+					-- 2. Source Toggle (ONLINE / LOCAL)
+					if IsMouseOverCentered(scoreAreaX + mainPartW - 140, headerY, 100, 24) then
+						if not profileOverlayActor.isRecentMode then
+							profileOverlayActor.isOnlineMode = not profileOverlayActor.isOnlineMode
+							profileOverlayActor.topPage = 1
+							MESSAGEMAN:Broadcast("UpdateOverlayUI")
+						end
+						return true
+					end
+					-- 3. Upload Button
+					if IsMouseOverCentered(scoreAreaX + mainPartW - 40, headerY, 80, 24) then
+						if DLMAN:IsLoggedIn() then DLMAN:UploadAllScores() else ms.ok("Log in to upload scores.") end
+						return true
+					end
+					-- 4. Avatar
+					if IsMouseOverCentered(profileSidebarX + profileSidebarW/2, SCREEN_CENTER_Y - overlayH/2 + 50, 60, 60) then
+						SCREENMAN:SetNewScreen("ScreenAssetSettings"); return true
+					end
+					-- 5. Skillset Tabs
+					local tabsYStart = SCREEN_CENTER_Y - overlayH/2 + 140
+					for i, ss in ipairs(skillsets) do
+						if IsMouseOver(profileSidebarX + 10, tabsYStart + (i-1)*skillsetTabH - skillsetTabH/2, profileSidebarW - 20, skillsetTabH) then
+							-- ms.ok("Skillset Click: " .. ss)
+							profileOverlayActor.currentSkillset = ss; profileOverlayActor.isRecentMode = false; profileOverlayActor.topPage = 1
+							if not profileOverlayActor.isOnlineMode then SCOREMAN:SortSSRsForGame(ss) end
+							MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
+						end
+					end
+					-- 6. Score Rows
+					local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
+					for i = 1, scorePageSize do
+						if IsMouseOver(scoreAreaX + 10, absRowsYStart + (i-1)*rowH - rowH/2, mainPartW - 20, rowH) then
+							-- ms.ok("Row Click: " .. i)
+							MESSAGEMAN:Broadcast("OverlayRowClicked", {index = i}); return true
 						end
 					end
 				end
 
-				-- If an overlay is active, we generally want to return false here
-				-- so that the decoration tab's own InputCallback can handle the click.
-				-- However, we still handle footer/header buttons above.
-				if HV.ActiveTab ~= "" then
-					return false
+				-- If an overlay is active, and we haven't handled the click yet, 
+				-- we return true to sink it so it doesn't click the music wheel under the overlay.
+				-- EXCEPT if it's a decoration tab (GOALS, TAGS, etc.) which handle their own sinking.
+				if HV.ActiveTab == "PROFILE" then
+					return true
 				end
 			end
 			
@@ -310,6 +381,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				["MenuRight"] = 1,
 				["MenuUp"] = -1,
 				["MenuDown"] = 1,
+				["Left"] = -1,
+				["Right"] = 1,
 			}
 			local logicalBtn = event.button or ""
 			
@@ -318,7 +391,12 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			if dir then
 				if HV.ActiveTab ~= "" then
 					if evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat" then
-						MESSAGEMAN:Broadcast("TabNavigation", {dir = dir})
+						if HV.ActiveTab == "PROFILE" then
+							if dir < 0 then MESSAGEMAN:Broadcast("PrevScorePage")
+							else MESSAGEMAN:Broadcast("NextScorePage") end
+						else
+							MESSAGEMAN:Broadcast("TabNavigation", {dir = dir})
+						end
 					end
 					return true 
 				end
@@ -343,6 +421,14 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			
 			-- 3. Key Presses (Global Shortcuts)
 			if evType == "InputEventType_FirstPress" then
+				-- Close any active tab on Escape or Back
+				if btn == "DeviceButton_escape" or logicalBtn == "Back" then
+					if HV.ActiveTab ~= "" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+						return true
+					end
+				end
+
 				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
 				if ctrl then
 					if btn == "DeviceButton_4" then
@@ -354,6 +440,16 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					end
 				end
 			end
+			
+			-- FALLBACK TRAPPING: PROFILE sinks everything internally.
+			-- Other tabs handle their own sinking in their callbacks.
+			if HV.ActiveTab == "PROFILE" then
+				if IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
+					return true
+				end
+			end
+			
+			return false
 		end -- end of HV.OverlayInputCallback
 		screen:AddInputCallback(HV.OverlayInputCallback)
 	end
@@ -368,11 +464,9 @@ main_af[#main_af + 1] = Def.ActorFrame {
 -- PROFILE OVERLAY REDESIGN (Sidebar + Main)
 -- ============================================================
 
-local sidebarW = 160
-local mainPartW = overlayW - sidebarW
-local skillsetTabH = 26
-local rowH = 26
-local rowsYStart = 60
+-- ============================================================
+-- PROFILE OVERLAY REDESIGN (Sidebar + Main)
+-- ============================================================
 
 local profileOverlay = Def.ActorFrame {
 	Name = "ProfileOverlay",
@@ -389,122 +483,78 @@ local profileOverlay = Def.ActorFrame {
 	-- Dark Background (Dim the rest of the screen)
 	Def.Quad {
 		InitCommand = function(self) self:zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,0.85")) end,
-		BeginCommand = function(self)
-			SCREENMAN:GetTopScreen():AddInputCallback(function(event)
-				if profileOverlayActor and profileOverlayActor:GetVisible() then
-					local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-					
-					-- 1. Handle Closing (Click Outside)
-					if event.type == "InputEventType_FirstPress" and IsMouseLeftClick(event.DeviceInput.button) then
-						if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-							return true
-						end
-					end
-
-					-- 2. Handle Actions (Buttons, Tabs)
-					local sidebarX = SCREEN_CENTER_X - overlayW/2
-					if event.type == "InputEventType_FirstPress" then
-						local mainAreaCenterX = SCREEN_CENTER_X + sidebarW/2
-						local headerY = SCREEN_CENTER_Y - overlayH/2 + 35
-						
-						-- Mode Toggle (TOP / RECENT)
-						if IsMouseOverCentered(mainAreaCenterX + (mainPartW/2 - 250), headerY, 100, 24) then
-							profileOverlayActor.isRecentMode = not profileOverlayActor.isRecentMode
-							profileOverlayActor.topPage = 1
-							profileOverlayActor.recentPage = 1
-							MESSAGEMAN:Broadcast("UpdateOverlayUI")
-							return true
-						end
-						
-						-- Source Toggle (ONLINE / LOCAL) — disabled in recent mode
-						if IsMouseOverCentered(mainAreaCenterX + (mainPartW/2 - 140), headerY, 100, 24) then
-							if not profileOverlayActor.isRecentMode then
-								profileOverlayActor.isOnlineMode = not profileOverlayActor.isOnlineMode
-								profileOverlayActor.topPage = 1
-								MESSAGEMAN:Broadcast("UpdateOverlayUI")
-							end
-							return true
-						end
-						
-						-- Upload Button
-						if IsMouseOverCentered(mainAreaCenterX + (mainPartW/2 - 40), headerY, 80, 24) then
-							if DLMAN:IsLoggedIn() then
-								DLMAN:UploadAllScores()
-								SCREENMAN:SystemMessage("Uploading all scores...")
-							else
-								ms.ok("Log in to upload scores.")
-							end
-							return true
-						end
-
-						-- Avatar Click inside overlay
-						local overlayAvX = SCREEN_CENTER_X - overlayW/2 + sidebarW/2
-						local overlayAvY = SCREEN_CENTER_Y - overlayH/2 + 50
-						if IsMouseOverCentered(overlayAvX, overlayAvY, 60, 60) then
-							SCREENMAN:SetNewScreen("ScreenAssetSettings")
-							return true
-						end
-						
-						-- Skillset Tabs
-
-						local tabsYStart = SCREEN_CENTER_Y - overlayH/2 + 140
-						for i, ss in ipairs(skillsets) do
-							if IsMouseOver(sidebarX + 10, tabsYStart + (i-1)*skillsetTabH - skillsetTabH/2, sidebarW - 20, skillsetTabH) then
-								profileOverlayActor.currentSkillset = ss
-								profileOverlayActor.isRecentMode = false
-								profileOverlayActor.topPage = 1
-								MESSAGEMAN:Broadcast("UpdateOverlayUI")
-								return true
-							end
-						end
-						
-						-- Score Row Clicks (Left = Find Song, Right = Validate)
-						local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
-						for i = 1, scorePageSize do
-							local rowTop = absRowsYStart + (i-1)*rowH - rowH/2
-							if IsMouseOver(sidebarX + sidebarW + 10, rowTop, mainPartW - 20, rowH) then
-								MESSAGEMAN:Broadcast("OverlayRowClicked", {index = i})
-								return true
-							end
-						end
-					end
-					
-					if event.type == "InputEventType_FirstPress" and event.DeviceInput.button == "DeviceButton_right mouse button" then
-						local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
-						for i = 1, scorePageSize do
-							local rowTop = absRowsYStart + (i-1)*rowH - rowH/2
-							if IsMouseOver(sidebarX + sidebarW + 10, rowTop, mainPartW - 20, rowH) then
-								MESSAGEMAN:Broadcast("OverlayRowRightClicked", {index = i})
-								return true
-							end
-						end
-					end
-					
-					-- 4. Sink all other input
-					return true
-				end
-			end)
-		end
 	},
 	-- Main Panel BG
 	Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(bgCard):diffusealpha(0.98) end },
 	
-	-- Sidebar Construction
+	-- 1. Grade Sidebar (Far Left)
+	Def.ActorFrame {
+		Name = "GradeSidebar",
+		InitCommand = function(self) self:x(-overlayW/2 + gradeSidebarW/2) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(gradeSidebarW, overlayH):diffuse(color("0.05,0.05,0.05,1")) end },
+		
+		-- Vertical Line Separator
+		Def.Quad {
+			InitCommand = function(self) 
+				self:halign(1):x(gradeSidebarW/2):zoomto(1, overlayH):diffuse(accentColor):diffusealpha(0.3)
+			end
+		},
+
+		-- Grades Display
+		(function()
+			local g = Def.ActorFrame { InitCommand = function(self) self:y(-overlayH/2 + 60) end }
+			local grades = {"AAAAA", "AAAA", "AAA", "AA", "A"}
+			local tiers = {"Grade_Tier01", "Grade_Tier04", "Grade_Tier07", "Grade_Tier10", "Grade_Tier13"}
+			
+			for i, grade in ipairs(grades) do
+				local gy = (i-1) * 32
+				g[#g+1] = Def.ActorFrame {
+					InitCommand = function(self) self:y(gy) end,
+					-- Grade Label
+					LoadFont("Common Normal") .. {
+						Text = HV.GetGradeName(tiers[i]),
+						InitCommand = function(self) 
+							self:halign(0.5):xy(0, -6):zoom(0.35)
+							self:diffuse(HVColor.GetGradeColor(tiers[i]))
+						end
+					},
+					-- Count
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self) 
+							self:halign(0.5):xy(0, 8):zoom(0.35):diffuse(mainText)
+						end,
+						BeginCommand = function(self)
+							if GRADECOUNTERSTORAGE then
+								self:settext(GRADECOUNTERSTORAGE[grade] or 0)
+							end
+						end,
+						UpdateOverlayUIMessageCommand = function(self)
+							if GRADECOUNTERSTORAGE then
+								self:settext(GRADECOUNTERSTORAGE[grade] or 0)
+							end
+						end
+					}
+				}
+			end
+			return g
+		end)()
+	},
+
+	-- 2. Profile Sidebar (Middle)
 	Def.ActorFrame {
 		Name = "Sidebar",
-		InitCommand = function(self) self:x(-overlayW/2 + sidebarW/2) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(sidebarW, overlayH):diffuse(color("0.07,0.07,0.07,1")) end },
+		InitCommand = function(self) self:x(-overlayW/2 + gradeSidebarW + profileSidebarW/2) end,
+		Def.Quad { InitCommand = function(self) self:zoomto(profileSidebarW, overlayH):diffuse(color("0.07,0.07,0.07,1")) end },
 		
 		-- Sidebar Separator with Glow
 		Def.Quad {
 			InitCommand = function(self) 
-				self:halign(1):x(sidebarW/2):zoomto(1, overlayH):diffuse(accentColor):diffusealpha(0.3)
+				self:halign(1):x(profileSidebarW/2):zoomto(1, overlayH):diffuse(accentColor):diffusealpha(0.3)
 			end
 		},
 		Def.Quad {
 			InitCommand = function(self) 
-				self:halign(1):x(sidebarW/2):zoomto(4, overlayH):diffuse(accentColor):diffusealpha(0.1)
+				self:halign(1):x(profileSidebarW/2):zoomto(4, overlayH):diffuse(accentColor):diffusealpha(0.1)
 			end
 		},
 		
@@ -564,12 +614,12 @@ local profileOverlay = Def.ActorFrame {
 					InitCommand = function(self) self:y((i-1) * skillsetTabH) end,
 					Def.Quad {
 						Name = "Bg",
-						InitCommand = function(self) self:zoomto(sidebarW - 12, skillsetTabH - 4):halign(0):x(-sidebarW/2 + 6):diffuse(bgCard):diffusealpha(0.4) end
+						InitCommand = function(self) self:zoomto(profileSidebarW - 12, skillsetTabH - 4):halign(0):x(-profileSidebarW/2 + 6):diffuse(bgCard):diffusealpha(0.4) end
 					},
 					-- Active bar
 					Def.Quad {
 						Name = "ActiveBar",
-						InitCommand = function(self) self:halign(0):x(-sidebarW/2 + 6):zoomto(3, skillsetTabH - 4):diffuse(accentColor):visible(false) end,
+						InitCommand = function(self) self:halign(0):x(-profileSidebarW/2 + 6):zoomto(3, skillsetTabH - 4):diffuse(accentColor):visible(false) end,
 						UpdateOverlayUIActionCommand = function(self)
 							local parent = profileOverlayActor
 							if not parent then return end
@@ -579,11 +629,11 @@ local profileOverlay = Def.ActorFrame {
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Label",
-						InitCommand = function(self) self:halign(0):x(-sidebarW/2 + 16):zoom(0.30):diffuse(subText):settext(ss:upper()) end
+						InitCommand = function(self) self:halign(0):x(-profileSidebarW/2 + 16):zoom(0.30):diffuse(subText):settext(ss:upper()) end
 					},
 					LoadFont("Common Normal") .. {
 						Name = "Val",
-						InitCommand = function(self) self:halign(1):x(sidebarW/2 - 20):zoom(0.32):diffuse(mainText) end,
+						InitCommand = function(self) self:halign(1):x(profileSidebarW/2 - 20):zoom(0.32):diffuse(mainText) end,
 						UpdateOverlaySkillsetsMessageCommand = function(self)
 							local val = 0
 							local prof = PROFILEMAN:GetProfile(PLAYER_1)
@@ -602,10 +652,13 @@ local profileOverlay = Def.ActorFrame {
 						local parent = profileOverlayActor
 						if not parent or not parent:GetVisible() then return end
 						
-						local rx = mouseX - (SCREEN_CENTER_X - overlayW/2)
+						local sidebarX = SCREEN_CENTER_X - overlayW/2
+						local profileSidebarX = sidebarX + gradeSidebarW
+						
+						local rx = mouseX - profileSidebarX
 						local ry = mouseY - (SCREEN_CENTER_Y - overlayH/2)
 						
-						local over = rx >= 10 and rx <= sidebarW - 10 
+						local over = rx >= 10 and rx <= profileSidebarW - 10 
 						         and ry >= (140 + (i-1)*skillsetTabH - skillsetTabH/2) 
 								 and ry <= (140 + (i-1)*skillsetTabH + skillsetTabH/2)
 						
@@ -617,31 +670,17 @@ local profileOverlay = Def.ActorFrame {
 						else
 							bg:diffuse(bgCard):diffusealpha(0.4)
 						end
-						
-						-- Handle click
-						if over and INPUTFILTER:IsBeingPressed("left mouse button") then
-							if parent.currentSkillset ~= ss or parent.isRecentMode then
-								parent.currentSkillset = ss
-								parent.isRecentMode = false
-								parent.topPage = 1
-								-- Sort local scores if needed
-								if not parent.isOnlineMode then
-									SCOREMAN:SortSSRsForGame(ss)
-								end
-								MESSAGEMAN:Broadcast("UpdateOverlayUI")
-							end
-						end
 					end
 				}
 			end
 			return tabs
 		end)(),
 	},
-	
-	-- Main Area
+
+	-- 3. Main Area (Scores - Far Right)
 	Def.ActorFrame {
 		Name = "MainArea",
-		InitCommand = function(self) self:x(sidebarW/2) end,
+		InitCommand = function(self) self:x(-overlayW/2 + gradeSidebarW + profileSidebarW + mainPartW/2) end,
 		-- Area Header
 		Def.ActorFrame {
 			Name = "MainHeader",
@@ -811,6 +850,11 @@ local profileOverlay = Def.ActorFrame {
 						Name = "Validation",
 						InitCommand = function(self) self:halign(1):x(mainPartW/2 - 30):zoom(0.28):diffuse(subText) end
 					},
+					-- Invalid Indicator
+					LoadFont("Common Normal") .. {
+						Name = "InvalidIndicator",
+						InitCommand = function(self) self:halign(0):x(-mainPartW/2 + 30):y(-8):zoom(0.25):diffuse(color("1,0,0,1")):settext("[INVALID]"):visible(false) end
+					},
 					SetUpdateFunction = function(af)
 						local parent = profileOverlayActor
 						if not parent or not parent:GetVisible() then return end
@@ -820,7 +864,8 @@ local profileOverlay = Def.ActorFrame {
 						local ry = mouseY - (SCREEN_CENTER_Y - overlayH/2)
 						local rowTop = rowsYStart + (i-1)*rowH - rowH/2
 						local rowBottom = rowTop + rowH
-						local over = rx >= sidebarW + 10 and rx <= overlayW - 10 and ry >= rowTop and ry <= rowBottom
+						local scoreAreaX = gradeSidebarW + profileSidebarW
+						local over = rx >= scoreAreaX + 10 and rx <= overlayW - 10 and ry >= rowTop and ry <= rowBottom
 						local bg = af:GetChild("Bg")
 						local score = af.currentScore
 						
@@ -964,7 +1009,18 @@ local profileOverlay = Def.ActorFrame {
 				pLabel:diffuse(HVColor.GetGradeColor(grade))
 				
 				row:GetChild("Validation"):settext(metadata)
-				row:GetChild("Bg"):diffuse(color("0,0,0,0.3"))
+				
+				local isInvalid = type(score) ~= "table" and not score:GetEtternaValid()
+				row:GetChild("InvalidIndicator"):visible(isInvalid)
+				if isInvalid then
+					row:GetChild("Bg"):diffuse(color("0.5,0.05,0.05,0.4"))
+					row:GetChild("SSR"):diffuse(color("0.6,0.6,0.6,1"))
+					row:GetChild("Title"):diffuse(color("0.6,0.6,0.6,1"))
+				else
+					row:GetChild("Bg"):diffuse(color("0,0,0,0.3"))
+					-- SSR color is set by HVColor.GetMSDRatingColor in line above
+					row:GetChild("Title"):diffuse(brightText)
+				end
 			else
 				row:visible(false)
 			end
@@ -1290,13 +1346,10 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			end
 			
 			-- 3. HANDLE OVERLAY INPUT SINKING
-			-- If any tab is active, we generally want to sink all non-mouse input 
-			-- from the engine/music wheel. Individual scripts will handle their own keys.
 			if activeTab ~= "" then
-				-- Let mouse clicks pass through for IsMouseOver checks in scripts
+				-- Sink everything for any active tab (mouse excluded)
+				-- This is a fallback; primary tab logic is in HV.OverlayInputCallback
 				if btn and btn:match("mouse") then return false end
-				
-				-- Sink everything else
 				return true
 			end
 			

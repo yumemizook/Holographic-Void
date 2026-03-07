@@ -1,0 +1,785 @@
+﻿[2026-03-07 13:14:32][INFO]: Etterna v0.74.4 - Build v0.74.4-0-gb6566006
+[2026-03-07 13:14:32][INFO]: System: Windows 10.0 Professional (Build #26200)
+[2026-03-07 13:14:32][INFO]: CPU: Intel(R) Pentium(R) Silver N6000 @ 1.10GHz
+[2026-03-07 13:14:32][INFO]: System Architecture: x64
+[2026-03-07 13:14:32][INFO]: Total Memory: 15.625GB
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Defaults.ini' failed: No such file or directory
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Static.ini' failed: No such file or directory
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Static.ini' failed: No such file or directory
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Defaults.ini' failed: No such file or directory
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Static.ini' failed: No such file or directory
+[2026-03-07 13:14:32][WARN]: Reading 'Data/Static.ini' failed: No such file or directory
+[2026-03-07 13:14:32][INFO]: Crash dumps WILL be uploaded if the game crashes.
+[2026-03-07 13:14:32][INFO]: Logging level 2 (0 - TRACE | 5 - FATAL)
+[2026-03-07 13:14:33][INFO]: Loading window: win32
+[2026-03-07 13:14:33][INFO]: ThemeManager::SwitchThemeAndLanguage: "Holographic Void", "en"
+[2026-03-07 13:14:33][INFO]: Theme: Holographic Void
+[2026-03-07 13:14:33][INFO]: Language: en
+[2026-03-07 13:14:33][INFO]: Loading "/Scripts/32log.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Scripts/extend_table.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Scripts/32log.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Scripts/extend_table.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/00 compat.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/00 init.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/00 Utility.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/01 alias.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/01 base.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/01 Functional.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/01 IniFile.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Actor.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 ActorDef.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Branches.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Colors.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Debug.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Enum.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 OptionsMenu.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Other.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Serialize.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Sprite.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 StageMods.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 ThemePrefs.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 ThemePrefsRows.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/02 Utilities.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/03 CustomSpeedMods.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/03 DisplaySpecs.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/03 Gameplay.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/03 GamePreferences.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/03 UserPreferences2.lua" ...
+[2026-03-07 13:14:33][WARN]: Reading 'Themes/_fallback/ThemeInfo.ini' failed: No such file or directory
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/04 LogDisplay.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/04 NumPadEntry.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/04 SetBGFitHelpers.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/09 PackList.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/09 SimNSkinPreview.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 AudioVisualizer.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 FileUtils.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 Scores.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 settings_system.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 Texts.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/10 WifeSundries.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/11 AssetsConfig.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/12 AssetsUtils.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/72 custom_windows_config.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/96 Tooltip.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/97 UIElements.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/99 util.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/_fallback/Scripts/find_missing_lang_strings.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/01 Init.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 01 Init.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/02 Colors.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 02 Colors.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/03 ThemePrefs.lua" ...
+[2026-03-07 13:14:33][INFO]: ThemePrefs.Init: loading from disk
+[2026-03-07 13:14:33][INFO]: IniFile.ReadFile( Save/ThemePrefs.ini )
+[2026-03-07 13:14:33][INFO]: Holographic Void: 03 ThemePrefs.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/04 ThemePrefsRows.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 04 ThemePrefsRows.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/05 Transitions.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 05 Transitions.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/06 Mouse.lua" ...
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/07 Util.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 07 Util.lua loaded.
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/08 EtternaUtils.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 08 EtternaUtils.lua loaded (expanded).
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/08 Tags.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: TAGMAN initialized (Source: tags.lua)
+[2026-03-07 13:14:33][INFO]: Loading "/Themes/Holographic Void/Scripts/09 Branch.lua" ...
+[2026-03-07 13:14:33][INFO]: Holographic Void: 09 Branch.lua loaded.
+[2026-03-07 13:14:33][INFO]: WaveOut software mixing at 44100hz
+[2026-03-07 13:14:33][INFO]: Starting thread: Decode thread
+[2026-03-07 13:14:33][INFO]: Starting thread: Mixer thread
+[2026-03-07 13:14:33][INFO]: Sound driver: WaveOut
+[2026-03-07 13:14:33][INFO]: Starting thread: Music thread
+[2026-03-07 13:14:33][INFO]: ThemeManager::SwitchThemeAndLanguage: "Holographic Void", "en"
+[2026-03-07 13:14:33][INFO]: Beginning InitSongsFromDisk
+[2026-03-07 13:14:33][INFO]: Beginning LoadCache
+[2026-03-07 13:14:34][INFO]: LoadCache Started 4 Threads
+[2026-03-07 13:14:42][INFO]: LoadCache Thread 3 Finished
+[2026-03-07 13:14:42][INFO]: LoadCache Thread 0 Finished
+[2026-03-07 13:14:42][INFO]: LoadCache Thread 1 Finished
+[2026-03-07 13:14:43][INFO]: LoadCache Thread 2 Finished
+[2026-03-07 13:14:43][INFO]: Finished LoadCache
+[2026-03-07 13:14:44][INFO]: InitSongsFromDisk Starting 4 Threads
+[2026-03-07 13:14:44][INFO]: InitSongsFromDisk Threads Finished
+[2026-03-07 13:14:44][INFO]: LoadStepmaniaSongDir Starting: Songs/
+[2026-03-07 13:14:46][INFO]: LoadStepmaniaSongDir Starting 4 Threads for Dir Songs/
+[2026-03-07 13:14:46][INFO]: Song /Songs/interesting files i found in my discord dms/snover pattern/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/DumpAss Dude's Dream/Zzz old pack bn/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/itg! Rhythm is just a step away!/cdtitles/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Jumpstream Of Fighters Vol. 1/_songlist/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Jumpstream Of Fighters Vol. 2/_extras/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Fullerene Shift/_Song List/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Nuclear Blast JS Awesome Bomb Filez/ZZZ SSFFRC/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Kauitsu's Soup Pack 3/z old cd titles (ignore this folder)/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Nuclear Blast JS Awesome Bomb Filez 4/Petit Pr�lude P�rim� (Xayphon)/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Kauitsu's Soup Pack 5/zzbackups/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Grape Cola 3/zzzzzzzz some notes n stuff/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/KBO Solo Files (Part VI)/jynweythek/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/KITUNEKOTEI (Full Collection)/夢幻ノ光/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/KITUNEKOTEI (Full Collection)/月不M/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Acerola/zz BN package/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Acerola/zz old GFX/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/ATTang/ATTang's Bad Files/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Charting Secret Santa 2024/GFX/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Charting Secret Santa 2025/GFX/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Charting Secret Santa 2025/to mikatheidiot - Extradimensional Cosmic Phenomenon (towakane)/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Chordial Blitz/zz BN package/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: Song /Songs/Chordial Blitz/zz old GFX/ has no SSC, SM, SMA, DWI, BMS, KSF, or OSU files - ignoring
+[2026-03-07 13:14:46][INFO]: LoadStepmaniaSongDir Finished: Songs/
+[2026-03-07 13:14:46][INFO]: LoadStepmaniaSongDir Starting: /AdditionalSongs/
+[2026-03-07 13:14:47][INFO]: LoadStepmaniaSongDir Finished: /AdditionalSongs/
+[2026-03-07 13:14:47][INFO]: InitSongsFromDisk Found 8725 songs in 14.115079 seconds
+[2026-03-07 13:14:47][INFO]: Loading the Calc Test node.
+[2026-03-07 13:14:47][INFO]: Loading /Save/LocalProfiles/00000000/Etterna.xml
+[2026-03-07 13:14:47][INFO]: Done loading from file
+[2026-03-07 13:14:48][INFO]: Loaded replay data type 2 at Save/ReplaysV2/S5359d02325e4c364501109dffaf53dff85fb59ee
+[2026-03-07 13:14:48][INFO]: Attempting to connect to: multi.etternaonline.com, Port: 8765
+[2026-03-07 13:14:48][ERROR]: Could not create ettp connection because: Connection creation attempt failed
+[2026-03-07 13:14:49][INFO]: Connected to ett server: multi.etternaonline.com
+[2026-03-07 13:14:49][INFO]: Server Version: 0 
+[2026-03-07 13:14:49][INFO]: Last seen video driver: Intel(R) UHD Graphics
+[2026-03-07 13:14:49][INFO]: Video renderers: 'd3d, opengl'
+[2026-03-07 13:14:49][INFO]: RageDisplay_D3D::RageDisplay_D3D()
+[2026-03-07 13:14:49][INFO]: Current renderer: Direct3D
+[2026-03-07 13:14:49][INFO]: Driver: igdumdim64.dll
+Description: Intel(R) UHD Graphics
+Max texture size: 8192
+Alpha in palette: no
+
+[2026-03-07 13:14:49][INFO]: This display adaptor supports the following modes:
+[2026-03-07 13:14:49][INFO]:   1920x1080 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1920x1080 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1920x1080 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1920x540 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1920x540 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1920x540 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   800x600 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   800x600 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   800x600 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   640x480 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   640x480 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   640x480 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x1024 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x1024 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x1024 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1024x768 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1024x768 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1024x768 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1680x1050 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1680x1050 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1680x1050 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x960 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x960 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x960 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x720 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x720 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x720 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x480 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x480 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x480 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x480 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x480 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x480 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x576 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x576 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x576 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x576 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x576 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   720x576 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1152x864 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1152x864 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1152x864 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x600 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x600 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x600 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x768 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x768 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x768 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x800 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x800 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1280x800 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1360x768 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1360x768 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1360x768 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1366x768 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1366x768 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1366x768 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1400x1050 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1400x1050 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1400x1050 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x900 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x900 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1440x900 59Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1600x900 75Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1600x900 60Hz, format 22
+[2026-03-07 13:14:49][INFO]:   1600x900 59Hz, format 22
+[2026-03-07 13:14:49][WARN]: RageDisplay_D3D::TryVideoMode( 1, 1366, 768, 32, 0, 0 )
+[2026-03-07 13:14:49][INFO]: Present Parameters: 1366, 768, 22, 1, 0, 1, 0x1404d2, 1, 1, 80, 0, 0, 2147483648
+[2026-03-07 13:14:50][INFO]: D3D Windowed 1366x768 32 color 32 texture 75Hz NoVsync NoSmoothLines
+[2026-03-07 13:14:50][INFO]: RageInput::RageInput()
+[2026-03-07 13:14:50][INFO]: DInput: Enumerating device - Type: 0x413 Instance Name: "Keyboard" Product Name: "Keyboard"
+[2026-03-07 13:14:50][INFO]: DInput: Enumerating device - Type: 0x112 Instance Name: "Mouse" Product Name: "Mouse"
+[2026-03-07 13:14:50][INFO]: Opening DIDevice 'Keyboard'
+[2026-03-07 13:14:50][INFO]: Opening DIDevice 'Mouse'
+[2026-03-07 13:14:50][INFO]: Found 2 DirectInput devices:
+[2026-03-07 13:14:50][INFO]:    0: 'Keyboard' axes: 0, hats: 0, buttons: 256 (buffered)
+[2026-03-07 13:14:50][INFO]:    1: 'Mouse' axes: 3, hats: 0, buttons: 8 (buffered)
+[2026-03-07 13:14:50][INFO]: Starting thread: DirectInput thread
+[2026-03-07 13:14:50][INFO]: ScreenManager::ThemeChanged
+[2026-03-07 13:14:50][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:14:50][INFO]: Loading screen: "ScreenSystemLayer"
+[2026-03-07 13:14:54][INFO]: Loaded "ScreenSystemLayer" ("ScreenSystemLayer") in 3.7132685
+[2026-03-07 13:14:54][INFO]: Loading screen: "ScreenSyncOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenSyncOverlay" ("ScreenSyncOverlay") in 2.1292403
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenStatsOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenStatsOverlay" ("ScreenStatsOverlay") in 0.0017825
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenDebugOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenDebugOverlay" ("ScreenDebugOverlay") in 0.013412
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenInstallOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenInstallOverlay" ("ScreenInstallOverlay") in 0.0011379
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenChatOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenChatOverlay" ("ScreenWithMenuElementsBasic") in 0.0255446
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenHVDownloadOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenHVDownloadOverlay" ("ScreenWithMenuElementsBasic") in 0.0129911
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenHVAlarmOverlay"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenHVAlarmOverlay" ("ScreenWithMenuElementsBasic") in 0.0095354
+[2026-03-07 13:14:56][INFO]: Loading screen: "ScreenInit"
+[2026-03-07 13:14:56][INFO]: Loaded "ScreenInit" ("ScreenSplash") in 0.0159952
+[2026-03-07 13:14:56][INFO]: PushLoadedScreen: "ScreenInit"
+[2026-03-07 13:14:56][INFO]: Ettp server identified: AltEOMulti (Version: 5)
+[2026-03-07 13:14:56][INFO]: Connection to 'AltEOMulti' successful.
+[2026-03-07 13:14:56][INFO]: RefreshLastVersion beginning to determine latest game version according to API
+[2026-03-07 13:14:56][INFO]: Refreshing Pack Tags
+[2026-03-07 13:14:56][INFO]: Generating GetPackTagsRequest
+[2026-03-07 13:14:58][INFO]: Loaded tagType noteskin_tag with 11 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType global_keyCount with 7 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType global_skillset with 8 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType judgement_tag with 5 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType noteskin_type with 5 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType toastie_type with 1 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType toastie_tag with 1 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType pack_bundle with 5 tags
+[2026-03-07 13:14:58][INFO]: Loaded tagType pack_tag with 8 tags
+[2026-03-07 13:14:58][INFO]: Caching packs for tag 'beginner'
+[2026-03-07 13:14:58][INFO]: Generating MultiSearchRequest for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['beginner'])
+[2026-03-07 13:14:58][INFO]: Finished creating MultiSearch request for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['beginner'])
+[2026-03-07 13:14:58][INFO]: Caching packs for tag 'novice'
+[2026-03-07 13:14:58][INFO]: Generating MultiSearchRequest for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['novice'])
+[2026-03-07 13:14:58][INFO]: Finished creating MultiSearch request for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['novice'])
+[2026-03-07 13:14:58][INFO]: Caching packs for tag 'intermediate'
+[2026-03-07 13:14:58][INFO]: Generating MultiSearchRequest for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['intermediate'])
+[2026-03-07 13:14:58][INFO]: Finished creating MultiSearch request for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['intermediate'])
+[2026-03-07 13:14:58][INFO]: Caching packs for tag 'advanced'
+[2026-03-07 13:14:58][INFO]: Generating MultiSearchRequest for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['advanced'])
+[2026-03-07 13:14:58][INFO]: Finished creating MultiSearch request for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['advanced'])
+[2026-03-07 13:14:58][INFO]: Caching packs for tag 'expert'
+[2026-03-07 13:14:58][INFO]: Generating MultiSearchRequest for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['expert'])
+[2026-03-07 13:14:58][INFO]: Finished creating MultiSearch request for (ApiSearchCriteria page: 0, per_page: 100, tags (matchAny=true): ['expert'])
+[2026-03-07 13:14:58][INFO]: RefreshLastVersion successful - Last Version is 0.74
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 1 (id 3334): Autotelic Jacks
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 2 (id 3403): Bursts Of A Teitoku Kai
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 3 (id 4473): Jumpstream Of Fighters Vol. 1
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 4 (id 3735): Jumpstream Of Fighters Vol. 2
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 5 (id 3756): Lofty Minipack 4 (Paradise Loft)
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 6 (id 3819): Minty Fresh Pack 3
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 7 (id 3873): Nuclear Kimchi Chordjack Pack
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 8 (id 4074): Skwid's Minipack 8 (Ok Here It Is Edition)
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 9 (id 4073): Skwid's Minipack 9 (Anchor Edition)
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 10 (id 4240): Treatpack 1
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 11 (id 4295): Valedumps 2
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', cached pack 12 (id 5000): World of Corruption
+[2026-03-07 13:14:59][INFO]: For tag 'advanced', finished caching packs - 12 total
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 1 (id 3455): Dark Chanchellors Pack
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 2 (id 3569): FFR Partyy Pack Vol. 1
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 3 (id 3712): Keyboard Collaboration II
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 4 (id 3711): Keyboard Collaboration III
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 5 (id 3768): Light Chancellors Pack 3
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 6 (id 3938): Oxicleaned
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 7 (id 4212): Stepping Stones 4
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 8 (id 4330): VGMP 4
+[2026-03-07 13:14:59][INFO]: For tag 'novice', cached pack 9 (id 4368): Xoon 5 -The Transition-
+[2026-03-07 13:14:59][INFO]: For tag 'novice', finished caching packs - 9 total
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 1 (id 3302): Acerola
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 2 (id 3417): Chordial Blitz
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 3 (id 3553): Fennec Fantasy
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 4 (id 3637): hi19hi19 Pack 3 - Popcorn Blast JS Buttery Snack Filez
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 5 (id 3636): hi19hi19 Pack 4 - Modern Keyboardsmash
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 6 (id 3635): hi19hi19 Pack 5 - Streams and Memes
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 7 (id 3779): LEINISM
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 8 (id 3874): Nuclear Blast JS Awesome Bomb Filez 5
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 9 (id 3868): ODIPack3
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 10 (id 5000): World of Corruption
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 11 (id 4352): Yolomania Vol. 3
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', cached pack 12 (id 4351): Yolomania Vol. 4
+[2026-03-07 13:14:59][INFO]: For tag 'intermediate', finished caching packs - 12 total
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 1 (id 4614): April Singles
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 2 (id 3431): cesspool of ribal 4
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 3 (id 3479): Denpack Append
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 4 (id 3486): DumpAss Dude's Dream
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 5 (id 3589): Fullerene Shift
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 6 (id 3827): Mina Minimegapack 6 (daunrealonez)
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 7 (id 3814): Miracle Streamz^2
+[2026-03-07 13:14:59][INFO]: For tag 'expert', cached pack 8 (id 5000): World of Corruption
+[2026-03-07 13:14:59][INFO]: For tag 'expert', finished caching packs - 8 total
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 1 (id 4822): ISAAC's Casualties of Rhythm 4
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 2 (id 3928): Otaku's Dream 10th Anime Mix
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 3 (id 3929): Otaku's Dream 9th Anime Mix
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 4 (id 3975): Piece of Cake 8
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 5 (id 4197): Super Meat Boy! Full-Keyboard Stepmania Pack
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 6 (id 4314): Vocaloid Collaboration 12
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', cached pack 7 (id 4313): Vocaloid Collaboration 13
+[2026-03-07 13:14:59][INFO]: For tag 'beginner', finished caching packs - 7 total
+[2026-03-07 13:15:01][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:15:01][INFO]: Resetting the current button table
+[2026-03-07 13:15:01][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.0929212
+[2026-03-07 13:15:02][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:15:11][INFO]: Resetting the current button table
+[2026-03-07 13:15:11][INFO]: Loading screen: "ScreenProfileLoad"
+[2026-03-07 13:15:11][INFO]: Loaded "ScreenProfileLoad" ("ScreenProfileLoad") in 0.0124666
+[2026-03-07 13:15:11][INFO]: PushLoadedScreen: "ScreenProfileLoad"
+[2026-03-07 13:15:12][INFO]: Loading screen: "ScreenSelectMusic"
+[2026-03-07 13:15:12][INFO]: Resetting the current button table
+[2026-03-07 13:15:13][INFO]: Loaded "ScreenSelectMusic" ("ScreenSelectMusic") in 1.1575149
+[2026-03-07 13:15:13][INFO]: PushLoadedScreen: "ScreenSelectMusic"
+[2026-03-07 13:15:13][INFO]: MusicWheel sorting took: 0.3118ms
+[2026-03-07 13:15:13][INFO]: MusicWheel sorting took: 232.4085ms
+[2026-03-07 13:15:14][INFO]: Successful login as AnemoArchon
+[2026-03-07 13:15:14][INFO]: Refreshing UserData for AnemoArchon
+[2026-03-07 13:15:14][INFO]: Refreshing Favorites - 1990-01-01 12:00:00 to 2100-01-01 12:00:00
+[2026-03-07 13:15:14][INFO]: Generating GetFavoritesRequest 1990-1-1 to 2100-1-1
+[2026-03-07 13:15:14][INFO]: Finished creating GetFavorites request for 1990-1-1 - 2100-1-1
+[2026-03-07 13:15:14][INFO]: Refreshing Goals - 1990-01-01 12:00:00 to 2100-01-01 12:00:00
+[2026-03-07 13:15:14][INFO]: Generating GetGoalsRequest 1990-1-1 to 2100-1-1
+[2026-03-07 13:15:14][INFO]: Finished creating GetGoals request for 1990-1-1 - 2100-1-1
+[2026-03-07 13:15:14][INFO]: Loading Playlists - 1990-01-01 12:00:00 to 2100-01-01 12:00:00
+[2026-03-07 13:15:14][INFO]: Generating GetPlaylistsRequest 1990-1-1 to 2100-1-1
+[2026-03-07 13:15:14][INFO]: Finished creating GetPlaylistsRequest request for 1990-1-1 - 2100-1-1
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Overall (overall)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Overall
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Stream (stream)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Stream
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Jumpstream (jumpstream)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Jumpstream
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Handstream (handstream)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Handstream
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Stamina (stamina)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Stamina
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset JackSpeed (jacks)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset JackSpeed
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Chordjack (chordjacks)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Chordjack
+[2026-03-07 13:15:14][INFO]: Generating RequestTop25 request for skillset Technical (technical)
+[2026-03-07 13:15:14][INFO]: Finished creating RequestTop25 request for skillset Technical
+[2026-03-07 13:15:14][INFO]: Generating ranked chartkeys request 2026-3-5 to 2100-1-1
+[2026-03-07 13:15:14][INFO]: Finished creating GetRankedChartkeys request for 2026-3-5 - 2100-1-1
+[2026-03-07 13:15:14][INFO]: Generating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:15:14][INFO]: Finished creating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:15:14][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:15:14][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:15:14][INFO]: RefreshUserData for AnemoArchon succeeded - Rank 984 - Overall 28.839111328125
+[2026-03-07 13:15:15][INFO]: GetPlaylistsRequest returned successfully. Found 0 online playlists
+[2026-03-07 13:15:15][INFO]: Found 0 online playlists which are saved locally, and 0 which are not
+[2026-03-07 13:15:15][INFO]: GetChartLeaderboard finished, but no callback was set
+[2026-03-07 13:15:15][INFO]: GetChartLeaderboard for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19 succeeded - 9 scores found
+[2026-03-07 13:15:15][INFO]: GetGoalsRequest returned successfully. Found 1 online goals
+[2026-03-07 13:15:15][INFO]: Found 0 online goals to save locally, 0 local goals to update online, and 0 local goals to upload as new ones
+[2026-03-07 13:15:15][INFO]: GetFavoritesRequest returned successfully. Found 1 online favorites
+[2026-03-07 13:15:15][INFO]: Found 0 online favorites to save locally, and 0 favorites to upload online
+[2026-03-07 13:15:15][INFO]: GetRankedChartkeys succeeded - 0 keys found for range 2026-3-5 - 2100-1-1 | 0 total keys
+[2026-03-07 13:15:15][INFO]: Updating online scores. (Uploading 2 scores)
+[2026-03-07 13:15:15][INFO]: Starting sequential score upload process - 2 scores split into chunks of 100
+[2026-03-07 13:15:15][INFO]: Creating BulkUploadScore request for 2 scores
+[2026-03-07 13:15:15][INFO]: Loaded replay data type 2 at Save/ReplaysV2/S99f5a37e0921b6360eab31bc65eebfdfc8e3b76c
+[2026-03-07 13:15:15][INFO]: Loaded input data at Save/InputData/S99f5a37e0921b6360eab31bc65eebfdfc8e3b76c
+[2026-03-07 13:15:15][INFO]: Loaded replay data type 2 at Save/ReplaysV2/S69d5a5c75e6493999ce261b86bffb83660d11ed2
+[2026-03-07 13:15:15][INFO]: Loaded input data at Save/InputData/S69d5a5c75e6493999ce261b86bffb83660d11ed2
+[2026-03-07 13:15:15][INFO]: Finished creating BulkUploadScore request for 2 scores
+[2026-03-07 13:15:17][WARN]: BulkScoreUpload had 2 failed uploads out of 2
+[2026-03-07 13:15:17][WARN]: Score S99f5a37e0921b6360eab31bc65eebfdfc8e3b76c was rejected by server for: "Score is not a PB"
+[2026-03-07 13:15:17][WARN]: Score S69d5a5c75e6493999ce261b86bffb83660d11ed2 was rejected by server for: "Score is not a PB"
+[2026-03-07 13:15:17][INFO]: BulkScoreUpload for 2 scores completed, and 2 of those were rejected - 
+	Overall 28.839111328125
+	Stream 27.7138671875
+	JS 29.6435546875
+	HS 28.55810546875
+	Jacks 25.8349609375
+	CJ 28.24072265625
+	Stamina 29.56103515625
+	Tech 27.60595703125
+[2026-03-07 13:15:17][INFO]: Sequential score upload queue empty - uploads finished
+[2026-03-07 13:15:18][INFO]: RequestTop25 found 25 scores for skillset Handstream
+[2026-03-07 13:15:18][INFO]: RequestTop25 found 25 scores for skillset Chordjack
+[2026-03-07 13:15:18][INFO]: RequestTop25 found 25 scores for skillset Stream
+[2026-03-07 13:15:18][INFO]: RequestTop25 found 25 scores for skillset JackSpeed
+[2026-03-07 13:15:19][INFO]: RequestTop25 found 25 scores for skillset Technical
+[2026-03-07 13:15:19][INFO]: RequestTop25 found 25 scores for skillset Jumpstream
+[2026-03-07 13:15:19][INFO]: RequestTop25 found 25 scores for skillset Stamina
+[2026-03-07 13:15:22][INFO]: RequestTop25 found 25 scores for skillset Overall
+[2026-03-07 13:15:38][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:15:38][WARN]: RageSoundDriver::GetHardwareFrame: too many tries
+[2026-03-07 13:16:08][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:16:09][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:16:09][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:16:09][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:17:10][INFO]: Resetting the current button table
+[2026-03-07 13:17:10][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:17:10][INFO]: Resetting the current button table
+[2026-03-07 13:17:10][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.0857587
+[2026-03-07 13:17:10][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:17:10][INFO]: Resetting the current button table
+[2026-03-07 13:17:10][INFO]: Loading screen: "ScreenInit"
+[2026-03-07 13:17:10][INFO]: Loaded "ScreenInit" ("ScreenSplash") in 0.0062699
+[2026-03-07 13:17:10][INFO]: PushLoadedScreen: "ScreenInit"
+[2026-03-07 13:17:11][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:17:11][INFO]: Resetting the current button table
+[2026-03-07 13:17:11][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.0773195
+[2026-03-07 13:17:11][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:17:12][INFO]: Resetting the current button table
+[2026-03-07 13:17:12][INFO]: Loading screen: "ScreenOptionsService"
+[2026-03-07 13:17:12][INFO]: Loaded "ScreenOptionsService" ("ScreenOptionsMaster") in 0.0618415
+[2026-03-07 13:17:13][INFO]: PushLoadedScreen: "ScreenOptionsService"
+[2026-03-07 13:17:14][INFO]: Loading screen: "ScreenOptionsTheme"
+[2026-03-07 13:17:14][INFO]: GetRow(HV_BGAnimIntensity), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_BackgroundEffect), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowMSD), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowProfileStats), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_MSDColorScaleV3), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowMeasureLines), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowNPS), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_NPSWindowSize), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowPacemakerGraph), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowTextPacemaker), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_PacemakerTargetType), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_PacemakerTargetGoal), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ShowMean), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_QuotesMode), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_ErrorBarMode), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_Particles), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_EnableGlow), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_UseCustomGrades), type table
+[2026-03-07 13:17:14][INFO]: GetRow(HV_GradeColorStyle), type table
+[2026-03-07 13:17:14][INFO]: Loaded "ScreenOptionsTheme" ("ScreenOptionsMaster") in 0.0343119
+[2026-03-07 13:17:14][INFO]: PushLoadedScreen: "ScreenOptionsTheme"
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:16][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:17:17][INFO]: Loading screen: "ScreenOptionsService"
+[2026-03-07 13:17:17][INFO]: Loaded "ScreenOptionsService" ("ScreenOptionsMaster") in 0.0137692
+[2026-03-07 13:17:17][INFO]: PushLoadedScreen: "ScreenOptionsService"
+[2026-03-07 13:17:18][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:17:18][INFO]: Resetting the current button table
+[2026-03-07 13:17:18][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.0701339
+[2026-03-07 13:17:18][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:17:19][INFO]: Resetting the current button table
+[2026-03-07 13:17:19][INFO]: Loading screen: "ScreenProfileLoad"
+[2026-03-07 13:17:19][INFO]: Loaded "ScreenProfileLoad" ("ScreenProfileLoad") in 0.0043042
+[2026-03-07 13:17:19][INFO]: PushLoadedScreen: "ScreenProfileLoad"
+[2026-03-07 13:17:20][INFO]: Loading screen: "ScreenSelectMusic"
+[2026-03-07 13:17:20][INFO]: Resetting the current button table
+[2026-03-07 13:17:21][INFO]: Loaded "ScreenSelectMusic" ("ScreenSelectMusic") in 0.8249588
+[2026-03-07 13:17:21][INFO]: PushLoadedScreen: "ScreenSelectMusic"
+[2026-03-07 13:17:21][INFO]: MusicWheel sorting took: 0.1745ms
+[2026-03-07 13:17:21][INFO]: MusicWheel sorting took: 230.2393ms
+[2026-03-07 13:17:21][INFO]: Generating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:17:21][INFO]: Finished creating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:17:22][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:22][INFO]: GetChartLeaderboard finished, but no callback was set
+[2026-03-07 13:17:22][INFO]: GetChartLeaderboard for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19 succeeded - 9 scores found
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:25][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:27][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:27][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:27][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:28][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:29][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:30][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:39][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:39][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:39][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:40][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:40][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:40][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:41][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:42][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:43][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:44][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:47][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:48][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:49][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:50][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:51][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:53][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:55][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:56][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:56][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:56][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:17:57][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:17:58][INFO]: MusicWheel sorting took: 72.185104ms
+[2026-03-07 13:17:59][INFO]: MusicWheel sorting took: 52.9434ms
+[2026-03-07 13:18:00][INFO]: MusicWheel sorting took: 45.0675ms
+[2026-03-07 13:18:01][INFO]: MusicWheel sorting took: 54.6584ms
+[2026-03-07 13:18:02][INFO]: MusicWheel sorting took: 48.6079ms
+[2026-03-07 13:18:02][INFO]: MusicWheel sorting took: 53.8214ms
+[2026-03-07 13:18:03][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:18:03][INFO]: MusicWheel sorting took: 60.6032ms
+[2026-03-07 13:18:04][INFO]: MusicWheel sorting took: 54.9896ms
+[2026-03-07 13:18:04][INFO]: MusicWheel sorting took: 51.4812ms
+[2026-03-07 13:18:05][INFO]: MusicWheel sorting took: 50.4621ms
+[2026-03-07 13:18:05][INFO]: MusicWheel sorting took: 51.1761ms
+[2026-03-07 13:18:07][INFO]: MusicWheel sorting took: 65.5935ms
+[2026-03-07 13:18:08][INFO]: MusicWheel sorting took: 59.4811ms
+[2026-03-07 13:18:08][INFO]: MusicWheel sorting took: 57.6867ms
+[2026-03-07 13:18:08][INFO]: MusicWheel sorting took: 50.1857ms
+[2026-03-07 13:18:09][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:18:09][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:18:09][WARN]: Error running input callback: attempt to call a nil value
+[2026-03-07 13:18:10][INFO]: Resetting the current button table
+[2026-03-07 13:18:10][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:18:10][INFO]: Resetting the current button table
+[2026-03-07 13:18:10][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.0884912
+[2026-03-07 13:18:10][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:18:12][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:19:01][INFO]: Loading screen: "ScreenOptionsService"
+[2026-03-07 13:19:01][INFO]: Loaded "ScreenOptionsService" ("ScreenOptionsMaster") in 0.0408209
+[2026-03-07 13:19:02][INFO]: PushLoadedScreen: "ScreenOptionsService"
+[2026-03-07 13:19:03][INFO]: Loading screen: "ScreenOptionsTheme"
+[2026-03-07 13:19:03][INFO]: GetRow(HV_BGAnimIntensity), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_BackgroundEffect), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowMSD), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowProfileStats), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_MSDColorScaleV3), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowMeasureLines), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowNPS), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_NPSWindowSize), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowPacemakerGraph), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowTextPacemaker), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_PacemakerTargetType), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_PacemakerTargetGoal), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ShowMean), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_QuotesMode), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_ErrorBarMode), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_Particles), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_EnableGlow), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_UseCustomGrades), type table
+[2026-03-07 13:19:03][INFO]: GetRow(HV_GradeColorStyle), type table
+[2026-03-07 13:19:03][INFO]: Loaded "ScreenOptionsTheme" ("ScreenOptionsMaster") in 0.0237152
+[2026-03-07 13:19:03][INFO]: PushLoadedScreen: "ScreenOptionsTheme"
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:06][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: IniFile.WriteFile( Save/ThemePrefs.ini )
+[2026-03-07 13:19:07][INFO]: Loading screen: "ScreenOptionsService"
+[2026-03-07 13:19:07][INFO]: Loaded "ScreenOptionsService" ("ScreenOptionsMaster") in 0.0079696
+[2026-03-07 13:19:07][INFO]: PushLoadedScreen: "ScreenOptionsService"
+[2026-03-07 13:22:37][INFO]: Loading screen: "ScreenTitleMenu"
+[2026-03-07 13:22:37][INFO]: Resetting the current button table
+[2026-03-07 13:22:38][INFO]: Loaded "ScreenTitleMenu" ("ScreenTitleMenu") in 0.1122576
+[2026-03-07 13:22:38][INFO]: PushLoadedScreen: "ScreenTitleMenu"
+[2026-03-07 13:22:39][INFO]: Loading screen: "ScreenProfileLoad"
+[2026-03-07 13:22:39][INFO]: Loaded "ScreenProfileLoad" ("ScreenProfileLoad") in 0.0062838
+[2026-03-07 13:22:39][INFO]: PushLoadedScreen: "ScreenProfileLoad"
+[2026-03-07 13:22:40][INFO]: Loading screen: "ScreenSelectMusic"
+[2026-03-07 13:22:40][INFO]: Resetting the current button table
+[2026-03-07 13:22:41][WARN]: String "Tags::TagList" is missing.
+[2026-03-07 13:22:41][INFO]: Dialog: "String "Tags::TagList" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:43][WARN]: String Tags::TagList could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:43][WARN]: String "Tags::TagFilter" is missing.
+[2026-03-07 13:22:43][INFO]: Dialog: "String "Tags::TagFilter" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:44][WARN]: String Tags::TagFilter could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:44][INFO]: Loaded "ScreenSelectMusic" ("ScreenSelectMusic") in 3.9842904
+[2026-03-07 13:22:44][INFO]: PushLoadedScreen: "ScreenSelectMusic"
+[2026-03-07 13:22:44][INFO]: MusicWheel sorting took: 0.1548ms
+[2026-03-07 13:22:44][INFO]: MusicWheel sorting took: 251.0945ms
+[2026-03-07 13:22:45][INFO]: Generating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:22:45][INFO]: Finished creating GetChartLeaderboard request for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19
+[2026-03-07 13:22:45][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:22:45][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:22:46][INFO]: GetChartLeaderboard finished, but no callback was set
+[2026-03-07 13:22:46][INFO]: GetChartLeaderboard for Xdf1dc3facce5d37a30ddfcfa5756c77ca87a0e19 succeeded - 9 scores found
+[2026-03-07 13:22:52][WARN]: String "Tags::Mode" is missing.
+[2026-03-07 13:22:52][INFO]: Dialog: "String "Tags::Mode" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:53][WARN]: String Tags::Mode could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:53][WARN]: String "Tags::AND" is missing.
+[2026-03-07 13:22:53][INFO]: Dialog: "String "Tags::AND" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:53][WARN]: String Tags::AND could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:53][WARN]: String "Tags::ExcludeMode" is missing.
+[2026-03-07 13:22:53][INFO]: Dialog: "String "Tags::ExcludeMode" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:54][WARN]: String Tags::ExcludeMode could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:54][WARN]: String "Tags::OR" is missing.
+[2026-03-07 13:22:54][INFO]: Dialog: "String "Tags::OR" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:54][WARN]: String Tags::OR could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:54][WARN]: String "Tags::Mode" is missing.
+[2026-03-07 13:22:54][INFO]: Dialog: "String "Tags::Mode" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:55][WARN]: String Tags::Mode could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:55][WARN]: String "Tags::AND" is missing.
+[2026-03-07 13:22:55][INFO]: Dialog: "String "Tags::AND" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:55][WARN]: String Tags::AND could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:55][WARN]: String "Tags::ExcludeMode" is missing.
+[2026-03-07 13:22:55][INFO]: Dialog: "String "Tags::ExcludeMode" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:56][WARN]: String Tags::ExcludeMode could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:56][WARN]: String "Tags::OR" is missing.
+[2026-03-07 13:22:56][INFO]: Dialog: "String "Tags::OR" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:57][WARN]: String Tags::OR could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:57][WARN]: String "Tags::HowToDelete" is missing.
+[2026-03-07 13:22:57][INFO]: Dialog: "String "Tags::HowToDelete" is missing.
+Correct this and click Retry, click Abort to crash, or click Ignore to attempt to continue." []
+[2026-03-07 13:22:57][WARN]: String Tags::HowToDelete could not be found in "Themes/Holographic Void/metrics.ini" or "Themes/_fallback/metrics.ini".
+[2026-03-07 13:22:59][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:23:06][INFO]: Starting thread: Buffered Audio Streamer
+[2026-03-07 13:23:09][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:23:41][INFO]: WM_CLOSE: shutting down
+[2026-03-07 13:23:41][INFO]: Loaded external keyboard layout 00000409
+[2026-03-07 13:23:41][INFO]: Shutting down mixer thread ...
+[2026-03-07 13:23:41][INFO]: Mixer thread shut down.
+[2026-03-07 13:23:41][INFO]: Shutting down decode thread ...
+[2026-03-07 13:23:41][INFO]: Decode thread shut down.
+[2026-03-07 13:23:41][INFO]: Shutting down DirectInput thread ...
+[2026-03-07 13:23:41][INFO]: DirectInput thread shut down.
+[2026-03-07 13:23:42][INFO]: Shutting down music start thread ...
+[2026-03-07 13:23:42][INFO]: Music start thread shut down.
+[2026-03-07 13:23:42][WARN]: TEXTUREMAN LEAK: '/NoteSkins/common/common/_blank.png', RefCount = 12.
+[2026-03-07 13:23:42][INFO]: RageDisplay_D3D::~RageDisplay()
+[2026-03-07 13:23:42][INFO]: Logging out

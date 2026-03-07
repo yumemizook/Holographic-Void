@@ -32,6 +32,8 @@ local function RefreshGoals()
 	goaltable = {}
 	local profile = GetProfile()
 	if profile then
+		-- Sync profile data (ensures goals are loaded from XML/Sync)
+		pcall(function() profile:SetFromAll() end)
 		local ok, gt = pcall(function() return profile:GetGoalTable() end)
 		if ok and gt then goaltable = gt end
 	end
@@ -83,12 +85,26 @@ local t = Def.ActorFrame {
 		end,
 	},
 
-	-- Add Goal button
+	-- Add Goal button (Relocated to top right for cleaner look)
 	Def.ActorFrame {
 		Name = "AddGoalBtn",
-		InitCommand = function(self) self:xy(overlayW/2 - 60, -overlayH/2 + 18) end,
-		Def.Quad { InitCommand = function(self) self:zoomto(80, 20):diffuse(accentColor):diffusealpha(0.3) end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.26):diffuse(brightText):settext(THEME:GetString("Goals", "AddGoal")) end },
+		InitCommand = function(self) self:xy(overlayW/2 - 80, -overlayH/2 + 25) end,
+		Def.Quad { 
+			InitCommand = function(self) 
+				self:zoomto(100, 26):diffuse(accentColor):diffusealpha(0.15)
+					:blend(Blend.Add)
+			end 
+		},
+		Def.Quad { 
+			InitCommand = function(self) 
+				self:zoomto(100, 2):valign(1):y(13):diffuse(accentColor):diffusealpha(0.6)
+			end 
+		},
+		LoadFont("Common Normal") .. { 
+			InitCommand = function(self) 
+				self:zoom(0.3):diffuse(brightText):settext(THEME:GetString("Goals", "AddGoal")) 
+			end 
+		},
 	},
 
 	-- Page indicator
@@ -110,35 +126,40 @@ local t = Def.ActorFrame {
 	Def.ActorFrame {
 		InitCommand = function(self) self:xy(-overlayW/2 + 16, -overlayH/2 + 38) end,
 
-		-- Priority header (clickable to sort)
+		-- Priority header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderPri",
-			InitCommand = function(self) self:halign(0.5):x(20):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "PriorityColumn")) end,
+			InitCommand = function(self) self:halign(0.5):x(45):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "PriorityColumn")) end,
 		},
-		-- Song name header (clickable to sort by name)
+		-- Song name header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderName",
-			InitCommand = function(self) self:halign(0):x(45):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "SongColumn")) end,
+			InitCommand = function(self) self:halign(0):x(75):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "SongColumn")) end,
 		},
 		-- Rate header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderRate",
-			InitCommand = function(self) self:halign(0.5):x(350):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "RateColumn")) end,
+			InitCommand = function(self) self:halign(0.5):x(365):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "RateColumn")) end,
 		},
 		-- Target header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderTarget",
-			InitCommand = function(self) self:halign(0.5):x(420):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "TargetColumn")) end,
+			InitCommand = function(self) self:halign(0.5):x(425):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "TargetColumn")) end,
 		},
 		-- Diff header
 		LoadFont("Common Normal") .. {
 			Name = "HeaderDiff",
-			InitCommand = function(self) self:halign(0.5):x(500):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "DiffColumn")) end,
+			InitCommand = function(self) self:halign(0.5):x(485):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "DiffColumn")) end,
 		},
-		-- Date header
+		-- PB header
 		LoadFont("Common Normal") .. {
-			Name = "HeaderDate",
-			InitCommand = function(self) self:halign(0.5):x(580):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "StatusColumn")) end,
+			Name = "HeaderPB",
+			InitCommand = function(self) self:halign(0.5):x(545):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "PBColumn") or "PB") end,
+		},
+		-- Status header
+		LoadFont("Common Normal") .. {
+			Name = "HeaderStatus",
+			InitCommand = function(self) self:halign(0.5):x(625):zoom(0.32):diffuse(accentColor):settext(THEME:GetString("Goals", "StatusColumn")) end,
 		},
 	},
 	Def.Quad {
@@ -146,79 +167,6 @@ local t = Def.ActorFrame {
 			self:halign(0):valign(0):xy(-overlayW/2 + 12, -overlayH/2 + 50)
 				:zoomto(overlayW - 24, 1):diffuse(color("0.12,0.12,0.12,1"))
 		end,
-	},
-
-	-- Configuration Panel (shown when adding a goal)
-	Def.ActorFrame {
-		Name = "ConfigPanel",
-		InitCommand = function(self) self:visible(false) end,
-		GoalTableRefreshCommand = function(self)
-			self:visible(IsAddingGoal)
-		end,
-
-		-- Semi-transparent background for config
-		Def.Quad { InitCommand = function(self) self:zoomto(overlayW, overlayH):diffuse(color("0,0,0,0.95")) end },
-		
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:y(-overlayH/2 + 60):zoom(0.6):diffuse(accentColor):settext(THEME:GetString("Goals", "NewGoalConfig")) end,
-		},
-
-		-- Settings rows
-		Def.ActorFrame {
-			InitCommand = function(self) self:y(-20) end,
-
-			-- Target %
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "TargetLabel")) end },
-			Def.Quad { 
-				Name = "TargetBg",
-				InitCommand = function(self) self:x(20):zoomto(120, 36):diffuse(color("0.1,0.1,0.1,1")) end,
-				GoalTableRefreshCommand = function(self) self:diffuse(ActiveInput == 1 and color("0.2,0.2,0.2,1") or color("0.1,0.1,0.1,1")) end,
-			},
-			LoadFont("Common Normal") .. { 
-				Name = "TargetVal",
-				InitCommand = function(self) self:x(20):zoom(0.5):diffuse(brightText) end,
-				GoalTableRefreshCommand = function(self) self:settextf("%.4f%%", NewGoalTarget) end,
-			},
-
-			-- Rate
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(60):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "RateLabel")) end },
-			LoadFont("Common Normal") .. { Name="RateL", InitCommand = function(self) self:x(-30):y(60):zoom(0.4):diffuse(accentColor):settext("<") end },
-			LoadFont("Common Normal") .. { 
-				Name = "RateVal",
-				InitCommand = function(self) self:x(20):y(60):zoom(0.5):diffuse(brightText) end,
-				GoalTableRefreshCommand = function(self) self:settextf("%.2fx", NewGoalRate) end,
-			},
-			LoadFont("Common Normal") .. { Name="RateR", InitCommand = function(self) self:x(70):y(60):zoom(0.4):diffuse(accentColor):settext(">") end },
-
-			-- Priority
-			LoadFont("Common Normal") .. { InitCommand = function(self) self:x(-140):y(120):halign(1):zoom(0.4):diffuse(subText):settext(THEME:GetString("Goals", "PriorityLabel")) end },
-			LoadFont("Common Normal") .. { Name="PriL", InitCommand = function(self) self:x(-30):y(120):zoom(0.4):diffuse(accentColor):settext("<") end },
-			LoadFont("Common Normal") .. { 
-				Name = "PriVal",
-				InitCommand = function(self) self:x(20):y(120):zoom(0.5):diffuse(brightText) end,
-				GoalTableRefreshCommand = function(self) self:settextf("%d", NewGoalPriority) end,
-			},
-			LoadFont("Common Normal") .. { Name="PriR", InitCommand = function(self) self:x(70):y(120):zoom(0.4):diffuse(accentColor):settext(">") end },
-		},
-
-		-- Buttons
-		Def.ActorFrame {
-			InitCommand = function(self) self:y(overlayH/2 - 60) end,
-			-- Confirm
-			Def.ActorFrame {
-				Name = "ConfirmBtn",
-				InitCommand = function(self) self:x(100) end,
-				Def.Quad { InitCommand = function(self) self:zoomto(140, 40):diffuse(color("0,0.5,0,0.6")) end },
-				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext(THEME:GetString("Goals", "Confirm")) end },
-			},
-			-- Cancel
-			Def.ActorFrame {
-				Name = "CancelBtn",
-				InitCommand = function(self) self:x(-100) end,
-				Def.Quad { InitCommand = function(self) self:zoomto(140, 40):diffuse(color("0.5,0,0,0.6")) end },
-				LoadFont("Common Normal") .. { InitCommand = function(self) self:zoom(0.45):diffuse(brightText):settext(THEME:GetString("Goals", "Cancel")) end },
-			},
-		},
 	},
 
 	-- Hint
@@ -259,28 +207,46 @@ local function makeGoalRow(i)
 				self:halign(0):valign(0):zoomto(overlayW - 32, rowH - 2):diffuse(color("0,0,0,0.2"))
 			end,
 			GoalTableRefreshCommand = function(self)
-				if sg and sg:IsAchieved() then
-					self:diffuse(color("0,0.15,0,0.3"))
-				else
-					self:diffuse(color("0,0,0,0.2"))
+				if sg then
+					if sg:IsVacuous() then
+						self:diffuse(color("0.15,0.15,0,0.3")) -- Yellowish for vacuous
+					elseif sg:IsAchieved() then
+						self:diffuse(color("0,0.15,0,0.3")) -- Greenish for achieved
+					else
+						self:diffuse(color("0,0,0,0.2"))
+					end
 				end
 			end,
 		},
 
-		-- Priority display (L/R click to adjust)
+		-- Delete button (X)
+		LoadActor(THEME:GetPathG("", "delete")) .. {
+			Name = "DeleteBtn",
+			InitCommand = function(self)
+				self:halign(0.5):valign(0.5):x(15):y(rowH/2):zoom(0.2)
+			end,
+			GoalTableRefreshCommand = function(self)
+				self:visible(sg ~= nil)
+				if sg then
+					self:diffuse(color("1,0.3,0.3,0.6"))
+				end
+			end,
+		},
+
+		-- Priority display
 		LoadFont("Common Normal") .. {
 			Name = "Priority",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(20):y(rowH/2):zoom(0.4):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(45):y(rowH/2):zoom(0.4):diffuse(mainText) end,
 			GoalTableRefreshCommand = function(self)
 				if sg then self:settextf("%d", sg:GetPriority()) else self:settext("") end
 			end,
 		},
 
-		-- Song name (click to find on wheel)
+		-- Song name
 		LoadFont("Zpix Normal") .. {
 			Name = "SongName",
 			InitCommand = function(self)
-				self:halign(0):valign(0.5):x(45):y(rowH/2):zoom(0.5):diffuse(brightText):maxwidth(350 / 0.5)
+				self:halign(0):valign(0.5):x(75):y(rowH/2):zoom(0.5):diffuse(brightText):maxwidth(280 / 0.5)
 			end,
 			GoalTableRefreshCommand = function(self)
 				if sg then
@@ -295,10 +261,10 @@ local function makeGoalRow(i)
 			end,
 		},
 
-		-- Rate (L/R click to adjust ±0.1)
+		-- Rate
 		LoadFont("Common Normal") .. {
 			Name = "Rate",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(420):y(rowH/2):zoom(0.4):diffuse(subText) end,
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(365):y(rowH/2):zoom(0.4):diffuse(subText) end,
 			GoalTableRefreshCommand = function(self)
 				if sg then self:settextf("%.2fx", sg:GetRate()) else self:settext("") end
 			end,
@@ -307,16 +273,16 @@ local function makeGoalRow(i)
 		-- Target %
 		LoadFont("Common Normal") .. {
 			Name = "Target",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(500):y(rowH/2):zoom(0.45):diffuse(mainText) end,
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(425):y(rowH/2):zoom(0.4):diffuse(mainText) end,
 			GoalTableRefreshCommand = function(self)
-				if sg then self:settextf("%.4f%%", sg:GetPercent() * 100) else self:settext("") end
+				if sg then self:settextf("%.2f%%", sg:GetPercent() * 100) else self:settext("") end
 			end,
 		},
 
 		-- Difficulty
 		LoadFont("Common Normal") .. {
 			Name = "Diff",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(580):y(rowH/2):zoom(0.4) end,
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(485):y(rowH/2):zoom(0.4) end,
 			GoalTableRefreshCommand = function(self)
 				if sg and goalsteps then
 					local d = ToEnumShortString(goalsteps:GetDifficulty())
@@ -327,16 +293,27 @@ local function makeGoalRow(i)
 			end,
 		},
 
-		-- Status (achieved / pending)
+		-- PB Display
 		LoadFont("Common Normal") .. {
-			Name = "Status",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(660):y(rowH/2):zoom(0.4) end,
+			Name = "PB",
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(545):y(rowH/2):zoom(0.38) end,
 			GoalTableRefreshCommand = function(self)
 				if sg then
-					if sg:IsAchieved() then
-						self:settext(THEME:GetString("Goals", "Done")):diffuse(color("0.4,1,0.4,1"))
+					local pb = sg:GetPBUpTo()
+					if pb then
+						local pbc = pb:GetWifeScore() * 100
+						if pb:GetMusicRate() < sg:GetRate() then
+							self:settextf("%.2f%% (%.2fx)", pbc, pb:GetMusicRate())
+						else
+							self:settextf("%.2f%%", pbc)
+						end
+						if sg:IsAchieved() then
+							self:diffuse(color("0.5,1,0.5,1"))
+						else
+							self:diffuse(subText)
+						end
 					else
-						self:settext(THEME:GetString("Goals", "Pending")):diffuse(color("1,0.7,0.3,1"))
+						self:settext("-"):diffuse(dimText)
 					end
 				else
 					self:settext("")
@@ -344,14 +321,22 @@ local function makeGoalRow(i)
 			end,
 		},
 
-		-- Delete button (X)
+		-- Status
 		LoadFont("Common Normal") .. {
-			Name = "DeleteBtn",
-			InitCommand = function(self)
-				self:halign(0.5):valign(0.5):x(overlayW - 42):y(rowH/2):zoom(0.26):diffuse(color("1,0.3,0.3,0.6")):settext("✕")
-			end,
+			Name = "Status",
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(625):y(rowH/2):zoom(0.38) end,
 			GoalTableRefreshCommand = function(self)
-				self:visible(sg ~= nil)
+				if sg then
+					if sg:IsVacuous() then
+						self:settext(THEME:GetString("Goals", "Vacuous")):diffuse(color("0.9,0.9,0.3,1"))
+					elseif sg:IsAchieved() then
+						self:settext(THEME:GetString("Goals", "Achieved")):diffuse(color("0.4,1,0.4,1"))
+					else
+						self:settext(THEME:GetString("Goals", "Pending")):diffuse(color("1,0.7,0.3,1"))
+					end
+				else
+					self:settext("")
+				end
 			end,
 		},
 	}
@@ -369,244 +354,84 @@ t[#t + 1] = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
 			screen:AddInputCallback(function(event)
+				-- Always sink inputs when visible to prevent leaks to underlying MusicWheel
 				if not goalsActor or not goalsActor:GetVisible() then return false end
-				if not event or not event.DeviceInput then return false end
-				
-				-- ============================================================
-				-- NUMERIC INPUT FOR TARGET %
-				-- ============================================================
-				if ActiveInput == 1 then
-					if event.type == "InputEventType_Release" then return true end
-					if event.button == "Start" or event.button == "Back" then
-						ActiveInput = 0
-						NewGoalTarget = tonumber(TargetQuery) or 93
-						if NewGoalTarget > 100 then NewGoalTarget = 100 end
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					end
 
-					if event.DeviceInput.button == "DeviceButton_backspace" then
-						TargetQuery = TargetQuery:sub(1, -2)
-					elseif event.DeviceInput.button == "DeviceButton_delete" then
-						TargetQuery = ""
-					elseif event.DeviceInput.button == "DeviceButton_period" or event.DeviceInput.button == "DeviceButton_kp ." then
-						if not TargetQuery:find("%.") then
-							TargetQuery = TargetQuery .. "."
-						end
-					else
-						local n = event.DeviceInput.button:match("DeviceButton_(%d)")
-						if n then
-							if TargetQuery == "0" then TargetQuery = "" end
-							TargetQuery = TargetQuery .. n
-							-- Cap at 100 or 2 decimal places
-							local val = tonumber(TargetQuery)
-							if val and val > 100 then TargetQuery = "100" end
-							local _, after = TargetQuery:find("%.")
-							if after and #TargetQuery - after > 4 then
-								TargetQuery = TargetQuery:sub(1, after + 4)
-							end
-						end
+				-- Sink mouse moves and other non-device inputs early
+				if not event or not event.DeviceInput then return true end
+				
+				local btn = event.DeviceInput.button or ""
+				local evType = event.type
+				local isRight = btn == "DeviceButton_right mouse button"
+				local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+				
+				-- Handle mouse moves and releases early
+				if evType == "InputEventType_Release" then return true end
+
+				-- Ensure period key is sunk even if not in numeric input mode
+				-- to prevent native Sort changes (Etterna default)
+				if btn == "DeviceButton_period" or btn == "DeviceButton_kp ." then
+					if ActiveInput ~= 1 then
+						return true -- Sink but don't handle
 					end
-					if TargetQuery == "" then TargetQuery = "0" end
-					NewGoalTarget = tonumber(TargetQuery) or 0
-					goalsActor:playcommand("GoalTableRefresh")
-					return true
 				end
 
-				if event.type ~= "InputEventType_FirstPress" then return true end
-				local btn = event.DeviceInput.button
-
-				-- ============================================================
-				-- KEYBOARD SUPPORT FOR CONFIG PANEL
-				-- ============================================================
-				if IsAddingGoal and ActiveInput == 0 then
-					if btn == "DeviceButton_up" or btn == "DeviceButton_left" then
-						NewGoalRate = math.max(0.1, NewGoalRate - 0.1)
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					elseif btn == "DeviceButton_down" or btn == "DeviceButton_right" then
-						NewGoalRate = math.min(3.0, NewGoalRate + 0.1)
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					elseif btn == "DeviceButton_pgup" then
-						NewGoalPriority = math.min(100, NewGoalPriority + 1)
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					elseif btn == "DeviceButton_pgdn" then
-						NewGoalPriority = math.max(0, NewGoalPriority - 1)
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					elseif btn == "DeviceButton_enter" or event.button == "Start" then
-						-- Trigger Confirm Logic
+				-- Add Goal Button Click (Top Right)
+				if btn == "DeviceButton_left mouse button" and evType == "InputEventType_FirstPress" then
+					-- Bounding box for the stylized button in the top right
+					-- Relative to center: x = overlayW/2 - 80 (260), y = -overlayH/2 + 25 (-175)
+					-- With width 100, height 26
+					local btnCX = SCREEN_CENTER_X + (overlayW / 2) - 80
+					local btnCY = SCREEN_CENTER_Y - (overlayH / 2) + 25
+					
+					if mx >= btnCX - 50 and mx <= btnCX + 50 and my >= btnCY - 13 and my <= btnCY + 13 then
 						local steps = GAMESTATE:GetCurrentSteps()
 						local profile = GetProfile()
 						if steps and profile then
-							local sg = profile:AddGoal(steps:GetChartKey())
-							if sg then
-								sg:SetPercent(NewGoalTarget / 100)
-								sg:SetRate(NewGoalRate)
-								sg:SetPriority(NewGoalPriority)
-								profile:SetFromAll()
+							local ck = steps:GetChartKey()
+							if ck then
+								local sg = profile:AddGoal(ck)
+								-- AddGoal might return true or a scoregoal object
+								if not sg or type(sg) == "boolean" then
+									local gt = profile:GetGoalTable()
+									for _, g in ipairs(gt) do
+										if g:GetChartKey() == ck then sg = g; break end
+									end
+								end
+								if sg and type(sg) ~= "boolean" then
+									sg:SetPercent(0.93)
+									sg:SetRate(getCurRateValue() or 1.0)
+									sg:SetPriority(0)
+									pcall(function() profile:SetFromAll() end)
+								end
+								RefreshGoals()
+								goalsActor:playcommand("GoalTableRefresh")
 							end
-							RefreshGoals()
-							IsAddingGoal = false
-							goalsActor:playcommand("GoalTableRefresh")
 						end
-						return true
-					elseif btn == "DeviceButton_escape" or event.button == "Back" then
-						IsAddingGoal = false
-						goalsActor:playcommand("GoalTableRefresh")
 						return true
 					end
 				end
 
 				-- Pagination
-				if not IsAddingGoal then
-					local dir = 0
-					if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
-					if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
-					if dir ~= 0 then
-						ind = math.max(0, math.min(#goaltable - numGoals, ind + dir * numGoals))
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					end
+				local dir = 0
+				if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
+				if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
+				if dir ~= 0 then
+					ind = math.max(0, math.min(#goaltable - numGoals, ind + dir * numGoals))
+					goalsActor:playcommand("GoalTableRefresh")
+					return true
 				end
 
 				-- Click handling
 				if btn == "DeviceButton_left mouse button" or btn == "DeviceButton_right mouse button" then
-					local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-					local isRight = btn == "DeviceButton_right mouse button"
-
 					-- Close on outside click
-					if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
-						if IsAddingGoal then
-							IsAddingGoal = false
-							ActiveInput = 0
-							goalsActor:playcommand("GoalTableRefresh")
-						else
-							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-						end
+					if mx < SCREEN_CENTER_X - overlayW/2 or mx > SCREEN_CENTER_X + overlayW/2 or my < SCREEN_CENTER_Y - overlayH/2 or my > SCREEN_CENTER_Y + overlayH/2 then
+						if evType ~= "InputEventType_FirstPress" then return true end
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						return true
 					end
 
-					-- Configuration Panel Clicks
-					if IsAddingGoal then
-						-- Target % Field
-						if IsMouseOverCentered(SCREEN_CENTER_X + 20, SCREEN_CENTER_Y - 20, 120, 36) then
-							ActiveInput = 1
-							TargetQuery = string.format("%.4f", NewGoalTarget)
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-						ActiveInput = 0 -- Clicked away from field
-
-						-- Rate adjust
-						local rateY = SCREEN_CENTER_Y + 40
-						-- Left arrow (<)
-						if IsMouseOverCentered(SCREEN_CENTER_X - 30, rateY, 40, 40) then
-							NewGoalRate = math.max(0.1, NewGoalRate - 0.1)
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-						-- Right arrow (>)
-						if IsMouseOverCentered(SCREEN_CENTER_X + 70, rateY, 40, 40) then
-							NewGoalRate = math.min(3.0, NewGoalRate + 0.1)
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-
-						-- Priority adjust
-						local priY = SCREEN_CENTER_Y + 100
-						-- Left arrow (<)
-						if IsMouseOverCentered(SCREEN_CENTER_X - 30, priY, 40, 40) then
-							NewGoalPriority = math.max(0, NewGoalPriority - 1)
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-						-- Right arrow (>)
-						if IsMouseOverCentered(SCREEN_CENTER_X + 70, priY, 40, 40) then
-							NewGoalPriority = math.min(100, NewGoalPriority + 1)
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-
-						-- Confirm / Cancel Buttons
-						local btnY = SCREEN_CENTER_Y + overlayH/2 - 60
-						-- Confirm
-						if IsMouseOverCentered(SCREEN_CENTER_X + 100, btnY, 140, 40) then
-							local steps = GAMESTATE:GetCurrentSteps()
-							local profile = GetProfile()
-							if steps and profile then
-								local ck = steps:GetChartKey()
-								if ck then
-									local sg = profile:AddGoal(ck)
-									-- Handle case where it returns boolean or nil
-									if not sg or type(sg) == "boolean" then
-										local gt = profile:GetGoalTable()
-										for _, g in ipairs(gt) do
-											if g:GetChartKey() == ck then sg = g; break end
-										end
-									end
-									
-									if sg and type(sg) ~= "boolean" then
-										sg:SetPercent(NewGoalTarget / 100)
-										sg:SetRate(NewGoalRate)
-										sg:SetPriority(NewGoalPriority)
-										profile:SetFromAll() -- Persist
-									end
-									RefreshGoals()
-									IsAddingGoal = false
-									goalsActor:playcommand("GoalTableRefresh")
-								end
-							end
-							return true
-						end
-						-- Cancel
-						if IsMouseOverCentered(SCREEN_CENTER_X - 100, btnY, 140, 40) then
-							IsAddingGoal = false
-							goalsActor:playcommand("GoalTableRefresh")
-							return true
-						end
-
-						return true -- Sink all input while config is open
-					end
-
-					-- Add Goal button
-					if not isRight and IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 60, SCREEN_CENTER_Y - overlayH/2 + 18, 100, 24) then
-						IsAddingGoal = true
-						NewGoalRate = getCurRateValue()
-						NewGoalTarget = 93.00
-						TargetQuery = "93.00"
-						NewGoalPriority = 0
-						goalsActor:playcommand("GoalTableRefresh")
-						return true
-					end
-
-					-- Header clicks to sort
-					local headerY = SCREEN_CENTER_Y - overlayH/2 + 38
-					if my >= headerY - 15 and my <= headerY + 15 and not isRight then
-						local profile = GetProfile()
-						if profile then
-							local hx = mx - (SCREEN_CENTER_X - overlayW/2 + 16)
-							if hx >= 0 and hx <= 40 then
-								pcall(function() profile:SortByPriority() end)
-							elseif hx >= 45 and hx <= 340 then
-								pcall(function() profile:SortByName() end)
-							elseif hx >= 340 and hx <= 400 then
-								pcall(function() profile:SortByRate() end)
-							elseif hx >= 400 and hx <= 460 then
-								pcall(function() profile:SortByDiff() end)
-							elseif hx >= 460 and hx <= 640 then
-								pcall(function() profile:SortByDate() end)
-							end
-							ind = 0
-							RefreshGoals()
-							goalsActor:playcommand("GoalTableRefresh")
-						end
-						return true
-					end
-
-					-- Row clicks
+					-- If we are clicking inside the overlay, it's safe to run the rest of the click logic.
 					for ri = 1, numGoals do
 						local rowTop = SCREEN_CENTER_Y + rowStartY + (ri - 1) * rowH
 						local rowLeft = SCREEN_CENTER_X - overlayW/2 + 16
@@ -616,8 +441,8 @@ t[#t + 1] = Def.ActorFrame {
 								local sg = goaltable[gIdx]
 								local hx = mx - rowLeft
 
-								-- Delete button (right end)
-								if hx >= overlayW - 65 and hx <= overlayW - 15 then
+								-- Delete button (left end)
+								if hx >= 0 and hx <= 30 then
 									if not isRight then
 										pcall(function() sg:Delete() end)
 										pcall(function() GetProfile():SetFromAll() end)
@@ -628,8 +453,19 @@ t[#t + 1] = Def.ActorFrame {
 									return true
 								end
 
+								-- Priority column (L +1, R -1)
+								if hx >= 30 and hx <= 65 then
+									if not isRight then
+										pcall(function() sg:SetPriority(sg:GetPriority() + 1) end)
+									else
+										pcall(function() sg:SetPriority(sg:GetPriority() - 1) end)
+									end
+									goalsActor:playcommand("GoalTableRefresh")
+									return true
+								end
+
 								-- Rate column (L +0.1, R -0.1)
-								if hx >= 350 and hx <= 410 then
+								if hx >= 345 and hx <= 395 then
 									if not isRight then
 										pcall(function() sg:SetRate(sg:GetRate() + 0.1) end)
 									else
@@ -639,8 +475,17 @@ t[#t + 1] = Def.ActorFrame {
 									return true
 								end
 
+								-- Target % column (L +1.0%, R -1.0%, Ctrl for +0.01%/-0.01%)
+								if hx >= 395 and hx <= 455 then
+									local step = INPUTFILTER:IsControlPressed() and 0.0001 or 0.01
+									if isRight then step = step * -1 end
+									pcall(function() sg:SetPercent(sg:GetPercent() + step) end)
+									goalsActor:playcommand("GoalTableRefresh")
+									return true
+								end
+
 								-- Song name click → find on wheel
-								if hx >= 30 and hx <= 350 and not isRight then
+								if hx >= 65 and hx <= 345 and not isRight then
 									local ck = sg:GetChartKey()
 									if ck then
 										local song = SONGMAN:GetSongByChartKey(ck)
@@ -660,19 +505,14 @@ t[#t + 1] = Def.ActorFrame {
 				end
 
 				if event.button == "Back" or event.DeviceInput.button == "DeviceButton_escape" then
-					if IsAddingGoal then
-						IsAddingGoal = false
-						ActiveInput = 0
-						goalsActor:playcommand("GoalTableRefresh")
-					else
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
-					end
+					MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 					return true
 				end
 
-				-- Sink all input when overlay is visible
-				return true
+				-- WE DO NOT SINK UNHANDLED INPUTS ANYMORE. Let standard wheel interactions pass through if not explicitly trapped above.
+				return false
 			end)
+
 	end,
 }
 
