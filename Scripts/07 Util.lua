@@ -50,4 +50,40 @@ function easyInputStringWithFunction(question, maxLength, isPassword, func)
 	)
 end
 
+--- Map a DeviceInput button name to its equivalent character.
+-- @param btn     The button string (e.g., "DeviceButton_a")
+-- @param shifted Boolean for shift key state
+-- @return        A single character string, or nil
+function DeviceBtnToChar(btn, shifted)
+	if not btn then return nil end
+	local b = btn:lower()
+	local letter = b:match("^devicebutton_([a-z])$")
+	if letter then return shifted and letter:upper() or letter end
+	local digit = b:match("^devicebutton_([0-9])$")
+	if digit then
+		if shifted then
+			local shiftMap = { ["1"] = "!", ["2"] = "@", ["3"] = "#", ["4"] = "$", ["5"] = "%",
+				["6"] = "^", ["7"] = "&", ["8"] = "*", ["9"] = "(", ["0"] = ")" }
+			return shiftMap[digit] or digit
+		end
+		return digit
+	end
+	
+	local symMap = {
+		["devicebutton_period"] = shifted and ">" or ".",
+		["devicebutton_comma"] = shifted and "<" or ",",
+		["devicebutton_slash"] = shifted and "?" or "/",
+		["devicebutton_backslash"] = shifted and "|" or "\\",
+		["devicebutton_minus"] = shifted and "_" or "-",
+		["devicebutton_equals"] = shifted and "+" or "=",
+		["devicebutton_semicolon"] = shifted and ":" or ";",
+		["devicebutton_apostrophe"] = shifted and "\"" or "'",
+		["devicebutton_left bracket"] = shifted and "{" or "[",
+		["devicebutton_right bracket"] = shifted and "}" or "]",
+		["devicebutton_grave"] = shifted and "~" or "`",
+		["devicebutton_space"] = " ",
+	}
+	return symMap[b]
+end
+
 Trace("Holographic Void: 07 Util.lua loaded.")

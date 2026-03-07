@@ -66,34 +66,7 @@ local function GetOnlineStatus()
 	return false, "", "Offline"
 end
 
-local function DeviceBtnToChar(btn, shifted)
-	local letter = btn:match("^DeviceButton_([a-z])$")
-	if letter then return shifted and letter:upper() or letter end
-	local digit = btn:match("^DeviceButton_([0-9])$")
-	if digit then
-		if shifted then
-			local shiftMap = { ["1"] = "!", ["2"] = "@", ["3"] = "#", ["4"] = "$", ["5"] = "%",
-				["6"] = "^", ["7"] = "&", ["8"] = "*", ["9"] = "(", ["0"] = ")" }
-			return shiftMap[digit] or digit
-		end
-		return digit
-	end
-	local symMap = {
-		["DeviceButton_period"] = shifted and ">" or ".",
-		["DeviceButton_comma"] = shifted and "<" or ",",
-		["DeviceButton_slash"] = shifted and "?" or "/",
-		["DeviceButton_backslash"] = shifted and "|" or "\\",
-		["DeviceButton_minus"] = shifted and "_" or "-",
-		["DeviceButton_equals"] = shifted and "+" or "=",
-		["DeviceButton_semicolon"] = shifted and ":" or ";",
-		["DeviceButton_apostrophe"] = shifted and "\"" or "'",
-		["DeviceButton_left bracket"] = shifted and "{" or "[",
-		["DeviceButton_right bracket"] = shifted and "}" or "]",
-		["DeviceButton_grave"] = shifted and "~" or "`",
-		["DeviceButton_space"] = " ",
-	}
-	return symMap[btn]
-end
+
 
 -- ============================================================
 -- LEFT PANEL BACKGROUND
@@ -876,14 +849,27 @@ t[#t + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-		screen:AddInputCallback(function(event)
-			if not event.DeviceInput then return false end
-			if event.type ~= "InputEventType_FirstPress" then return end
+		
+		-- Cleanup existing
+		if HV.DiffSelectorInputCallback then
+			pcall(function() screen:RemoveInputCallback(HV.DiffSelectorInputCallback) end)
+		end
+		
+		HV.DiffSelectorInputCallback = function(event)
+			if not event or not event.DeviceInput then return false end
+			
+			-- Screen name check to avoid leaking into text entry or other overlays
+			local top = SCREENMAN:GetTopScreen()
+			if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
+			
+			if event.type ~= "InputEventType_FirstPress" then return false end
 			local btn = event.DeviceInput.button
-			if btn ~= "DeviceButton_left mouse button" then return end
+			if btn ~= "DeviceButton_left mouse button" then return false end
+			
 			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
 			local song = GAMESTATE:GetCurrentSong()
-			if not song then return end
+			if not song then return false end
+			
 			for di2, dname2 in ipairs(diffNames) do
 				local tx = diffSelectorX
 				local ty = diffSelectorTopY + 16 + (di2 - 1) * (diffTabH + 3)
@@ -899,7 +885,10 @@ t[#t + 1] = Def.ActorFrame {
 					end
 				end
 			end
-		end)
+			return false
+		end
+		
+		screen:AddInputCallback(HV.DiffSelectorInputCallback)
 	end
 }
 

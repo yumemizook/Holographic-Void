@@ -40,6 +40,7 @@ local profileOverlayActor = nil
 local globalTooltipActor = nil
 local previewActive = false
 local inputDebugActor = nil
+local searchString = ""
 
 -- Mouse wheel locking to prevent double-moves
 local lastWheelMove = 0
@@ -364,6 +365,44 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				if HV.ActiveTab == "PROFILE" then
 					return true
 				end
+
+				-- --- MUSIC WHEEL SELECTION ---
+				-- If no tab is active, handle clicking on music wheel items
+				if HV.ActiveTab == "" then
+					-- MusicWheel is on the right side. 
+					-- metrics.ini: MusicWheelX=SCREEN_WIDTH-180, MusicWheelItem width=280
+					-- Hitbox: [SCREEN_WIDTH-320, SCREEN_WIDTH-40]
+					if virtualX >= SCREEN_WIDTH - 325 and virtualX <= SCREEN_WIDTH - 35 then
+						local mw = screen:GetMusicWheel()
+						if mw then
+							-- Calculate offset relative to center (SCREEN_CENTER_Y)
+							-- Spacing is 40px per item (from metrics ItemTransformFunction)
+							local offset = math.floor((virtualY - SCREEN_CENTER_Y) / 40 + 0.5)
+							
+							if offset == 0 then
+								-- Clicked the center: Start the song
+								screen:PostScreenMessage("SM_BeginStart", 0) -- Native Start() may be too aggressive
+								-- or just call Select() on the wheel
+								-- most themes use screen:SelectCurrent() or Start()
+								screen:queuecommand("Start") 
+							else
+								-- Clicked another item: Scroll to it
+								local dir = offset > 0 and 1 or -1
+								local steps_to_move = math.abs(offset)
+								
+								-- Stop any existing wheel movement first
+								mw:Move(0)
+								
+								-- Move item by item
+								for i=1, steps_to_move do
+									mw:Move(dir)
+									mw:Move(0)
+								end
+							end
+							return true
+						end
+					end
+				end
 			end
 			
 			-- 2.6 Mouse Wheel & Keyboard Navigation
@@ -419,6 +458,91 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			end
 
 			
+
+			-- --- SEARCH INPUT HANDLING ---
+			if HV.ActiveTab == "SEARCH" then
+				local whee = top.GetMusicWheel and top:GetMusicWheel() or (HV.SSM and HV.SSM.GetMusicWheel and HV.SSM:GetMusicWheel())
+				
+				-- Handle Backspace
+				if btn:lower() == "devicebutton_backspace" then
+					if evType ~= "InputEventType_Release" then
+						if #searchString > 0 then
+							searchString = searchString:sub(1, -2)
+							if whee then whee:SongSearch(searchString) end
+							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+						end
+					end
+					return true
+				end
+
+				-- Handle Delete
+				if btn:lower() == "devicebutton_delete" then
+					if evType ~= "InputEventType_Release" then
+						searchString = ""
+						if whee then whee:SongSearch("") end
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+					end
+					return true
+				end
+
+				-- Handle Enter / Escape (Deactivate)
+				local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
+				local isEscape = (event.button == "Back" or btn:lower() == "devicebutton_escape")
+				
+				if isEnter then
+					if evType == "InputEventType_FirstPress" then
+						-- CLOSE SEARCH but keep filter.
+						-- Broadcasting twice ensuring NO leak to MusicWheel or Screen
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString, applied = true})
+					end
+					return true -- STRICT CAPTURE
+				end
+				if isEscape then
+					if evType == "InputEventType_FirstPress" then
+						searchString = ""
+						if whee then whee:SongSearch("") end
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+					end
+					return true
+				end
+
+				-- Handle Paste (Ctrl + V)
+				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
+				if ctrl and btn:lower() == "devicebutton_v" then
+					if evType == "InputEventType_FirstPress" then
+						if Arch and Arch.getClipboard then
+							local clip = Arch.getClipboard()
+							if clip then
+								searchString = searchString .. clip
+								if whee then whee:SongSearch(searchString) end
+								MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+							end
+						end
+					end
+					return true
+				end
+
+				-- Handle Typing (Lenient character detection)
+				local shifted = INPUTFILTER:IsBeingPressed("left shift") or INPUTFILTER:IsBeingPressed("right shift")
+				local c = event.char or DeviceBtnToChar(btn, shifted)
+				
+				if c and c ~= "" then
+					if evType ~= "InputEventType_Release" then
+						searchString = searchString .. c
+						if whee then whee:SongSearch(searchString) end
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+					end
+					return true
+				end
+
+				-- Fallback: Sink most input to prevent music wheel movement while typing
+				-- but allow mouse movement and clicks to close the search
+				if btn:match("mouse") then return false end
+				return true
+			end
+
 			-- 3. Key Presses (Global Shortcuts)
 			if evType == "InputEventType_FirstPress" then
 				-- Close any active tab on Escape or Back
@@ -1046,6 +1170,7 @@ local profileOverlay = Def.ActorFrame {
 		local targetTab = params and params.Tab or ""
 		
 		-- Set input redirection for ALL tabs to block the C++ MusicWheel
+		-- Force redirection if tab is NOT empty, otherwise turn it off
 		local redirected = (targetTab ~= "")
 		SCREENMAN:set_input_redirected(PLAYER_1, redirected)
 		SCREENMAN:set_input_redirected(PLAYER_2, redirected)
@@ -1159,12 +1284,69 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			InitCommand = function(self)
 				self:halign(0):valign(0.5):xy(32, 14):zoom(0.35):diffuse(subText):settext("Click here to Search (or Ctrl + 4)")
 			end,
-			SearchQueryUpdatedMessageCommand = function(self, params)
-				if params and params.query and params.query ~= "" then
-					self:settext("Search: " .. params.query):diffuse(brightText)
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == "SEARCH" then
+					if searchString == "" then
+						self:settext("Type to search..."):diffuse(subText)
+					else
+						self:settext(searchString):diffuse(brightText)
+					end
 				else
-					self:settext("Click here to Search (or Ctrl + 4)"):diffuse(subText)
+					if searchString ~= "" then
+						self:settext("Search: " .. searchString):diffuse(brightText)
+					else
+						self:settext("Click here to Search (or Ctrl + 4)"):diffuse(subText)
+					end
 				end
+			end,
+			SearchQueryUpdatedMessageCommand = function(self, params)
+				if HV.ActiveTab == "SEARCH" then
+					if searchString == "" then
+						self:settext("Type to search..."):diffuse(subText)
+					else
+						self:settext(searchString):diffuse(brightText)
+					end
+				else
+					if searchString ~= "" then
+						self:settext("Search: " .. searchString):diffuse(brightText)
+					else
+						self:settext("Click here to Search (or Ctrl + 4)"):diffuse(subText)
+					end
+				end
+			end
+		},
+		-- Integrated Blinking Cursor
+		LoadFont("Common Normal") .. {
+			Name = "Cursor",
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(32, 14):zoom(0.35):diffuse(accentColor):settext("|"):visible(false)
+			end,
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == "SEARCH" then
+					self:visible(true):playcommand("Blink")
+					self:playcommand("Position")
+				else
+					self:visible(false):stoptweening()
+				end
+			end,
+			SearchQueryUpdatedMessageCommand = function(self, params)
+				self:playcommand("Position")
+			end,
+			PositionCommand = function(self)
+				local placeholder = self:GetParent():GetChild("SearchPlaceholder")
+				if placeholder then
+					if searchString == "" then
+						-- Left of "Type to search..."
+						self:x(32 - 4) 
+					else
+						-- Right of query
+						local textW = placeholder:GetZoomedWidth()
+						self:x(32 + textW + 2)
+					end
+				end
+			end,
+			BlinkCommand = function(self)
+				self:stoptweening():diffusealpha(1):sleep(0.5):linear(0.1):diffusealpha(0):sleep(0.3):queuecommand("Blink")
 			end
 		}
 	},
@@ -1306,7 +1488,7 @@ main_af[#main_af + 1] = Def.Actor {
 }
 
 -- Load Decoration Overlays (Initially hidden, using standard Toggle[NAME]Overlay messages)
-local decorOverlays = {"search", "scores", "filters", "playlists", "tags", "goals"}
+local decorOverlays = {"scores", "filters", "playlists", "tags", "goals"}
 for _, name in ipairs(decorOverlays) do
 	main_af[#main_af + 1] = LoadActor("../ScreenSelectMusic decorations/" .. name .. ".lua")
 end
@@ -1369,6 +1551,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				end
 				return true
 			end
+
+			return false -- Allow all other input through
 		end)
 	end
 }
