@@ -725,7 +725,7 @@ function wife3(maxms, ts, version)
 end
 
 -- holy shit this is fugly
-function getRescoredWife3Judge(version, judgeScale, rst)
+function getRescoredWife3Judge(version, judgeScale, rst, useFullChart)
 	local totalPoints = 0
 	local tso = ms.JudgeScalers[judgeScale] or 1
 
@@ -742,11 +742,14 @@ function getRescoredWife3Judge(version, judgeScale, rst)
 	totalPoints = totalPoints + (rst["holdsMissed"] or 0) * -4.5
 	totalPoints = totalPoints + (rst["rollsMissed"] or 0) * -4.5
 
-	local maxPoints = (rst["totalNotes"] or rst["totalTaps"] or 0) * 2
+	-- Denominator logic: useFullChart for progress (eval), otherwise use totalTaps for accuracy (HUD)
+	local denomCount = useFullChart and (rst["totalNotes"] or rst["totalTaps"] or 0) or (rst["totalTaps"] or 0)
+	local maxPoints = denomCount * 2
+	
 	if maxPoints <= 0 then return 0 end
 
 	local res = (totalPoints / maxPoints) * 100
-	return math.min(res, 100) -- Only clamp upper bound, allowing negative scores if not floored elsewhere
+	return math.min(res, 100) -- Only clamp upper bound
 end
 
 function getRescoreElements(pss, score)
