@@ -179,22 +179,22 @@ local judgmentColors = {
 }
 
 -- [NEW] Combo Graph Configuration
-local comboConfig = {
- 	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
- 	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
- 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
- 	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
- 	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
- 	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
- }
+ local comboConfig = {
+  	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
+  	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
+  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
+  	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
+  	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
+  	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
+  }
 -- local comboConfig = {
--- 	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
--- 	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
--- 	{ name = "15ms FA+", window = 15.0,  judgment = 4, color = color("#39d1ff") },
--- 	{ name = "Marvelous", window = 45.0,  judgment = 4, color = judgmentColors[1] },
--- 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
--- 	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
--- }
+--  	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
+--  	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
+--  	{ name = "15ms FA+", window = 15.0,  judgment = 4, color = color("#39d1ff") },
+--  	{ name = "Marvelous", window = 45.0,  judgment = 4, color = judgmentColors[1] },
+--  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
+--  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
+--  }
 
 -- local comboConfig = {
 -- 	{ name = "Absolute",  window = 5.0,  judgment = 4, color = color("#c3f1ff") },
@@ -480,7 +480,7 @@ local function scoreBoard(pn)
 		LoadFont("Common Large") .. {
 			InitCommand = function(self)
 				self:halign(0):valign(0):xy(pad - 10, pad + 80):zoom(0.55):diffuse(brightText):diffusealpha(0)
-				self:maxwidth((frameW - pad*2) / 0.5)
+				self:maxwidth((frameW - pad*2 - 105) / 0.5)
 			end,
 			OnCommand = function(self) 
 				if song then self:settext(song:GetDisplayMainTitle()) end 
