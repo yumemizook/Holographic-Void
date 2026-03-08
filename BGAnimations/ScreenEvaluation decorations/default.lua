@@ -179,14 +179,14 @@ local judgmentColors = {
 }
 
 -- [NEW] Combo Graph Configuration
---  local comboConfig = {
---   	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
---   	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
---   	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
---   	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
---   	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
---   	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
---   }
+  local comboConfig = {
+   	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
+   	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
+   	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
+   	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
+   	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
+   	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
+   }
 -- local comboConfig = {
 --  	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
 --  	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
@@ -196,14 +196,14 @@ local judgmentColors = {
 --  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
 --  }
 
- local comboConfig = {
- 	{ name = "Absolute",  window = 5.0,  judgment = 4, color = color("#c3f1ff") },
- 	{ name = "Ludicrous",  window = 12.25,  judgment = 7, color = color("#c3f1ff") },
- 	{ name = "Ridiculous", window = 22.5,  judgment = 7, color = color("#86e3ff") },
- 	{ name = "Marvelous", window = 22.5,  judgment = 4, color = color("#39d1ff") },
- 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
- 	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
- }
+--  local comboConfig = {
+--  	{ name = "Absolute",  window = 5.0,  judgment = 4, color = color("#c3f1ff") },
+--  	{ name = "Ludicrous",  window = 12.25,  judgment = 7, color = color("#c3f1ff") },
+--  	{ name = "Ridiculous", window = 22.5,  judgment = 7, color = color("#86e3ff") },
+--  	{ name = "Marvelous", window = 22.5,  judgment = 4, color = color("#39d1ff") },
+--  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
+--  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
+--  }
 -- [NEW] Life Difficulty Color Helper (1-7 scale)
 local function getLifeDifficultyColor(diff)
 	local c1 = color("#A0CFAB") -- Easy / Green
