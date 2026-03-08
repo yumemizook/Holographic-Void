@@ -180,14 +180,30 @@ local judgmentColors = {
 
 -- [NEW] Combo Graph Configuration
 local comboConfig = {
-	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
-	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
-	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
-	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
-	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
-	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
-}
+ 	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
+ 	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
+ 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
+ 	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
+ 	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
+ 	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
+ }
+-- local comboConfig = {
+-- 	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
+-- 	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
+-- 	{ name = "15ms FA+", window = 15.0,  judgment = 4, color = color("#39d1ff") },
+-- 	{ name = "Marvelous", window = 45.0,  judgment = 4, color = judgmentColors[1] },
+-- 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
+-- 	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
+-- }
 
+-- local comboConfig = {
+-- 	{ name = "Absolute",  window = 5.0,  judgment = 4, color = color("#c3f1ff") },
+-- 	{ name = "Ludicrous",  window = 12.25,  judgment = 7, color = color("#c3f1ff") },
+-- 	{ name = "Ridiculous", window = 22.5,  judgment = 7, color = color("#86e3ff") },
+-- 	{ name = "Marvelous", window = 22.5,  judgment = 4, color = color("#39d1ff") },
+-- 	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff")] },
+-- 	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
+-- }
 -- [NEW] Life Difficulty Color Helper (1-7 scale)
 local function getLifeDifficultyColor(diff)
 	local c1 = color("#A0CFAB") -- Easy / Green
@@ -1321,16 +1337,17 @@ t[#t + 1] = Def.ActorFrame {
 					Name = "Lane_" .. i,
 					InitCommand = function(self) self:y(cy):zbuffer(true) end,
 
-					-- 0. Depth Clearance (Initializes depth buffer to 0 for this lane)
+					-- 0. Depth Clearance (Initializes depth buffer to 0 / Near)
 					Def.Quad {
 						InitCommand = function(self)
 							self:halign(0):zoomto(graphW, laneH):diffusealpha(0)
-							self:blend("BlendMode_NoEffect") -- Write to Z but not to color
-							self:zwrite(true):z(0)
+							self:blend("BlendMode_NoEffect")
+							-- Force write 0 to depth buffer
+							self:ztest(false):zwrite(true):z(0)
 						end
 					},
 
-					-- 1. Label - Base (Judgment Color)
+					-- 1. Label - Base (Judgment Color) - Always visible
 					LoadFont("Common Normal") .. {
 						InitCommand = function(self)
 							self:zoom(0.32):settext(conf.name):halign(0):x(5)
@@ -1338,7 +1355,7 @@ t[#t + 1] = Def.ActorFrame {
 						end
 					},
 
-					-- 2. Combo Number - Base (Judgment Color)
+					-- 2. Combo Number - Base (Judgment Color) - Always visible
 					LoadFont("Common Normal") .. {
 						InitCommand = function(self)
 							self:zoom(0.35):settext(val):ztest(false)
@@ -1350,37 +1367,41 @@ t[#t + 1] = Def.ActorFrame {
 						end
 					},
 
-					-- 3. The Horizontal Bar (Timeline) - Writes to Depth Buffer
+					-- 3. The Horizontal Bar (Timeline) - Writes 1 to Depth Buffer
 					Def.Quad {
 						InitCommand = function(self)
 							self:halign(0):xy(startX, 0):zoomto(barW, laneH - 2)
 							self:diffuse(conf.color):diffusealpha(0.6)
-							self:zwrite(true):z(1) -- Draw at depth 1
+							-- Draw at depth 1 and write it.
+							-- Since background is 0, this will pass LessEqual if we aren't careful.
+							-- Actually, we use ztest(false) to ensure it always draws on Pass 3.
+							self:ztest(false):zwrite(true):z(1)
 							if isHighest then
-								self:glow(color("1,1,1,0.2"))
-								self:diffusealpha(0.8)
+								self:glow(color("1,1,1,0.2")):diffusealpha(0.8)
 							end
 						end
 					},
 
-					-- 4. Label - Over (Black, only visible where Bar exists)
+					-- 4. Label - Over (Black, only where depth is at least 1)
 					LoadFont("Common Normal") .. {
 						InitCommand = function(self)
 							self:zoom(0.32):settext(conf.name):halign(0):x(5)
-							-- ztest(true) with LessEqual will only pass where depth is 1 or more.
-							-- Since background is 0, it fails there.
+							-- ztest(true) uses LessEqual. 
+							-- We are at z=1. 
+							-- If depth is 0 (no bar): 1 <= 0 is FALSE. 
+							-- If depth is 1 (bar): 1 <= 1 is TRUE.
 							self:diffuse(color("0,0,0,1")):ztest(true):z(1)
 						end
 					},
 
-					-- 5. Combo Number - Over (Black, only visible where Bar exists)
+					-- 5. Combo Number - Over (Black, only where depth is at least 1)
 					LoadFont("Common Normal") .. {
 						InitCommand = function(self)
-							self:zoom(0.35):settext(val):diffuse(color("0,0,0,1")):ztest(true):z(1)
+							self:zoom(0.35):settext(val):ztest(true):z(1)
 							if barW > 30 then
-								self:xy(startX + barW/2, 0)
+								self:xy(startX + barW/2, 0):diffuse(color("0,0,0,1"))
 							else
-								self:xy(startX + barW + 5, 0):halign(0)
+								self:xy(startX + barW + 5, 0):halign(0):diffuse(conf.color)
 							end
 						end
 					},
