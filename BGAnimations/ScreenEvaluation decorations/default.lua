@@ -178,6 +178,65 @@ local judgmentColors = {
 	color("#A0C8E0"), color("#C8A0E0"), color("#E0A0A0")
 }
 
+-- [NEW] Combo Graph Configuration
+local comboConfig = {
+	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
+	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
+	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
+	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
+	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
+	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
+}
+
+-- [NEW] Life Difficulty Color Helper (1-7 scale)
+local function getLifeDifficultyColor(diff)
+	local c1 = color("#A0CFAB") -- Easy / Green
+	local c2 = color("#CFD198") -- Normal / Gold
+	local c3 = color("#CF9898") -- Hard / Red
+	if diff <= 4 then
+		return HV.LerpColor((diff - 1) / 3, c1, c2)
+	else
+		return HV.LerpColor((diff - 4) / 3, c2, c3)
+	end
+end
+
+-- [NEW] Combo Streak Calculation Logic (Timeline-aware)
+local function calculateMaxStreaks(dvt, nrv, config)
+	local results = {}
+	for i = 1, #config do
+		results[i] = { max = 0, startRow = 0, endRow = 0 }
+	end
+	if not dvt or not nrv then return results end
+
+	local currentStreaks = {}
+	local startRows = {}
+	for i = 1, #config do currentStreaks[i] = 0 startRows[i] = 1 end
+
+	for idx = 1, #dvt do
+		local off = dvt[idx]
+		local row = nrv[idx] or 0
+		local absOff = math.abs(off)
+		
+		for i, conf in ipairs(config) do
+			local threshold = conf.window * (ms.JudgeScalers[conf.judgment] or 1)
+			if absOff <= threshold then
+				if currentStreaks[i] == 0 then
+					startRows[i] = row
+				end
+				currentStreaks[i] = currentStreaks[i] + 1
+				if currentStreaks[i] > results[i].max then
+					results[i].max = currentStreaks[i]
+					results[i].startRow = startRows[i]
+					results[i].endRow = row
+				end
+			else
+				currentStreaks[i] = 0
+			end
+		end
+	end
+	return results
+end
+
 -- Scroll support
 local function scroller(event)
 	if event.type == "InputEventType_FirstPress" then
@@ -1199,7 +1258,19 @@ t[#t + 1] = Def.ActorFrame {
 			end,
 		},
 
-		-- Life Graph BG
+		-- Life Graph Background (Markers)
+		Def.ActorFrame {
+			Name = "LifeGraphMarkers",
+			InitCommand = function(self) self:diffusealpha(0.2) end,
+			-- 20% Line
+			Def.Quad { InitCommand = function(self) self:xy(0, 80 * 0.8):zoomto(rightW, 1):halign(0):diffuse(color("1,1,1,1")) end },
+			-- 50% Line
+			Def.Quad { InitCommand = function(self) self:xy(0, 80 * 0.5):zoomto(rightW, 1):halign(0):diffuse(color("1,1,1,1")) end },
+			-- 100% Line (Top)
+			Def.Quad { InitCommand = function(self) self:xy(0, 0):zoomto(rightW, 1):halign(0):diffuse(color("1,1,1,1")) end },
+		},
+
+		-- Life Graph
 		Def.GraphDisplay {
 			InitCommand = function(self) 
 				self:Load("GraphDisplay") 
@@ -1209,25 +1280,114 @@ t[#t + 1] = Def.ActorFrame {
 				pcall(function()
 					local ss = SCREENMAN:GetTopScreen():GetStageStats()
 					self:Set(ss, pss)
-					self:diffusealpha(0.3)
+					local lifeDiff = GetLifeDifficulty()
+					local c = getLifeDifficultyColor(lifeDiff)
+					self:diffuse(c):diffusealpha(0.6)
+					-- Apply gradient: Top is whiter
+					self:diffusebottomedge(c):diffusetopedge(color("1,1,1,1"))
 					pcall(function() self:GetChild("Line"):diffusealpha(0) end)
 				end)
 			end
 		},
 
-		-- Combo Graph
-		Def.ComboGraph {
-			InitCommand = function(self) 
-				self:Load("ComboGraph" .. ToEnumShortString(pn)) 
-				self:xy(0, 80):zoomto(rightW, 80):halign(0):valign(0)
-			end,
-			BeginCommand = function(self)
-				pcall(function()
-					local ss = SCREENMAN:GetTopScreen():GetStageStats()
-					self:Set(ss, pss)
-				end)
+		-- Custom 6-Column Combo Graph (Timeline View)
+		(function()
+			local results = calculateMaxStreaks(dvt, nrv, comboConfig)
+			local overallMax = 0
+			for _, r in ipairs(results) do if r.max > overallMax then overallMax = r.max end end
+			
+			local graphW = rightW
+			local graphH = 80
+			local laneH = graphH / #comboConfig
+			local af = Def.ActorFrame {
+				Name = "ComboGraph",
+				-- Position -2px X, +5px Y from the original (0, 80) relative to Graphs AF
+				InitCommand = function(self) self:xy(-2, 85) end,
+			}
+
+			local lastRow = nrv and nrv[#nrv] or 1
+			if lastRow == 0 then lastRow = 1 end
+
+			for i, conf in ipairs(comboConfig) do
+				local res = results[i]
+				local val = res.max
+				local startX = (res.startRow / lastRow) * graphW
+				local endX = (res.endRow / lastRow) * graphW
+				local barW = math.max(2, endX - startX)
+				local cy = (i - 1) * laneH + laneH/2
+				local isHighest = val == overallMax and overallMax > 0
+
+				af[#af + 1] = Def.ActorFrame {
+					Name = "Lane_" .. i,
+					InitCommand = function(self) self:y(cy):zbuffer(true) end,
+
+					-- 0. Depth Clearance (Initializes depth buffer to 0 for this lane)
+					Def.Quad {
+						InitCommand = function(self)
+							self:halign(0):zoomto(graphW, laneH):diffusealpha(0)
+							self:blend("BlendMode_NoEffect") -- Write to Z but not to color
+							self:zwrite(true):z(0)
+						end
+					},
+
+					-- 1. Label - Base (Judgment Color)
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:zoom(0.32):settext(conf.name):halign(0):x(5)
+							self:diffuse(conf.color):ztest(false)
+						end
+					},
+
+					-- 2. Combo Number - Base (Judgment Color)
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:zoom(0.35):settext(val):ztest(false)
+							if barW > 30 then
+								self:xy(startX + barW/2, 0):diffuse(conf.color)
+							else
+								self:xy(startX + barW + 5, 0):halign(0):diffuse(conf.color)
+							end
+						end
+					},
+
+					-- 3. The Horizontal Bar (Timeline) - Writes to Depth Buffer
+					Def.Quad {
+						InitCommand = function(self)
+							self:halign(0):xy(startX, 0):zoomto(barW, laneH - 2)
+							self:diffuse(conf.color):diffusealpha(0.6)
+							self:zwrite(true):z(1) -- Draw at depth 1
+							if isHighest then
+								self:glow(color("1,1,1,0.2"))
+								self:diffusealpha(0.8)
+							end
+						end
+					},
+
+					-- 4. Label - Over (Black, only visible where Bar exists)
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:zoom(0.32):settext(conf.name):halign(0):x(5)
+							-- ztest(true) with LessEqual will only pass where depth is 1 or more.
+							-- Since background is 0, it fails there.
+							self:diffuse(color("0,0,0,1")):ztest(true):z(1)
+						end
+					},
+
+					-- 5. Combo Number - Over (Black, only visible where Bar exists)
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:zoom(0.35):settext(val):diffuse(color("0,0,0,1")):ztest(true):z(1)
+							if barW > 30 then
+								self:xy(startX + barW/2, 0)
+							else
+								self:xy(startX + barW + 5, 0):halign(0)
+							end
+						end
+					},
+				}
 			end
-		},
+			return af
+		end)(),
 	},
 
 	-- ============================================================
