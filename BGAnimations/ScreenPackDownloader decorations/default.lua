@@ -547,7 +547,7 @@ local bundleListFrame = Def.ActorFrame {
 bundleListFrame[#bundleListFrame + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:zoomto(bundleListW, bundleItemH * #availableBundles)
-		self:diffuse(color("0.05,0.05,0.05,0.95")):strokeColor(borderColor):strokeWidth(1)
+		self:diffuse(color("0.05,0.05,0.05,0.95"))
 	end
 }
 

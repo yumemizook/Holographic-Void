@@ -59,7 +59,7 @@ local o = Def.ActorFrame {
 	-- Background Quad
 	Def.Quad {
 		InitCommand = function(self)
-			self:xy(0, SCREEN_CENTER_Y - 50):zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0.05,0.05,0.05,0.9")):strokeColor(color("0.18,0.18,0.18,1")):strokeWidth(1)
+			self:xy(0, SCREEN_CENTER_Y - 50):zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0.05,0.05,0.05,0.9"))
 		end
 	},
 	LoadFont("Common Large") .. {

@@ -218,7 +218,7 @@ local function input(event)
 				if item and isOver(item:GetChild("ClickArea")) then
 					local s = chartPanelRef.available and chartPanelRef.available[d]
 					if s then
-						GAMESTATE:SetCurrentSteps(s)
+						GAMESTATE:SetCurrentSteps(PLAYER_1, s)
 						steps = s
 						MESSAGEMAN:Broadcast("ReloadChartPreview")
 						return true
