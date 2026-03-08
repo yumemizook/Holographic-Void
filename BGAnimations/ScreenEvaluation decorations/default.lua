@@ -606,6 +606,47 @@ local function scoreBoard(pn)
 				end,
 			},
 		},
+
+		-- Chart Progress (Percentage completion on fail)
+		Def.ActorFrame {
+			Name = "ChartProgressWrapper",
+			InitCommand = function(self) self:xy(110, 29):visible(false) end,
+			OnCommand = function(self)
+				local grade = pss:GetWifeGrade()
+				if grade == "Grade_Failed" then
+					local totalNotes = songTotalNotes or steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
+					local encounteredNotes = 0
+					for _, j in ipairs(judges) do
+						encounteredNotes = encounteredNotes + pss:GetTapNoteScores(j)
+					end
+					
+					local progress = (totalNotes > 0) and (encounteredNotes / totalNotes) or 0
+					local targetProgress = progress * 100
+					local duration = 0.8
+					local curTime = 0
+
+					self:visible(true):diffusealpha(0):sleep(0.4):linear(0.2):diffusealpha(1)
+					
+					local label = self:GetChild("ProgressLabel")
+					self:SetUpdateFunction(function(self, delta)
+						curTime = curTime + delta
+						local animProgress = math.min(1, curTime / duration)
+						local displayPct = targetProgress * math.sin(animProgress * (math.pi / 2)) -- Ease out Sine
+						
+						label:settextf("%.2f%% completed", math.min(displayPct, 100))
+						
+						if animProgress >= 1 then
+							self:SetUpdateFunction(nil)
+						end
+					end)
+				end
+			end,
+
+			LoadFont("Common Normal") .. {
+				Name = "ProgressLabel",
+				InitCommand = function(self) self:halign(0):valign(0):zoom(0.4):diffuse(accentColor) end,
+			}
+		},
 		-- DP (WifeDP)
 		Def.ActorFrame {
 			Name = "WifeDPDisplay",
