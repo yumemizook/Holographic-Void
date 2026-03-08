@@ -1067,12 +1067,12 @@ t[#t + 1] = Def.ActorFrame {
 			end
 			self:visible(true)
 			local judges = {
-				{name = "W1", label = "MAV", val = score:GetTapNoteScore("TapNoteScore_W1")},
-				{name = "W2", label = "PER", val = score:GetTapNoteScore("TapNoteScore_W2")},
-				{name = "W3", label = "GRE", val = score:GetTapNoteScore("TapNoteScore_W3")},
-				{name = "W4", label = "GOO", val = score:GetTapNoteScore("TapNoteScore_W4")},
+				{name = "W1", label = "MARV", val = score:GetTapNoteScore("TapNoteScore_W1")},
+				{name = "W2", label = "PERF", val = score:GetTapNoteScore("TapNoteScore_W2")},
+				{name = "W3", label = "GREAT", val = score:GetTapNoteScore("TapNoteScore_W3")},
+				{name = "W4", label = "GOOD", val = score:GetTapNoteScore("TapNoteScore_W4")},
 				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
-				{name = "Miss", label = "MIS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
+				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
 			}
 			for i, j in ipairs(judges) do
 				local block = self:GetChild("Blocks"):GetChild("Block_" .. i)
@@ -1085,8 +1085,8 @@ t[#t + 1] = Def.ActorFrame {
 					
 					local c = HVColor.Judgment and HVColor.Judgment[j.name] or color("0.5,0.5,0.5,1")
 					bg:diffuse(c):diffusealpha(0.2) -- translucent colored quad
-					lbl:settext(j.label):diffuse(c)
-					valTxt:diffuse(c)
+					lbl:settext(j.label):diffuse(c):zoom(0.2)
+					valTxt:diffuse(c):zoom(0.45)
 				end
 			end
 		end,
