@@ -785,7 +785,7 @@ t[#t + 1] = Def.ActorFrame {
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local rs = getRescoreElements(pss, pss)
-					local j4 = getRescoredWife3Judge(1, 4, rs, false)
+					local j4 = getRescoredWife3Judge(1, 4, rs)
 					self:settext(string.format("%.4f%%", j4))
 				end
 			end,

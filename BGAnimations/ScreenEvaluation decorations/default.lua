@@ -201,7 +201,7 @@ local judgmentColors = {
 --  	{ name = "Ludicrous",  window = 12.25,  judgment = 7, color = color("#c3f1ff") },
 --  	{ name = "Ridiculous", window = 22.5,  judgment = 7, color = color("#86e3ff") },
 --  	{ name = "Marvelous", window = 22.5,  judgment = 4, color = color("#39d1ff") },
---  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff") },
+--  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff")] },
 --  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
 --  }
 -- [NEW] Life Difficulty Color Helper (1-7 scale)
@@ -321,7 +321,7 @@ end
 
 
 -- Rescore function (ported from EtternaUtils.lua)
-local function getRescoredWife3Judge(version, judge, rst, useFullChart)
+local function getRescoredWife3Judge(judgeType, judge, rst)
 	local totalPoints = 0
 	local tso = ms.JudgeScalers[judge] or 1
 
@@ -336,11 +336,7 @@ local function getRescoredWife3Judge(version, judge, rst, useFullChart)
 	totalPoints = totalPoints + (rst["holdsMissed"] or 0) * -4.5
 	totalPoints = totalPoints + (rst["rollsMissed"] or 0) * -4.5
 
-	-- Denominator logic: useFullChart for progress (eval), otherwise use totalTaps for accuracy (HUD)
-	-- In Evaluation, we usually want Progress% relative to the whole song.
-	local denomCount = useFullChart and (rst["totalNotes"] or rst["totalTaps"] or 0) or (rst["totalTaps"] or 0)
-	local maxPoints = denomCount * 2
-	
+	local maxPoints = (rst["totalNotes"] or rst["totalTaps"] or 0) * 2
 	if maxPoints <= 0 then return 0 end
 
 	local res = (totalPoints / maxPoints) * 100
@@ -383,11 +379,11 @@ local function scoreBoard(pn)
 			if params.Name == "PrevJudge" and judge > 1 then
 				judge = judge - 1
 				clampJudge()
-				rescoredPercentage = getRescoredWife3Judge(3, judge, rst, true)
+				rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 			elseif params.Name == "NextJudge" and judge < 9 then
 				judge = judge + 1
 				clampJudge()
-				rescoredPercentage = getRescoredWife3Judge(3, judge, rst, true)
+				rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 			end
 			if params.Name == "ResetJudge" then
 				judge = PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty()

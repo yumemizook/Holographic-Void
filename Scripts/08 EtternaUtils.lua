@@ -725,39 +725,36 @@ function wife3(maxms, ts, version)
 end
 
 -- holy shit this is fugly
-function getRescoredWife3Judge(version, judgeScale, rst, useFullChart)
-	local totalPoints = 0
-	local tso = ms.JudgeScalers[judgeScale] or 1
-
+function getRescoredWife3Judge(version, judgeScale, rst)
+	local tso = ms.JudgeScalers
+	local ts = tso[judgeScale]
+	local p = 0.0
 	local dvt = rst["dvt"]
-	if not dvt or #dvt == 0 then return 0 end
+	if dvt == nil then return p end
 
-	for i = 1, #dvt do
-		totalPoints = totalPoints + wife3(math.abs(dvt[i]), tso)
+	for i = 1, #dvt do							-- wife2 does not require abs due to ^2 but this does
+		p = p + wife3(math.abs(dvt[i]), ts, version)
 	end
-
-	-- Apply penalties matching ScreenEvaluation
-	totalPoints = totalPoints + (rst["misses"] or 0) * -5.5
-	totalPoints = totalPoints + (rst["minesHit"] or 0) * -7
-	totalPoints = totalPoints + (rst["holdsMissed"] or 0) * -4.5
-	totalPoints = totalPoints + (rst["rollsMissed"] or 0) * -4.5
-
-	-- Denominator logic: useFullChart for progress (eval), otherwise use totalTaps for accuracy (HUD)
-	local denomCount = useFullChart and (rst["totalNotes"] or rst["totalTaps"] or 0) or (rst["totalTaps"] or 0)
-	local maxPoints = denomCount * 2
+	p = p + (rst["holdsMissed"] * -4.5)
+	p = p + (rst["minesHit"] * -7)
 	
-	if maxPoints <= 0 then return 0 end
-
-	local res = (totalPoints / maxPoints) * 100
-	return math.min(res, 100) -- Only clamp upper bound
+	local totalTaps = rst["totalTaps"] or rst["totalNotes"] or #dvt
+	if totalTaps == 0 or totalTaps < #dvt then 
+		totalTaps = #dvt 
+	end
+	if totalTaps == 0 then return 0 end
+	
+	local finalPoints = math.min(totalTaps * 2, p)
+	return (finalPoints / (totalTaps * 2)) * 100.0
 end
 
 function getRescoreElements(pss, score)
 	local o = {}
-	local radarpss = pss.GetRadarPossible and pss:GetRadarPossible() or pss:GetRadarValues()
+	o["dvt"] = pss:GetOffsetVector()
+	
+	local radarpss = pss.GetRadarActual and pss:GetRadarActual() or pss:GetRadarValues()
 	local radarscore = score.GetRadarValues and score:GetRadarValues() or score:GetRadarActual()
 	
-	o["dvt"] = pss:GetOffsetVector()
 	o["totalHolds"] = (radarpss:GetValue("RadarCategory_Holds") or 0)
 	o["totalRolls"] = (radarpss:GetValue("RadarCategory_Rolls") or 0)
 	o["holdsHit"] = (radarscore:GetValue("RadarCategory_Holds") or 0)
@@ -767,12 +764,13 @@ function getRescoreElements(pss, score)
 	o["minesHit"] = (radarpss:GetValue("RadarCategory_Mines") or 0) - (radarscore:GetValue("RadarCategory_Mines") or 0)
 	
 	o["totalTaps"] = pss:GetTotalTaps()
-	o["misses"] = pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_Miss") or (o["totalTaps"] - #o["dvt"])
+	o["tapsHit"] = #o["dvt"]
+	o["misses"] = o["totalTaps"] - o["tapsHit"]
 	
 	local steps = GAMESTATE:GetCurrentSteps()
 	if steps then
-		local pn = GAMESTATE:GetEnabledPlayers()[1]
-		o["totalNotes"] = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
+		local rv = steps:GetRadarValues(PLAYER_1)
+		o["totalNotes"] = rv:GetValue("RadarCategory_Notes")
 	else
 		o["totalNotes"] = o["totalTaps"]
 	end
