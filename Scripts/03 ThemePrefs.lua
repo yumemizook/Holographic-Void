@@ -292,7 +292,14 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 	
-	-- Gameplay: Show Mean on Notefield
+	-- Gameplay: Show Hit Mean Display
+	HV_ShowHitMean = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Gameplay: Show Hit Mean Display (Legacy compatibility)
 	HV_ShowMean = {
 		Default = true,
 		Choices = {"Off", "On"},
@@ -347,6 +354,64 @@ local HVPrefs = {
 	HV_AlarmTime = { Default = "12:00" },
 	HV_AlarmTimerDuration = { Default = 5 },
 	HV_AlarmShowInGameplay = { Default = true },
+
+	-- Gameplay Customization: HUD Elements
+	HV_ShowJudgment = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ShowCombo = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ShowCurrentWife = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ShowJudgeCounter = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ShowPlayerInfo = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ProgressBarPosition = {
+		Default = "Bottom",
+		Choices = {"Top", "Bottom", "Off"},
+		Values = {"Top", "Bottom", "Off"}
+	},
+	HV_ShowInGameLeaderboard = {
+		Default = "Off",
+		Choices = {"Off", "Local", "Online"},
+		Values = {"Off", "Local", "Online"}
+	},
+	HV_ShowNPSGraph = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	HV_ComboBreakHighlight = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	-- Gameplay: Assist mode (Clap/Metronome/Both)
+	HV_AssistMode = {
+		Default = "Off",
+		Choices = {"Off", "Clap", "Metronome", "Both"},
+		Values = {"Off", "Clap", "Metronome", "Both"}
+	},
+	HV_GoalTrackerText = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.
@@ -393,6 +458,85 @@ end
 --- Check if measure lines should be shown.
 function HV.ShowMeasureLines()
 	local val = ThemePrefs.Get("HV_ShowMeasureLines")
+	return val == "true" or val == true
+end
+
+--- Check if judgment text should be shown.
+function HV.ShowJudgment()
+	local val = ThemePrefs.Get("HV_ShowJudgment")
+	return val == "true" or val == true
+end
+
+--- Check if combo counter should be shown.
+function HV.ShowCombo()
+	local val = ThemePrefs.Get("HV_ShowCombo")
+	return val == "true" or val == true
+end
+
+--- Check if current wife% should be shown during gameplay.
+function HV.ShowCurrentWife()
+	local val = ThemePrefs.Get("HV_ShowCurrentWife")
+	return val == "true" or val == true
+end
+
+--- Check if judge counter should be shown.
+function HV.ShowJudgeCounter()
+	local val = ThemePrefs.Get("HV_ShowJudgeCounter")
+	return val == "true" or val == true
+end
+
+--- Check if player info should be shown.
+function HV.ShowPlayerInfo()
+	local val = ThemePrefs.Get("HV_ShowPlayerInfo")
+	return val == "true" or val == true
+end
+
+--- Get progress bar position (Top, Bottom, or Off).
+function HV.GetProgressBarPosition()
+	return ThemePrefs.Get("HV_ProgressBarPosition") or "Bottom"
+end
+
+--- Get in-game leaderboard mode ("Off", "Local", or "Online").
+function HV.ShowInGameLeaderboard()
+	local val = ThemePrefs.Get("HV_ShowInGameLeaderboard")
+	-- Backwards compat: true -> "Local", false/nil -> "Off"
+	if val == true or val == "true" then return "Local" end
+	if val == false or val == "false" or val == nil then return "Off" end
+	return val
+end
+
+--- Check if NPS graph should be shown.
+function HV.ShowNPSGraph()
+	local val = ThemePrefs.Get("HV_ShowNPSGraph")
+	return val == "true" or val == true
+end
+
+--- Check if combo break lane highlighting is enabled.
+function HV.ComboBreakHighlight()
+	local val = ThemePrefs.Get("HV_ComboBreakHighlight")
+	return val == "true" or val == true
+end
+
+--- Check if assist mode is enabled.
+function HV.AssistMode()
+	local val = ThemePrefs.Get("HV_AssistMode")
+	return val ~= "Off" and val ~= nil
+end
+
+--- Get assist mode type.
+function HV.GetAssistMode()
+	return ThemePrefs.Get("HV_AssistMode") or "Off"
+end
+
+--- Check if goal tracker text should be shown.
+function HV.ShowGoalTrackerText()
+	local val = ThemePrefs.Get("HV_GoalTrackerText")
+	return val == "true" or val == true
+end
+
+--- Check if hit mean display should be shown.
+function HV.ShowHitMean()
+	local val = ThemePrefs.Get("HV_ShowMean")
 	return val == "true" or val == true
 end
 

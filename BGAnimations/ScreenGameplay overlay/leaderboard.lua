@@ -1,0 +1,293 @@
+-- Holographic Void: In-Game Leaderboard (Single Player)
+-- Shows local or online high scores for the current song during gameplay
+-- Top-left corner, individual score cards + live current score
+
+local leaderboardMode = HV.ShowInGameLeaderboard() -- "Off", "Local", or "Online"
+if leaderboardMode == "Off" then
+	return Def.ActorFrame {}
+end
+
+-- Check if we have a current song and steps
+local song = GAMESTATE:GetCurrentSong()
+local steps = GAMESTATE:GetCurrentSteps()
+if not song or not steps then
+	return Def.ActorFrame {}
+end
+
+-- HV-themed colors
+local accentColor = HVColor.Accent or color("#00CFFF")
+local brightText = color("1,1,1,1")
+local dimText = color("0.65,0.65,0.65,1")
+local bgCard = color("0.06,0.06,0.06,0.85")
+local bgCardSelected = color("0.12,0.12,0.12,0.95")
+
+-- Layout
+local cardW = 155
+local cardH = 38
+local cardGap = 3
+local startX = 10
+local startY = 40
+local maxEntries = 5
+
+-- Get player profile name
+local profileName = "Player"
+local profile = PROFILEMAN:GetProfile(PLAYER_1)
+if profile then
+	local name = profile:GetDisplayName()
+	if name and name ~= "" then profileName = name end
+end
+
+-- Grade helper
+local function GetGradeStr(wife)
+	if     wife >= 99.9935 then return "AAAAA"
+	elseif wife >= 99.955  then return "AAAA"
+	elseif wife >= 99.70   then return "AAA"
+	elseif wife >= 93.00   then return "AA"
+	elseif wife >= 80.00   then return "A"
+	elseif wife >= 70.00   then return "B"
+	elseif wife >= 60.00   then return "C"
+	elseif wife >= 0       then return "D"
+	end
+	return "F"
+end
+
+-- Score data storage (shared between logic and commands)
+local highScores = {}
+
+-- ============================================================
+-- Data Fetching Logic
+-- ============================================================
+local function UpdateScores()
+	highScores = {}
+	local ck = steps:GetChartKey()
+	if not ck then return end
+
+	if leaderboardMode == "Online" then
+		-- Fetch from DLMAN
+		local lb = DLMAN:GetChartLeaderBoard(ck)
+		if lb then
+			for i = 1, math.min(maxEntries, #lb) do
+				local s = lb[i]
+				pcall(function()
+					local wife = s:GetWifeScore() * 100
+					highScores[#highScores + 1] = {
+						rank = i,
+						wife = wife,
+						combo = s:GetMaxCombo(),
+						gradeStr = GetGradeStr(wife),
+						name = s:GetDisplayName() or s:GetName() or "???",
+						rate = s:GetMusicRate(),
+					}
+				end)
+			end
+		end
+
+		-- If none found, request them (seed for next play or late refresh)
+		if #highScores == 0 and DLMAN:IsLoggedIn() then
+			DLMAN:RequestChartLeaderBoardFromOnline(ck, function(lbData)
+				if lbData and #lbData > 0 then
+					MESSAGEMAN:Broadcast("RefreshLeaderboard")
+				end
+			end)
+		end
+	else
+		-- Local Scores
+		local sl = SCOREMAN:GetScoresByKey(ck)
+		if sl then
+			local allScores = {}
+			for _, scoreList in pairs(sl) do
+				local scoreTable = scoreList:GetScores()
+				if scoreTable then
+					for _, s in ipairs(scoreTable) do allScores[#allScores + 1] = s end
+				end
+			end
+			table.sort(allScores, function(a, b) return a:GetWifeScore() > b:GetWifeScore() end)
+			for i = 1, math.min(maxEntries, #allScores) do
+				local s = allScores[i]
+				local wife = s:GetWifeScore() * 100
+				highScores[#highScores + 1] = {
+					rank = i,
+					wife = wife,
+					combo = s:GetMaxCombo(),
+					gradeStr = GetGradeStr(wife),
+					name = profileName,
+					rate = s:GetMusicRate(),
+				}
+			end
+		end
+	end
+end
+
+-- Initial fetch
+UpdateScores()
+
+-- ============================================================
+-- UI Construction
+-- ============================================================
+local t = Def.ActorFrame {
+	Name = "InGameLeaderboard",
+	InitCommand = function(self) self:xy(startX, startY) end,
+	RefreshLeaderboardMessageCommand = function(self)
+		UpdateScores()
+		self:playcommand("RefreshScores")
+	end,
+
+	-- Mode Tag
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(4, -12):zoom(0.24)
+				:diffuse(accentColor):diffusealpha(0.6)
+				:settext(leaderboardMode:upper())
+		end
+	}
+}
+
+-- Create historical cards
+for i = 1, maxEntries do
+	local cardY = (i - 1) * (cardH + cardGap)
+
+	t[#t + 1] = Def.ActorFrame {
+		Name = "ScoreCard_" .. i,
+		InitCommand = function(self) self:xy(0, cardY) end,
+		RefreshScoresCommand = function(self)
+			local data = highScores[i]
+			self:visible(data ~= nil)
+			if data then self:playcommand("SetData", data) end
+		end,
+
+		-- Card Background (Subtle Gradient)
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(cardW, cardH)
+					:diffuse(bgCard)
+					:diffusetopedge(color("0.1,0.1,0.1,0.85"))
+			end
+		},
+
+		-- Accent Strip (Grade Colored)
+		Def.Quad {
+			Name = "AccentStrip",
+			InitCommand = function(self) self:halign(0):valign(0):zoomto(2, cardH) end,
+			SetDataCommand = function(self, data)
+				self:diffuse(HVColor.GetGradeColor(data.gradeStr)):diffusealpha(0.8)
+			end
+		},
+
+		-- Rank
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(6, 3):zoom(0.28):diffuse(dimText) end,
+			SetDataCommand = function(self, data) self:settextf("#%d", data.rank) end
+		},
+
+		-- Player Name
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(28, 3):zoom(0.28):maxwidth((cardW - 80) / 0.28) end,
+			SetDataCommand = function(self, data)
+				self:settext(data.name)
+				local isLocalUser = (data.name == profileName)
+				self:diffuse(isLocalUser and brightText or dimText)
+			end
+		},
+
+		-- Wife %
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(6, 19):zoom(0.32) end,
+			SetDataCommand = function(self, data)
+				self:diffuse(HVColor.GetGradeColor(data.gradeStr))
+				if data.wife >= 99.7 then self:settextf("%.4f%%", data.wife)
+				else self:settextf("%.2f%%", data.wife) end
+			end
+		},
+
+		-- Rate / Combo (Right-aligned)
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 3):zoom(0.22):diffuse(dimText) end,
+			SetDataCommand = function(self, data) self:settextf("%.2fx", data.rate) end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 21):zoom(0.22):diffuse(dimText) end,
+			SetDataCommand = function(self, data) self:settextf("%dx", data.combo) end
+		}
+	}
+end
+
+-- Current Score Card (Live)
+local currentAccent = accentColor
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "CurrentScoreRow",
+	RefreshScoresCommand = function(self)
+		local y = #highScores * (cardH + cardGap) + 6
+		self:stoptweening():linear(0.2):y(y)
+		self:visible(true)
+	end,
+
+	-- Card Background
+	Def.Quad {
+		InitCommand = function(self)
+			self:halign(0):valign(0):zoomto(cardW, cardH)
+				:diffuse(bgCardSelected)
+		end
+	},
+
+	-- Pulsing Accent Strip
+	Def.Quad {
+		Name = "CurrentAccent",
+		InitCommand = function(self)
+			self:halign(0):valign(0):zoomto(2, cardH)
+				:diffuse(currentAccent)
+				:diffusealpha(0.8)
+				:pulse():effectmagnitude(1.0, 0.4, 0):effectperiod(1.5)
+		end
+	},
+
+	-- "NOW" Label
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(6, 3):zoom(0.24)
+				:diffuse(currentAccent):settext("NOW")
+		end
+	},
+
+	-- Player Name
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:halign(0):valign(0):xy(32, 3):zoom(0.28)
+				:diffuse(brightText):settext(profileName)
+		end
+	},
+
+	-- Live Stats
+	LoadFont("Common Normal") .. {
+		Name = "LiveWife",
+		InitCommand = function(self) self:halign(0):valign(0):xy(6, 19):zoom(0.32):settext("100.00%") end,
+		JudgmentMessageCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
+			if not pss then return end
+			local wife = pss:GetWifeScore() * 100
+			if wife >= 99.7 then self:settextf("%.4f%%", wife)
+			else self:settextf("%.2f%%", wife) end
+			local g = GetGradeStr(wife)
+			local c = HVColor.GetGradeColor(g)
+			self:diffuse(c)
+			local acc = self:GetParent():GetChild("CurrentAccent")
+			if acc then acc:diffuse(c) end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "LiveCombo",
+		InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 21):zoom(0.22):diffuse(dimText):settext("0x") end,
+		JudgmentMessageCommand = function(self)
+			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
+			if not pss then return end
+			local combo = pss:GetCurrentCombo()
+			self:settextf("%dx", combo)
+			self:diffuse(combo >= 100 and accentColor or dimText)
+		end
+	}
+}
+
+-- Trigger first refresh
+t.BeginCommand = function(self) self:playcommand("RefreshScores") end
+
+return t

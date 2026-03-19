@@ -143,6 +143,54 @@ local function updateSync(self)
 		end
 	end
 	
+	-- Update NPS tooltip position and value
+	if npsTooltipActor and rootRef and rootRef:GetVisible() and steps then
+		local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+		-- Get CDG frame true position for accurate bounds checking
+		local cdgX = SCREEN_CENTER_X - (SCREEN_WIDTH - 120)/2
+		local cdgY = SCREEN_HEIGHT - 60 - 40  -- frame center minus half height
+		local cdgW = SCREEN_WIDTH - 120
+		local cdgH = 80
+		
+		-- Simple bounds check (reference: _chorddensitygraph.lua lines 20-27)
+		local inGraph = mx >= cdgX and mx <= cdgX + cdgW and my >= cdgY and my <= cdgY + cdgH
+		
+		if inGraph then
+			npsTooltipActor:visible(true)
+			npsTooltipActor:xy(mx + 15, my - 35)
+			
+			-- Calculate NPS at this position
+			local relX = mx - cdgX
+			local p = math.max(0, math.min(1, relX / cdgW))
+			
+			local rate = math.max(MIN_MUSIC_RATE, getCurRateValue())
+			local vectors = steps:GetCDGraphVectors(rate)
+			
+			if vectors and vectors[1] and #vectors[1] > 0 then
+				local npsV = vectors[1]
+				local idx = math.floor(p * #npsV) + 1
+				idx = math.max(1, math.min(#npsV, idx))
+				-- NPS values are already correct, don't multiply by 2
+				local nps = npsV[idx]
+				
+				local textActor = npsTooltipActor:GetChild("NPSText")
+				if textActor then
+					textActor:settextf("%.1f NPS", nps)
+				end
+			else
+				-- Debug: show when vectors fail
+				local textActor = npsTooltipActor:GetChild("NPSText")
+				if textActor then
+					textActor:settext("no data")
+				end
+			end
+		else
+			npsTooltipActor:visible(false)
+		end
+	elseif npsTooltipActor then
+		npsTooltipActor:visible(false)
+	end
+	
 	-- MSD Tooltip hover check
 	if msdTooltipActor and rootRef and rootRef:GetVisible() then
 		local rightSidebar = rootRef:GetChild("RightSidebar")
@@ -498,6 +546,11 @@ local function radarPanelComp()
 end
 
 -- 3. CHORD DENSITY GRAPH
+local peak70LineActor = nil
+local tooltipActor = nil
+local npsTooltipActor = nil
+local showTooltip = false
+
 local function densityGraphComp()
 	return Def.ActorFrame {
 		Name = "CDGFrame",
@@ -510,7 +563,7 @@ local function densityGraphComp()
 		Def.Quad { Name = "ProgressMarker", InitCommand = function(self) self:x(-(SCREEN_WIDTH-120)/2):zoomto(2, 80):diffuse(accentColor) end },
 		Def.Quad { Name = "ClickArea", InitCommand = function(self) self:zoomto(SCREEN_WIDTH - 120, 80):diffusealpha(0) end },
 
-		-- Graph (AMV)
+		-- Graph (AMV) - drawn first so line appears on top
 		Def.ActorMultiVertex {
 			Name = "GraphAMV",
 			ReloadCommand = function(self)
@@ -521,10 +574,12 @@ local function densityGraphComp()
 				local npsV = vectors[1]
 				local nRows = #npsV
 				local gW = SCREEN_WIDTH - 120
-				local gH = 70
+				local gH = 40
 				local rW = gW / nRows
 				local mNPS = 0
-				for i=1, #npsV do if npsV[i]*2 > mNPS then mNPS = npsV[i]*2 end end
+				for i=1, #npsV do
+					if npsV[i] > mNPS then mNPS = npsV[i] end
+				end
 				
 				local mHeight = gH / math.max(1, mNPS)
 				local verts, nCols = {}, steps:GetNumColumns()
@@ -534,7 +589,7 @@ local function densityGraphComp()
 						if vectors[d][r] > 0 then
 							local val = 0.2 + (nCols - (d-1)) * (0.6 / nCols)
 							local c = color(val..","..val..","..val..",1")
-							local x, y = -(gW/2) + (r-1)*rW, gH/2
+							local x, y = -(gW/2) + (r-1)*rW, gH/2 +20
 							local bh, bw = rW, -(vectors[d][r]*2*mHeight)
 							verts[#verts+1] = {{x, y, 0}, c}
 							verts[#verts+1] = {{x+bh, y, 0}, c}
@@ -545,6 +600,127 @@ local function densityGraphComp()
 				end
 				self:SetVertices(verts):SetDrawState({Mode="DrawMode_Quads", First=1, Num=#verts})
 			end
+		},
+
+		-- 70% Peak NPS Reference Line (drawn on top of everything)
+		Def.ActorFrame {
+			Name = "Peak70Container",
+			InitCommand = function(self)
+				self:xy(-(SCREEN_WIDTH - 120)/2, 0)
+				self:halign(0)
+				self:z(1000)  -- Ensure it's above all other elements
+			end,
+			ReloadCommand = function(self)
+				if steps then
+					local rate = math.max(MIN_MUSIC_RATE, getCurRateValue())
+					local vectors = steps:GetCDGraphVectors(rate)
+					if vectors and vectors[1] then
+						local npsV = vectors[1]
+						local mNPS = 0
+						local maxRaw = 0
+						for i=1, #npsV do
+							local raw = npsV[i]
+							if raw > maxRaw then maxRaw = raw end
+							local val = npsV[i]  -- NPS values are already correct, don't multiply by 2
+							if val > mNPS then mNPS = val end
+						end
+						if mNPS >= 2 then
+							local peak70 = mNPS * 0.7
+							-- Graph height is 70, center is 0, range is -35 to +35
+							-- 70% line should be 70% of the way up from bottom
+							local yPos = 35 - (0.7 * 70)  -- = 35 - 49 = -14
+							self:y(yPos)
+							self:visible(true)
+							-- Update the text with the actual 70% NPS value
+							local textActor = self:GetChild("Peak70Text")
+							if textActor then
+								textActor:settextf("%.1f (70%%)", peak70)
+							end
+						else
+							self:visible(false)
+						end
+					else
+						self:visible(false)
+					end
+				end
+			end,
+
+			-- The line (thicker with accent color)
+			Def.Quad {
+				Name = "Peak70Line",
+				InitCommand = function(self)
+					self:zoomto(SCREEN_WIDTH - 120, 2)
+					self:diffuse(accentColor)
+					self:diffusealpha(0.6)
+					self:halign(0)
+				end,
+			},
+
+			-- The text label (with accent color)
+			LoadFont("Common Normal") .. {
+				Name = "Peak70Text",
+				InitCommand = function(self)
+					self:x(SCREEN_WIDTH - 130)
+					self:y(-4)
+					self:zoom(0.28)
+					self:diffuse(accentColor)
+					self:halign(1)
+					self:settext("-- (70%)")
+				end
+			}
+		},
+
+		-- Hover Tooltip Area (invisible but captures mouse)
+		Def.Quad {
+			Name = "TooltipArea",
+			InitCommand = function(self)
+				self:zoomto(SCREEN_WIDTH - 120, 80)
+				self:xy(-(SCREEN_WIDTH - 120)/2, 40)
+				self:halign(0):valign(1)
+				self:diffusealpha(0)
+				self:z(400)
+			end
+		},
+
+		-- Tooltip Display (positioned in updateSync)
+		Def.ActorFrame {
+			Name = "NPSTooltip",
+			InitCommand = function(self)
+				npsTooltipActor = self
+				self:visible(false)
+				self:z(500)
+			end,
+
+			-- Background
+			Def.Quad {
+				InitCommand = function(self)
+					self:zoomto(90, 26)
+					self:diffuse(bgDark):diffusealpha(0.95)
+					self:halign(0):valign(1)
+				end
+			},
+
+			-- Border
+			Def.Quad {
+				InitCommand = function(self)
+					self:zoomto(90, 2)
+					self:y(-26)
+					self:diffuse(accentColor)
+					self:halign(0)
+				end
+			},
+
+			-- Text
+			LoadFont("Common Normal") .. {
+				Name = "NPSText",
+				InitCommand = function(self)
+					self:halign(0):valign(0)
+					self:x(5):y(-22)
+					self:zoom(0.35)
+					self:diffuse(accentColor)
+					self:settext("-- NPS")
+				end
+			}
 		}
 	}
 end

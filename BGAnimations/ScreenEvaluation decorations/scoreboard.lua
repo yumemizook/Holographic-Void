@@ -1,6 +1,7 @@
 --- Holographic Void: Local Scoreboard (ported from Fatigue / spawncamping-wallhack)
 -- Displays paginated local high-scores for the chart at the current rate.
 -- Features: SSR, Judgment tally (no labels), ClearType lamp, sort by SSR.
+-- NEW: Clickable score cards to view different score data
 
 local lines = 4
 local pn = GAMESTATE:GetEnabledPlayers()[1]
@@ -9,11 +10,17 @@ local steps = GAMESTATE:GetCurrentSteps()
 local score = pss:GetHighScore()
 local hsTable = getScoreTable(pn, getCurRate()) or {}
 
+-- Currently selected score index (for viewing)
+local selectedScoreIndex = 0
+
 local scoreIndex = 0
 if #hsTable > 0 then
 	local ok, idx = pcall(function() return getHighScoreIndex(hsTable, score) end)
 	if ok and idx then scoreIndex = idx end
 end
+
+-- Initialize selected score to current play
+selectedScoreIndex = scoreIndex
 
 -- Sort by SSR (descending)
 table.sort(hsTable, function(a, b)
@@ -43,6 +50,18 @@ local function movePage(n)
 	MESSAGEMAN:Broadcast("UpdateLocalScoreboard")
 end
 
+-- Function to select a score when clicked
+local function selectScore(idx)
+	if not hsTable[idx] then return end
+	selectedScoreIndex = idx
+	-- Set the score for viewing in the main eval screen
+	if hsTable[idx] then
+		SCOREMAN:SetMostRecentScore(hsTable[idx])
+		MESSAGEMAN:Broadcast("ScoreChanged")
+		MESSAGEMAN:Broadcast("UpdateLocalScoreboard")
+	end
+end
+
 -- HV Color palette
 local accentColor = HVColor.Accent
 local brightText = color("1,1,1,1")
@@ -50,6 +69,7 @@ local dimText = brightText
 local subText = brightText
 local mainText = brightText
 local bgCard = color("0.06,0.06,0.06,0.95")
+local selectedHighlight = color("#00CFFF")
 
 -- Judgment colors (same as main eval for tally coloring)
 local judgmentColors = {
@@ -58,6 +78,7 @@ local judgmentColors = {
 }
 
 local function scoreItem(i)
+	local rowIdx = 0
 	return Def.ActorFrame {
 		Name = "LocalRow" .. i,
 		InitCommand = function(self) self:y((i - 1) * 46) end,
@@ -65,6 +86,7 @@ local function scoreItem(i)
 		UpdateLocalScoreboardMessageCommand = function(self) self:playcommand("UpdateRow") end,
 		UpdateRowCommand = function(self)
 			local idx = (curPage - 1) * lines + i
+			rowIdx = idx
 			if hsTable[idx] then
 				self:visible(true)
 				self:RunCommandsOnChildren(function(child) child:playcommand("SetScore", {index = idx}) end)
@@ -73,13 +95,48 @@ local function scoreItem(i)
 			end
 		end,
 
+		-- Click handling row (invisible overlay)
+		Def.Quad {
+			Name = "ClickArea",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(300, 42):diffusealpha(0)
+			end,
+			MouseLeftClickMessageCommand = function(self, params)
+				if self:IsOver() and rowIdx > 0 then
+					selectScore(rowIdx)
+				end
+			end,
+			MouseOverCommand = function(self)
+				if rowIdx > 0 and rowIdx ~= selectedScoreIndex then
+					self:GetParent():GetChild("RowBG"):diffuse(color("0.1,0.1,0.1,0.6"))
+				end
+			end,
+			MouseOutCommand = function(self)
+				if rowIdx > 0 then
+					local bg = self:GetParent():GetChild("RowBG")
+					if rowIdx == selectedScoreIndex then
+						bg:diffuse(selectedHighlight):diffusealpha(0.15)
+					elseif rowIdx == scoreIndex then
+						bg:diffuse(accentColor):diffusealpha(0.1)
+					else
+						bg:diffuse(color("0,0,0,0.4"))
+					end
+				end
+			end
+		},
+
 		-- Row BG
 		Def.Quad {
+			Name = "RowBG",
 			InitCommand = function(self)
 				self:halign(0):valign(0):zoomto(300, 42):diffuse(color("0,0,0,0.4"))
 			end,
 			SetScoreCommand = function(self, params)
-				if params.index == scoreIndex then
+				if params.index == selectedScoreIndex then
+					-- Highlight for selected score
+					self:diffuse(selectedHighlight):diffusealpha(0.15)
+				elseif params.index == scoreIndex then
+					-- Original play score highlight
 					self:diffuse(accentColor):diffusealpha(0.1)
 				else
 					self:diffuse(color("0,0,0,0.4"))
@@ -87,6 +144,19 @@ local function scoreItem(i)
 			end,
 			WheelUpSlowMessageCommand = function(self) if self:IsOver() then movePage(-1) end end,
 			WheelDownSlowMessageCommand = function(self) if self:IsOver() then movePage(1) end end
+		},
+
+		-- Selection indicator (left border)
+		Def.Quad {
+			Name = "SelectionIndicator",
+			InitCommand = function(self) self:halign(0):valign(0):zoomto(3, 42):diffusealpha(0) end,
+			SetScoreCommand = function(self, params)
+				if params.index == selectedScoreIndex then
+					self:diffuse(selectedHighlight):diffusealpha(1)
+				else
+					self:diffusealpha(0)
+				end
+			end
 		},
 
 		-- ClearType lamp
@@ -204,6 +274,14 @@ local t = Def.ActorFrame {
 		InitCommand = function(self) self:xy(0, -18):zoom(0.35):halign(0):diffuse(accentColor) end,
 		OnCommand = function(self)
 			self:settextf("Local Scores (sorted by SSR) — %d total", #hsTable)
+		end,
+		UpdateLocalScoreboardMessageCommand = function(self)
+			-- Show indicator if viewing a different score
+			if selectedScoreIndex > 0 and selectedScoreIndex ~= scoreIndex then
+				self:settextf("Viewing Score #%d (Click current play to return)", selectedScoreIndex)
+			else
+				self:settextf("Local Scores (sorted by SSR) — %d total", #hsTable)
+			end
 		end
 	},
 

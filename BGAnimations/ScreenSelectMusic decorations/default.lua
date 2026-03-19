@@ -484,7 +484,27 @@ t[#t + 1] = Def.ActorFrame {
 				local mins = math.floor(len / 60)
 				local secs = math.floor(len % 60)
 				self:settext(string.format("%d:%02d", mins, secs))
-				self:diffuse(HVColor.GetSongLengthColor(len))
+				
+				-- Color gradient based on length
+				-- < 1:00 = white, 1:00-3:30 = green to yellow, 3:30-7:00 = yellow to red, 7:00-10:00 = red to purple, > 10:00 = purple
+				if len < 60 then
+					self:diffuse(color("1,1,1,1"))  -- White
+				elseif len < 210 then  -- 3:30
+					local t = (len - 60) / 150  -- 0 to 1 over 2.5 minutes
+					local g = 1 - t * 0.5  -- 1 to 0.5
+					self:diffuse(color("0.5,"..g..",0.5,1"))  -- Green to Yellow
+				elseif len < 420 then  -- 7:00
+					local t = (len - 210) / 210  -- 0 to 1 over 3.5 minutes
+					local r = 0.5 + t * 0.5  -- 0.5 to 1
+					local g = 0.5 - t * 0.5  -- 0.5 to 0
+					self:diffuse(color(r..","..g..",0.5,1"))  -- Yellow to Red
+				elseif len < 600 then  -- 10:00
+					local t = (len - 420) / 180  -- 0 to 1 over 3 minutes
+					local b = 0.5 + t * 0.5  -- 0.5 to 1
+					self:diffuse(color("1,0,"..b..",1"))  -- Red to Purple
+				else
+					self:diffuse(color("0.7,0,1,1"))  -- Purple
+				end
 			else
 				self:settext("--:--")
 				self:diffuse(mainText)
@@ -495,6 +515,55 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		CurrentRateChangedMessageCommand = function(self)
 			-- SelectionManager handles this now
+		end
+	},
+
+	-- NPS Label
+	LoadFont("Common Normal") .. {
+		Name = "NPSLabel",
+		InitCommand = function(self)
+			self:halign(0):valign(0):x(panelW * 0.65):zoom(0.35):diffuse(dimText)
+			self:settext("NPS")
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "NPSValue",
+		InitCommand = function(self)
+			self:halign(0):valign(0):x(panelW * 0.65 + 28):zoom(0.4):diffuse(mainText)
+		end,
+		SetCommand = function(self)
+			local data = HV.CurrentSongData
+			if data.steps then
+				local rate = math.max(0.05, getCurRateValue())
+				local vectors = data.steps:GetCDGraphVectors(rate)
+				if vectors and vectors[1] and #vectors[1] > 0 then
+					local npsV = vectors[1]
+					local mNPS = 0
+					for i=1, #npsV do
+						if npsV[i] > mNPS then mNPS = npsV[i] end
+					end
+					if mNPS >= 2 then
+						local peak70 = mNPS * 0.7
+						self:settextf("%.0f (%.0f)", mNPS, peak70)
+						self:diffuse(accentColor)
+					else
+						self:settext("-- (--)")
+						self:diffuse(dimText)
+					end
+				else
+					self:settext("-- (--)")
+					self:diffuse(dimText)
+				end
+			else
+				self:settext("-- (--)")
+				self:diffuse(dimText)
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		CurrentRateChangedMessageCommand = function(self)
+			self:playcommand("Set")
 		end
 	},
 

@@ -172,7 +172,7 @@ local graphVerts = Def.ActorFrame {
 			self:halign(0)
 		end
 	},
-	
+
 	-- AMV Graph
 	Def.ActorMultiVertex {
 		Name = "AMV_QuadStrip",

@@ -66,10 +66,14 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- SONG PROGRESS BAR (TOP of screen)
 -- ============================================================
+local progressBarPosition = HV.GetProgressBarPosition()
 local barW = SCREEN_WIDTH * 0.4
 local barH = 6
-local barY = 12
+local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bottom" and SCREEN_BOTTOM - 12 or 12)
 
+local showProgressBar = progressBarPosition ~= "Off"
+
+if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, barY)
@@ -145,8 +149,7 @@ t[#t + 1] = Def.ActorFrame {
 		PracticeModeReloadMessageCommand = function(self) self:queuecommand("UpdateBars") end
 	}
 }
-
--- Practice Mode Indicator
+end -- End progress bar visibility check
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "PracticeIndicator",
 	InitCommand = function(self)
@@ -264,6 +267,9 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- SCORE % (REAL-TIME)
 -- ============================================================
+local showCurrentWife = HV.ShowCurrentWife()
+
+if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
 	InitCommand = function(self)
@@ -317,12 +323,13 @@ t[#t + 1] = Def.ActorFrame {
 		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
 	}
 }
+end -- End current wife % visibility check
 
 -- ============================================================
--- TEXT PACEMAKER (TIL DEATH STYLE)
+-- TEXT GOAL TRACKER (TIL DEATH STYLE)
 -- ============================================================
-local showTextPacemaker = (ThemePrefs.Get("HV_ShowTextPacemaker") == "true" or ThemePrefs.Get("HV_ShowTextPacemaker") == true)
-if showTextPacemaker then
+local showGoalTrackerText = HV.ShowGoalTrackerText()
+if showGoalTrackerText then
 	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType")
 	if not pacemakerMode or pacemakerMode == "" then pacemakerMode = "Target" end
 
@@ -377,16 +384,17 @@ end
 -- ============================================================
 -- NOTEFIELD MEAN DISPLAY (Dedicated Object)
 -- ============================================================
-local showMean = (ThemePrefs.Get("HV_ShowMean") == "true" or ThemePrefs.Get("HV_ShowMean") == true)
-if showMean then
-	t[#t + 1] = Def.ActorFrame {
-		Name = "NotefieldMean",
-		InitCommand = function(self)
-			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
-		end,
-		OnCommand = function(self)
-			self:linear(0.2):diffusealpha(0.8)
-		end,
+t[#t + 1] = Def.ActorFrame {
+	Name = "NotefieldMean",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
+		-- Check if hit mean should be shown
+		local showMean = HV.ShowHitMean()
+		self:visible(showMean)
+	end,
+	OnCommand = function(self)
+		self:linear(0.2):diffusealpha(0.8)
+	end,
 
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
@@ -408,13 +416,14 @@ if showMean then
 			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
 		}
 	}
-end
 
 -- ============================================================
 -- CENTERED COMBO / MISS STREAK (per-note update)
 -- ============================================================
+local showCombo = HV.ShowCombo()
 local missStreak = 0
 
+if showCombo then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
@@ -528,8 +537,90 @@ t[#t + 1] = Def.ActorFrame {
 	end,
 	PracticeModeReloadMessageCommand = function(self) self:playcommand("PracticeModeReset") end
 }
+end -- End combo visibility check
 
--- Practice CD Graph
+-- ============================================================
+-- COMBO BREAK LANE HIGHLIGHT
+-- ============================================================
+local showComboBreakHighlight = HV.ComboBreakHighlight()
+
+if showComboBreakHighlight then
+t[#t + 1] = Def.ActorFrame {
+	Name = "ComboBreakHighlight",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y)
+	end,
+
+	-- Lane highlight quads (4 lanes for standard 4K)
+	Def.Quad {
+		Name = "Lane1",
+		InitCommand = function(self)
+			self:zoomto(64, 480):x(-96):diffuse(color("1,0,0,0")):diffusealpha(0)
+		end,
+		FlashCommand = function(self)
+			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+			self:linear(0.1):diffusealpha(0.5)
+			self:linear(0.2):diffusealpha(0)
+		end
+	},
+	Def.Quad {
+		Name = "Lane2",
+		InitCommand = function(self)
+			self:zoomto(64, 480):x(-32):diffuse(color("1,0,0,0")):diffusealpha(0)
+		end,
+		FlashCommand = function(self)
+			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+			self:linear(0.1):diffusealpha(0.5)
+			self:linear(0.2):diffusealpha(0)
+		end
+	},
+	Def.Quad {
+		Name = "Lane3",
+		InitCommand = function(self)
+			self:zoomto(64, 480):x(32):diffuse(color("1,0,0,0")):diffusealpha(0)
+		end,
+		FlashCommand = function(self)
+			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+			self:linear(0.1):diffusealpha(0.5)
+			self:linear(0.2):diffusealpha(0)
+		end
+	},
+	Def.Quad {
+		Name = "Lane4",
+		InitCommand = function(self)
+			self:zoomto(64, 480):x(96):diffuse(color("1,0,0,0")):diffusealpha(0)
+		end,
+		FlashCommand = function(self)
+			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+			self:linear(0.1):diffusealpha(0.5)
+			self:linear(0.2):diffusealpha(0)
+		end
+	},
+
+	JudgmentMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		if not params.TapNoteScore then return end
+
+		-- Flash on combo-breaking judgments
+		local isComboBreak = (params.TapNoteScore == "TapNoteScore_Miss" or
+							  params.TapNoteScore == "TapNoteScore_W5" or
+							  params.TapNoteScore == "TapNoteScore_W4")
+
+		if isComboBreak and params.Notes then
+			-- Flash lanes that had notes in this judgment
+			for i = 1, 4 do
+				if params.Notes[i] ~= nil then
+					local lane = self:GetChild("Lane" .. i)
+					if lane then
+						lane:stoptweening():playcommand("Flash")
+					end
+				end
+			end
+		end
+	end
+}
+end -- End combo break highlight
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "PracticeCDGraphContainer",
 	InitCommand = function(self)
@@ -559,11 +650,12 @@ local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
 local showEWMA = (ebMode == "EWMAOnly" or ebMode == "Both")
 local showStandard = (ebMode == "Standard" or ebMode == "Both")
 
-t[#t + 1] = Def.ActorFrame {
-	Name = "ErrorBar",
-	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off")
-	end,
+	t[#t + 1] = Def.ActorFrame {
+		Name = "ErrorBar",
+		InitCommand = function(self)
+			local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
+			self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off")
+		end,
 
 	-- Background line
 	Def.Quad {
@@ -667,10 +759,12 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- TWO-COLUMN JUDGMENT TALLY + PERFORMANCE METRICS
 -- ============================================================
+local showJudgeCounter = HV.ShowJudgeCounter()
 local tallyX = SCREEN_CENTER_X + 150
 local tallyY = SCREEN_BOTTOM - 200
 local colSpacing = 70
 
+if showJudgeCounter then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
@@ -1000,6 +1094,7 @@ t[#t + 1] = Def.ActorFrame {
 		}
 	}
 }
+end -- End judge counter visibility check
 
 -- ============================================================
 -- SONG TITLE (BOTTOM of screen)
@@ -1147,6 +1242,8 @@ end
 t[#t + 1] = LoadActor("scoretracking")
 t[#t + 1] = LoadActor("pacemaker")
 t[#t + 1] = LoadActor("npscalc")
+t[#t + 1] = LoadActor("multiplayer")
+t[#t + 1] = LoadActor("leaderboard")
 t[#t + 1] = LoadActor("avatar")
 t[#t + 1] = LoadActor("intro")
 

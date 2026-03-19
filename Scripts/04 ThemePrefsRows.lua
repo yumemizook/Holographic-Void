@@ -204,6 +204,63 @@ local HVPrefRows = {
 		Choices = {"Off", "Quotes", "Tips"},
 		Values  = {"Off", "Quotes", "Tips"},
 	},
+
+	-- Gameplay HUD Customization
+	HV_ShowJudgment = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ShowCombo = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ShowCurrentWife = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ShowJudgeCounter = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ShowPlayerInfo = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ProgressBarPosition = {
+		Default = "Bottom",
+		Choices = {"Top", "Bottom", "Off"},
+		Values = {"Top", "Bottom", "Off"},
+	},
+	HV_ShowInGameLeaderboard = {
+		Default = "Off",
+		Choices = {"Off", "Local", "Online"},
+		Values = {"Off", "Local", "Online"},
+	},
+	HV_ShowNPSGraph = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_ComboBreakHighlight = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	HV_AssistMode = {
+		Default = "Off",
+		Choices = {"Off", "Clap", "Metronome", "Both"},
+		Values = {"Off", "Clap", "Metronome", "Both"},
+	},
+	HV_GoalTrackerText = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -246,7 +303,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
 	return l
 end
 
@@ -254,6 +311,7 @@ end
 local function HVThemePrefRow(name, title)
 	local row = ThemePrefRow(name, title)
 	row.ExportOnChange = true
+	
 	local baseSave = row.SaveSelections
 	row.SaveSelections = function(self, list, pn)
 		baseSave(self, list, pn)
@@ -263,11 +321,11 @@ local function HVThemePrefRow(name, title)
 end
 
 function OptionRowPacemakerType()
-	return HVThemePrefRow("HV_PacemakerTargetType")
+	return HVThemePrefRow("HV_PacemakerTargetType", "Pacemaker Target Type")
 end
 
 function OptionRowPacemakerGoal()
-	return HVThemePrefRow("HV_PacemakerTargetGoal")
+	return HVThemePrefRow("HV_PacemakerTargetGoal", "Pacemaker Target Goal")
 end
 
 function OptionRowShowTextPacemaker()
@@ -285,6 +343,120 @@ end
 
 function OptionRowErrorBarMode()
 	return HVThemePrefRow("HV_ErrorBarMode", "Error Bar Mode")
+end
+
+function OptionRowProgressBarPosition()
+	return HVThemePrefRow("HV_ProgressBarPosition", "Progress Bar Position")
+end
+
+function OptionRowShowJudgment()
+	local row = ThemePrefRow("HV_ShowJudgment", "Show Judgment")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowJudgment")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowShowCombo()
+	local row = ThemePrefRow("HV_ShowCombo", "Show Combo")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowCombo")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowShowCurrentWife()
+	local row = ThemePrefRow("HV_ShowCurrentWife", "Show Current %")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowCurrentWife")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowShowJudgeCounter()
+	local row = ThemePrefRow("HV_ShowJudgeCounter", "Show Judge Counter")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowJudgeCounter")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowShowPlayerInfo()
+	local row = ThemePrefRow("HV_ShowPlayerInfo", "Show Player Info")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowPlayerInfo")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowShowInGameLeaderboard()
+	return HVThemePrefRow("HV_ShowInGameLeaderboard", "In-Game Leaderboard")
+end
+
+function OptionRowShowNPSGraph()
+	local row = ThemePrefRow("HV_ShowNPSGraph", "Show NPS Graph")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowNPSGraph")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowComboBreakHighlight()
+	local row = ThemePrefRow("HV_ComboBreakHighlight", "Combo Break Highlight")
+	local baseLoad = row.LoadSelections
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ComboBreakHighlight")
+		if val == "true" or val == true then
+			list[2] = true  -- On
+		else
+			list[1] = true  -- Off
+		end
+	end
+	return row
+end
+
+function OptionRowAssistMode()
+	return HVThemePrefRow("HV_AssistMode", "Assist Mode")
+end
+
+function OptionRowGoalTrackerText()
+	return HVThemePrefRow("HV_GoalTrackerText", "Goal Tracker Text")
 end
 
 -- Listen for pref changes and refresh accent color

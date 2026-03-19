@@ -40,6 +40,9 @@ local t = Def.ActorFrame {
 	Name = "AvatarDisplay",
 	InitCommand = function(self)
 		self:xy(panelX, panelY)
+		-- Check if player info should be shown
+		local showPlayerInfo = HV.ShowPlayerInfo()
+		self:visible(showPlayerInfo)
 		actual_dp = 0
 		total_max = 0
 		local steps = GAMESTATE:GetCurrentSteps()

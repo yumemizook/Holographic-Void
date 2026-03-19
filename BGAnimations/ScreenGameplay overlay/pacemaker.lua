@@ -1,4 +1,4 @@
--- Holographic Void: Pacemaker (adapted from Fatigue)
+-- Holographic Void: Goal Tracker (adapted from Fatigue)
 -- Visual score meter comparing current score against personal best and a target goal.
 -- Includes a real-time grade display, colored by HVColor.
 
@@ -220,7 +220,7 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			DisplayCommand = function(self)
 				self:align(0.5, 1.1):zoom(fontZoomSmall):y(-10)
-				self:settext("Target"):maxwidth(panelWidth * 0.22 / 0.35)
+				self:settext("Goal"):maxwidth(panelWidth * 0.22 / 0.35)
 				self:decelerate(1.5):y(-(meterheight - 10) * target2 / 100 - 10)
 				self:sleep(1):linear(0.5):diffusealpha(0)
 			end,
