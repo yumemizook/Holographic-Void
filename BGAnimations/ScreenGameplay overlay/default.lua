@@ -1,5 +1,4 @@
--- the main stuff in-game
-
+local pn = GAMESTATE:GetEnabledPlayers()[1] or PLAYER_1
 
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
@@ -190,28 +189,33 @@ t[#t + 1] = Def.ActorFrame {
 			self:playcommand("RefreshLife")
 		end,
 		RefreshLifeCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local lifeVal = pss:GetCurrentLife()
-				if lifeVal then
-					local fillH = lifeBarH * lifeVal
-					self:zoomto(lifeBarW, fillH)
+			local screen = SCREENMAN:GetTopScreen()
+			local lifeVal = 0
+			if screen and screen:GetLifeMeter(pn) then
+				lifeVal = screen:GetLifeMeter(pn):GetLife()
+			else
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				lifeVal = pss:GetCurrentLife() or 0
+			end
+			
+			if lifeVal then
+				local fillH = lifeBarH * lifeVal
+				self:zoomto(lifeBarW, fillH)
 
-					-- Coloring based on Life Difficulty (consistent with avatar.lua)
-					local diff = GetLifeDifficulty()
-					if diff <= 2 then
-						self:diffuse(color("#A0CFAB")) -- Green
-					elseif diff <= 4 then
-						self:diffuse(color("#5ABAFF")) -- Cyan/Blue
-					elseif diff == 5 then
-						self:diffuse(color("#CFD198")) -- Yellow
-					elseif diff == 6 then
-						self:diffuse(color("#E0B080")) -- Orange
-					else
-						self:diffuse(color("#CF9898")) -- Red
-					end
-					self:diffusealpha(0.8)
+				-- Coloring based on Life Difficulty (consistent with avatar.lua)
+				local diff = GetLifeDifficulty()
+				if diff <= 2 then
+					self:diffuse(color("#A0CFAB")) -- Green
+				elseif diff <= 4 then
+					self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+				elseif diff == 5 then
+					self:diffuse(color("#CFD198")) -- Yellow
+				elseif diff == 6 then
+					self:diffuse(color("#E0B080")) -- Orange
+				else
+					self:diffuse(color("#CF9898")) -- Red
 				end
+				self:diffusealpha(0.8)
 			end
 		end
 	},
@@ -229,6 +233,9 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:y(-lifeBarH / 2 - 10):zoom(0.25):diffuse(subText)
 		end,
+		BeginCommand = function(self)
+			self:playcommand("RefreshLifePct")
+		end,
 		JudgmentMessageCommand = function(self)
 			self:queuecommand("RefreshLifePct")
 		end,
@@ -236,12 +243,17 @@ t[#t + 1] = Def.ActorFrame {
 			self:playcommand("RefreshLifePct")
 		end,
 		RefreshLifePctCommand = function(self)
-			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			if pss then
-				local lifeVal = pss:GetCurrentLife()
-				if lifeVal then
-					self:settext(string.format("%.0f%%", lifeVal * 100))
-				end
+			local screen = SCREENMAN:GetTopScreen()
+			local lifeVal = 0
+			if screen and screen:GetLifeMeter(pn) then
+				lifeVal = screen:GetLifeMeter(pn):GetLife()
+			else
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				lifeVal = pss:GetCurrentLife() or 0
+			end
+			
+			if lifeVal then
+				self:settext(string.format("%.1f%%", lifeVal * 100))
 			end
 		end,
 		PracticeModeResetMessageCommand = function(self) self:playcommand("RefreshLifePct") end,
@@ -559,6 +571,14 @@ t[#t + 1] = Def.ActorFrame {
 			self:zoomto(ebW, ebH):visible(false)
 		end
 	},
+
+	-- Center Line (0ms)
+	Def.Quad {
+		Name = "CenterLine",
+		InitCommand = function(self)
+			self:zoomto(1, ebH + 8):diffuse(color("1,1,1,0.3"))
+		end
+	},
 	
 	-- Early Indicator (Left)
 	LoadFont("Common Normal") .. {
@@ -600,6 +620,9 @@ t[#t + 1] = Def.ActorFrame {
 
 		local offset = params.TapNoteOffset
 		if not offset then return end
+
+		-- Exclude misses from EWMA
+		if params.TapNoteScore == "TapNoteScore_Miss" then return end
 
 		-- Clamp for visualization
 		local visualOffset = offset * 1000 -- to ms
@@ -777,20 +800,45 @@ t[#t + 1] = Def.ActorFrame {
 			InitCommand = function(self)
 				self:halign(1):valign(0):x(65):zoom(0.34):diffuse(subText)
 				self:settext("0.0000%")
+				self.currWifePoints = 0
 			end,
-			JudgmentMessageCommand = function(self)
+			JudgmentMessageCommand = function(self, msg)
+				-- Only process tap-related judgments.
+				if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
+					local ts = ms.JudgeScalers[4] or 1.0 -- J4 rescaling always uses J4 (Index 4)
+					if msg.TapNoteOffset then
+						self.currWifePoints = self.currWifePoints + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
+					elseif msg.TapNoteScore == "TapNoteScore_Miss" then
+						self.currWifePoints = self.currWifePoints - 5.5
+					elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
+						self.currWifePoints = self.currWifePoints - 7.0
+					end
+				elseif msg.HoldNoteScore == "HoldNoteScore_LetGo" then
+					self.currWifePoints = self.currWifePoints - 4.5
+				end
 				self:queuecommand("Update")
 			end,
 			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
-					local rs = getRescoreElements(pss, pss)
-					local j4 = getRescoredWife3Judge(1, 4, rs)
-					self:settext(string.format("%.4f%%", j4))
+					local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
+									   pss:GetTapNoteScores("TapNoteScore_W2") +
+									   pss:GetTapNoteScores("TapNoteScore_W3") +
+									   pss:GetTapNoteScores("TapNoteScore_W4") +
+									   pss:GetTapNoteScores("TapNoteScore_W5") +
+									   pss:GetTapNoteScores("TapNoteScore_Miss")
+					
+					local maxPoints = notesPassed * 2
+					if maxPoints > 0 then
+						local j4 = math.min((self.currWifePoints / maxPoints) * 100, 100)
+						self:settext(string.format("%.4f%%", j4))
+					else
+						self:settext("100.0000%")
+					end
 				end
 			end,
-			PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
-			PracticeModeReloadMessageCommand = function(self) self:settext("0.00%") end
+			PracticeModeResetMessageCommand = function(self) self.currWifePoints = 0; self:settext("100.0000%") end,
+			PracticeModeReloadMessageCommand = function(self) self.currWifePoints = 0; self:settext("100.0000%") end
 		},
 
 		-- MA Ratio (W1/W2)

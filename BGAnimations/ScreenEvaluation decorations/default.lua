@@ -18,13 +18,30 @@ local judges = {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteSc
 -- Rescoring/offset plot state
 local nrv, dvt, ctt, ntt, totalTaps
 local function updateVectors()
-	nrv = pss:GetNoteRowVector()
-	ctt = pss:GetTrackVector()
-	ntt = pss:GetTapNoteTypeVector()
-	totalTaps = pss:GetTotalTaps()
+	local replay = curScore and curScore:GetReplay() or nil
+	local hasReplay = replay and replay:LoadAllData()
+	
+	if hasReplay then
+		nrv = replay:GetNoteRowVector()
+		ctt = replay:GetTrackVector()
+		ntt = replay:GetTapNoteTypeVector()
+		dvt = replay:GetOffsetVector()
+		totalTaps = 0
+		if ntt then
+			for _, typ in ipairs(ntt) do
+				if typ == "TapNoteType_Tap" or typ == "TapNoteType_HoldHead" or typ == "TapNoteType_Lift" then
+					totalTaps = totalTaps + 1
+				end
+			end
+		end
+	else
+		nrv = pss:GetNoteRowVector()
+		ctt = pss:GetTrackVector()
+		ntt = pss:GetTapNoteTypeVector()
+		dvt = pss:GetOffsetVector()
+		totalTaps = pss:GetTotalTaps()
+	end
 	songTotalNotes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
-	totalTaps = pss:GetTotalTaps()
-	dvt = pss:GetOffsetVector()
 end
 updateVectors()
 
@@ -289,59 +306,53 @@ local t = Def.ActorFrame {
 		SCREENMAN:SetSystemCursorVisible(true)
 		INPUTFILTER:SetMouseVisible(true)
 	end,
+
+	-- Dedicated actor for logging session grades
+	Def.Actor {
+		Name = "SessionGradeLogger",
+		OnCommand = function(self)
+			local screen = SCREENMAN:GetTopScreen()
+			if not screen then 
+				-- Retry next frame if screen is not yet available
+				self:sleep(0.01):queuecommand("On")
+				return 
+			end
+
+			-- Only log once per screen entry
+			if not screen.HV_GradeCounted then
+				if GRADECOUNTERSTORAGE and GRADECOUNTERSTORAGE.incrementSession then
+					GRADECOUNTERSTORAGE:incrementSession(pss:GetWifeGrade())
+				end
+				screen.HV_GradeCounted = true
+			end
+		end
+	},
 	ScoreChangedMessageCommand = function(self)
 		pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-		curScore = pss:GetHighScore()
+		
+		-- In Etterna, viewing a score on the scoreboard sets the SCOREMAN most recent score.
+		local mss = SCOREMAN:GetMostRecentScore()
+		if mss and mss:GetScore() > 0 then
+			curScore = mss
+		else
+			curScore = pss:GetHighScore()
+		end
+
 		updateVectors()
 		clearRatioCache()
 		self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 		self:RunCommandsOnChildren(function(self) self:playcommand("On") end)
+		
+		-- Force rescoredPercentage update based on new dvt and curScore before SetJudge triggers completely 
+		local rst = getRescoreElements(pss, curScore)
+		rst.dvt = dvt -- Inject correct offset vector
+		rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 	end
 }
 
--- Get rescore elements helper
-local function getRescoreElems()
-	local o = {}
-	local radarpss = pss:GetRadarPossible()
-	local radarscore = curScore:GetRadarValues()
-	
-	o["dvt"] = pss:GetOffsetVector()
-	o["totalHolds"] = radarpss:GetValue("RadarCategory_Holds")
-	o["totalRolls"] = radarpss:GetValue("RadarCategory_Rolls")
-	o["holdsHit"] = radarscore:GetValue("RadarCategory_Holds")
-	o["rollsHit"] = radarscore:GetValue("RadarCategory_Rolls")
-	o["holdsMissed"] = o["totalHolds"] - o["holdsHit"]
-	o["rollsMissed"] = o["totalRolls"] - o["rollsHit"]
-	o["minesHit"] = radarpss:GetValue("RadarCategory_Mines") - radarscore:GetValue("RadarCategory_Mines")
-	o["totalTaps"] = pss:GetTotalTaps()
-	o["misses"] = pss:GetTapNoteScores("TapNoteScore_Miss")
-	o["totalNotes"] = songTotalNotes
-	return o
-end
+-- Rescore data + rescore now delegate to the corrected global functions in 08 EtternaUtils.lua.
+-- getRescoreElements(pss, curScore) is used in place of the old local getRescoreElems().
 
-
--- Rescore function (ported from EtternaUtils.lua)
-local function getRescoredWife3Judge(judgeType, judge, rst)
-	local totalPoints = 0
-	local tso = ms.JudgeScalers[judge] or 1
-
-	local dvt = rst["dvt"]
-	if not dvt or #dvt == 0 then return 0 end
-
-	for i = 1, #dvt do
-		totalPoints = totalPoints + wife3(math.abs(dvt[i]), tso)
-	end
-	totalPoints = totalPoints + (rst["misses"] or 0) * -5.5
-	totalPoints = totalPoints + (rst["minesHit"] or 0) * -7
-	totalPoints = totalPoints + (rst["holdsMissed"] or 0) * -4.5
-	totalPoints = totalPoints + (rst["rollsMissed"] or 0) * -4.5
-
-	local maxPoints = (rst["totalNotes"] or rst["totalTaps"] or 0) * 2
-	if maxPoints <= 0 then return 0 end
-
-	local res = (totalPoints / maxPoints) * 100
-	return math.min(res, 100) -- Only clamp upper bound
-end
 
 ------------------------------------------------------------
 -- LEFT PANEL: SCORE CARD
@@ -375,7 +386,7 @@ local function scoreBoard(pn)
 				return
 			end
 
-			local rst = getRescoreElems()
+			local rst = getRescoreElements(pss, curScore)
 			if params.Name == "PrevJudge" and judge > 1 then
 				judge = judge - 1
 				clampJudge()
@@ -1132,7 +1143,7 @@ local function scoreBoard(pn)
 
 	-- Column 2: Timing Stats
 	local timingStartY = statsStartY + 28 + (3 * rowH)
-	local tStatLabels = {"Mean", "Std Dev", "Max Dev"}
+	local tStatLabels = {"Mean", "Std Dev", "Largest"}
 	for i, label in ipairs(tStatLabels) do
 		local ty = timingStartY + (i - 1) * rowH
 		board[#board + 1] = LoadFont("Common Normal") .. {

@@ -725,56 +725,79 @@ function wife3(maxms, ts, version)
 end
 
 -- holy shit this is fugly
-function getRescoredWife3Judge(version, judgeScale, rst)
+function getRescoredWife3Judge(version, judgeScale, rst, useCurrent)
 	local tso = ms.JudgeScalers
-	local ts = tso[judgeScale]
-	local p = 0.0
+	local ts = (tso and tso[judgeScale]) or 1.0
+	local totalPoints = 0.0
 	local dvt = rst["dvt"]
-	if dvt == nil then return p end
-
-	for i = 1, #dvt do							-- wife2 does not require abs due to ^2 but this does
-		p = p + wife3(math.abs(dvt[i]), ts, version)
-	end
-	p = p + (rst["holdsMissed"] * -4.5)
-	p = p + (rst["minesHit"] * -7)
 	
-	local totalTaps = rst["totalTaps"] or rst["totalNotes"] or #dvt
-	if totalTaps == 0 or totalTaps < #dvt then 
-		totalTaps = #dvt 
+	if dvt then
+		for i = 1, #dvt do
+			local offset = math.abs(dvt[i])
+			totalPoints = totalPoints + wife3(offset, ts, version)
+		end
 	end
-	if totalTaps == 0 then return 0 end
 	
-	local finalPoints = math.min(totalTaps * 2, p)
-	return (finalPoints / (totalTaps * 2)) * 100.0
+	-- Penalize holds, rolls, and mines.
+	
+	totalPoints = totalPoints + (math.max(0, rst["holdsMissed"] or 0) * -4.5)
+	totalPoints = totalPoints + (math.max(0, rst["rollsMissed"] or 0) * -4.5)
+	totalPoints = totalPoints + (math.max(0, rst["minesHit"] or 0) * -7)
+	
+	-- Use notesPassed for live percentage, totalNotes for evaluation.
+	local maxNotes = 0
+	if useCurrent then
+		maxNotes = math.max(0, rst["notesPassed"] or 0)
+	else
+		maxNotes = math.max(0, rst["totalNotes"] or 0)
+		-- For evaluation, we must penalize unplayed notes (from failing early) as misses.
+		local unplayed = math.max(0, maxNotes - (rst["notesPassed"] or 0))
+		totalPoints = totalPoints + (unplayed * 5.5) -- unhit notes are unhit
+	end
+	
+	if maxNotes <= 0 then return 0 end
+	local maxPoints = maxNotes * 2
+	
+	return math.min((totalPoints / maxPoints) * 100.0, 100)
 end
 
 function getRescoreElements(pss, score)
 	local o = {}
 	o["dvt"] = pss:GetOffsetVector()
 	
-	local radarpss = pss.GetRadarActual and pss:GetRadarActual() or pss:GetRadarValues()
-	local radarscore = score.GetRadarValues and score:GetRadarValues() or score:GetRadarActual()
+	-- Base counts from PlayerStageStats (Live Stats)
+	o["misses"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_Miss")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_Miss")) or 0)
+	o["holdsMissed"] = math.max(0, (pss.GetHoldNoteScores and pss:GetHoldNoteScores("HoldNoteScore_LetGo")) or (pss.GetHoldNoteScore and pss:GetHoldNoteScore("HoldNoteScore_LetGo")) or 0)
+	o["rollsMissed"] = 0
+	o["minesHit"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_HitMine")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_HitMine")) or 0)
 	
-	o["totalHolds"] = (radarpss:GetValue("RadarCategory_Holds") or 0)
-	o["totalRolls"] = (radarpss:GetValue("RadarCategory_Rolls") or 0)
-	o["holdsHit"] = (radarscore:GetValue("RadarCategory_Holds") or 0)
-	o["rollsHit"] = (radarscore:GetValue("RadarCategory_Rolls") or 0)
-	o["holdsMissed"] = o["totalHolds"] - o["holdsHit"]
-	o["rollsMissed"] = o["totalRolls"] - o["rollsHit"]
-	o["minesHit"] = (radarpss:GetValue("RadarCategory_Mines") or 0) - (radarscore:GetValue("RadarCategory_Mines") or 0)
-	
-	o["totalTaps"] = pss:GetTotalTaps()
-	o["tapsHit"] = #o["dvt"]
-	o["misses"] = o["totalTaps"] - o["tapsHit"]
-	
-	local steps = GAMESTATE:GetCurrentSteps()
-	if steps then
-		local rv = steps:GetRadarValues(PLAYER_1)
-		o["totalNotes"] = rv:GetValue("RadarCategory_Notes")
-	else
-		o["totalNotes"] = o["totalTaps"]
+	-- Count hits
+	local hits = 0
+	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
+		local count = (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_"..name)) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_"..name)) or 0
+		if count ~= -1 then hits = hits + count end
 	end
+	o["tapsHit"] = hits
+	o["notesPassed"] = o["tapsHit"] + o["misses"]
 	
+	-- Radar totals (Chart-wide) - Use Steps object for maximum stability
+	local steps = GAMESTATE:GetCurrentSteps()
+	local radar = steps and steps:GetRadarValues(PLAYER_1)
+	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or 0
+	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
+	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or 0
+	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or 0
+	
+	-- Ensure >= 0
+	o["totalHolds"] = math.max(0, o["totalHolds"])
+	o["totalRolls"] = math.max(0, o["totalRolls"])
+	o["totalMines"] = math.max(0, o["totalMines"])
+	o["totalNotes"] = math.max(0, o["totalNotes"])
+	
+
+	if score and score ~= pss then
+	end
+
 	return o
 end
 

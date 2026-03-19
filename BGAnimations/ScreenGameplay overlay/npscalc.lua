@@ -6,13 +6,16 @@ local pn = GAMESTATE:GetEnabledPlayers()[1]
 local countNotesSeparately = GAMESTATE:CountNotesSeparately()
 
 -- Check preferences
-local showNPS = ThemePrefs.Get("HV_ShowNPS") ~= "false"
+local showNPS = (ThemePrefs.Get("HV_ShowNPS") == "true" or ThemePrefs.Get("HV_ShowNPS") == true)
 if not showNPS then
 	return Def.ActorFrame {}
 end
 
 -- Window sizes from ThemePrefs instead of hardcoded
-local npsWindow = tonumber(ThemePrefs.Get("HV_NPSWindowSize")) or 1.5
+local function getWindowSize()
+	return tonumber(ThemePrefs.Get("HV_NPSWindowSize")) or 1.5
+end
+local npsWindow = getWindowSize()
 local minWindow = 0.5 
 
 -- HV Specific Styling & Position
@@ -71,11 +74,8 @@ local function Update(self)
 	removeNote()
 	curNPS = getCurNPS()
 
-	-- Only start updating peak after window has passed
-	local musicSeconds = GAMESTATE:GetSongPosition():GetMusicSeconds() / getCurRateValue()
-	if musicSeconds > npsWindow then
-		peakNPS = math.max(peakNPS, curNPS)
-	end
+	-- Track peak NPS from the start of the song
+	peakNPS = math.max(peakNPS, curNPS)
 	
 	if npsTextActor then
 		npsTextActor:settextf("NPS: %0.0f  Peak: %0.0f", curNPS, peakNPS)
@@ -106,6 +106,11 @@ local t = Def.ActorFrame {
 				local currentTime = GAMESTATE:GetSongPosition():GetMusicSeconds() / getCurRateValue()
 				addNote(currentTime, chordsize)
 				lastJudgment = params.TapNoteScore
+			end
+		end,
+		ThemePrefChangedMessageCommand = function(self, params)
+			if params and params.Name == "HV_NPSWindowSize" then
+				npsWindow = getWindowSize()
 			end
 		end
 	}

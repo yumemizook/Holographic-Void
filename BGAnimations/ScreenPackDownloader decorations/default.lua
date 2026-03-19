@@ -206,10 +206,7 @@ t[#t + 1] = Def.ActorFrame {
 		self:SetUpdateFunction(function()
 			local dls = DLMAN:GetDownloads()
 			if dls and #dls > 0 then
-				local dl = dls[1]
-				local kb = dl:GetKBDownloaded()
-				local total = dl:GetTotalKB()
-				statusText:settextf("DL: %d/%dKB", kb, total)
+				statusText:settext("DOWNLOAD IN PROGRESS")
 				statusText:diffuse(accentColor)
 			else
 				local queued = DLMAN:GetQueuedPacks()
@@ -350,7 +347,7 @@ for i = 1, packsPerPage do
 			Name = "RowIdx",
 			InitCommand = function(self)
 				self:halign(0):valign(0):xy(colIdxX, 3)
-					:zoom(0.24):diffuse(dimText)
+					:zoom(0.36):diffuse(dimText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -369,7 +366,7 @@ for i = 1, packsPerPage do
 			Name = "PackName",
 			InitCommand = function(self)
 				self:halign(0):valign(0):xy(colNameX, 3)
-					:zoom(0.32):diffuse(mainText)
+					:zoom(0.44):diffuse(mainText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -377,6 +374,8 @@ for i = 1, packsPerPage do
 					self:settext(pack:GetName())
 					if installedFlags[i] then
 						self:diffuse(installedColor)
+					elseif pack:IsNSFW() then
+						self:diffuse(color("1,0,0,1"))
 					elseif i == selectedRow then
 						self:diffuse(brightText)
 					else
@@ -394,7 +393,7 @@ for i = 1, packsPerPage do
 			Name = "AvgMSD",
 			InitCommand = function(self)
 				self:halign(1):valign(0):xy(colAvgX, 3)
-					:zoom(0.26):diffuse(subText)
+					:zoom(0.38):diffuse(subText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -402,8 +401,12 @@ for i = 1, packsPerPage do
 					local avg = pack:GetAvgDifficulty()
 					if avg and avg > 0 then
 						self:settextf("%.1f", avg)
+						if HVColor and HVColor.GetMSDRatingColor then
+							self:diffuse(HVColor.GetMSDRatingColor(avg))
+						end
 					else
 						self:settext("-")
+						self:diffuse(subText)
 					end
 					self:visible(true)
 				else
@@ -417,7 +420,7 @@ for i = 1, packsPerPage do
 			Name = "SongCount",
 			InitCommand = function(self)
 				self:halign(1):valign(0):xy(colSongsX, 3)
-					:zoom(0.26):diffuse(subText)
+					:zoom(0.38):diffuse(subText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -440,7 +443,7 @@ for i = 1, packsPerPage do
 			Name = "PackSize",
 			InitCommand = function(self)
 				self:halign(1):valign(0):xy(colSizeX, 3)
-					:zoom(0.26):diffuse(subText)
+					:zoom(0.38):diffuse(subText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -467,7 +470,7 @@ for i = 1, packsPerPage do
 		LoadFont("Common Normal") .. {
 			Name = "StatusText",
 			InitCommand = function(self)
-				self:halign(0.5):valign(0):xy(colStatusX, 3):zoom(0.24)
+				self:halign(0.5):valign(0):xy(colStatusX, 3):zoom(0.36)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
 				local pack = currentPacks[i]
@@ -524,8 +527,8 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		end
 	end,
 	ShowLoadingCommand = function(self)
-		self:settext("Fetching packs from server..."):visible(true)
-		self:diffuse(accentColor):diffusealpha(0.6)
+		-- self:settext("Fetching packs from server..."):visible(true)
+		-- self:diffuse(accentColor):diffusealpha(0.6)
 	end
 }
 

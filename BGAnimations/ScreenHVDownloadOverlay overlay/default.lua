@@ -13,7 +13,7 @@ local mainText = color("0.9,0.9,0.9,1")
 
 -- Queue panel constants
 local queueRowH = 18           -- height per queued pack row
-local maxQueueDisplay = 8      -- max queued items to show
+local maxQueueDisplay = 50     -- max queued items to show
 local hoverZoneH = 28          -- hitbox height at screen bottom for hover detection
 local panelPadding = 8
 
@@ -191,10 +191,9 @@ t.OnCommand = function(self)
 		-- Update compact bar
 		if hasDL then
 			local dl = dls[1]
-			local dlKB = dl:GetKBDownloaded()
-			local totalKB = dl:GetTotalKB()
-			local mb = dlKB / 1024
-			local total = totalKB / 1024
+			local dlKB = dl:GetKBDownloaded() / 1024
+			local totalKB = dl:GetTotalKB() / 1024
+			local kbsec = dl:GetKBPerSecond()
 			local percent = 0
 			if totalKB > 0 then
 				percent = dlKB / totalKB
@@ -209,10 +208,10 @@ t.OnCommand = function(self)
 			local queueCount = queued and #queued or 0
 			if queueCount > 0 then
 				status:settextf(THEME:GetString("DownloadOverlay", "DownloadingQueuedFormatted"),
-					packName, mb, total, queueCount)
+					packName, dlKB, totalKB, kbsec, queueCount)
 			else
 				status:settextf(THEME:GetString("DownloadOverlay", "DownloadingFormatted"),
-					packName, mb, total)
+					packName, dlKB, totalKB, kbsec)
 			end
 
 			pct:settextf("%.0f%%", percent * 100)

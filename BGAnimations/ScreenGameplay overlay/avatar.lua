@@ -2,7 +2,7 @@
 -- Shows player avatar, name, MSD, difficulty, mods, judge/scoring info,
 -- life bar, and real-time DP / Wife% during gameplay.
 
-local pn = GAMESTATE:GetEnabledPlayers()[1]
+local pn = GAMESTATE:GetEnabledPlayers()[1] or PLAYER_1
 local profile = GetPlayerOrMachineProfile(pn)
 local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 
@@ -20,7 +20,15 @@ local fontZoomSmall = 0.45
 
 -- Life helper
 local function PLife()
-	local life = STATSMAN:GetCurStageStats():GetPlayerStageStats():GetCurrentLife() or 0
+	-- Priority 1: Direct LifeMeter actor polling (Smoothest, most reliable)
+	local screen = SCREENMAN:GetTopScreen()
+	if screen and screen:GetLifeMeter(pn) then
+		return screen:GetLifeMeter(pn):GetLife()
+	end
+	
+	-- Priority 2: PlayerStageStats (Fallback)
+	local stats = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+	local life = stats:GetCurrentLife() or 0
 	return math.max(0, life)
 end
 
@@ -130,12 +138,18 @@ local t = Def.ActorFrame {
 		InitCommand = function(self)
 			self:xy(avatarSize + 6, 52):halign(0):zoom(fontZoomSmall * 1.1)
 		end,
+		BeginCommand = function(self)
+			self:playcommand("UpdateLife")
+		end,
 		JudgmentMessageCommand = function(self)
+			self:playcommand("UpdateLife")
+		end,
+		PlayingUpdateMessageCommand = function(self)
 			self:playcommand("UpdateLife")
 		end,
 		UpdateLifeCommand = function(self)
 			local life = PLife()
-			self:settextf("%.0f%%", life * 100)
+			self:settextf("%.1f%%", life * 100)
 			
 			-- Coloring based on Life Difficulty (Range 1-7)
 			local diff = GetLifeDifficulty()
@@ -174,6 +188,9 @@ local t = Def.ActorFrame {
 		end,
 		JudgmentMessageCommand = function(self, params)
 			self:playcommand("Set", params)
+		end,
+		PlayingUpdateMessageCommand = function(self)
+			self:playcommand("Set")
 		end,
 		SetCommand = function(self, params)
 			if params ~= nil and params.TapNoteScore == "TapNoteScore_AvoidMine" then
@@ -226,7 +243,7 @@ local t = Def.ActorFrame {
 				elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 					actual_dp = actual_dp - 7.0
 				end
-			elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" then
+			elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
 				actual_dp = actual_dp - 4.5
 			end
 			

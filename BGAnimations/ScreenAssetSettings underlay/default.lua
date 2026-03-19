@@ -38,6 +38,17 @@ local function getToastyPreview(dirPath)
 	return nil
 end
 
+local function getToastySoundPath(dirPath)
+	local files = FILEMAN:GetDirListing(dirPath .. "/")
+	for _, f in ipairs(files) do
+		local ext = f:sub(-4):lower()
+		if ext == ".wav" or ext == ".mp3" or ext == ".ogg" then
+			return dirPath .. "/" .. f
+		end
+	end
+	return nil
+end
+
 local function loadAssetTable()
 	local type = assetTypes[curType]
 	local dir = assetFolders[type]
@@ -84,6 +95,14 @@ local function confirmPick(idx)
 	selectedIndex = idx
 	MESSAGEMAN:Broadcast("AssetChanged", {type = type, path = path})
 	if type == "avatar" then MESSAGEMAN:Broadcast("AvatarChanged") end
+	
+	if type == "toasty" then
+		local soundPath = getToastySoundPath(path)
+		if soundPath then
+			MESSAGEMAN:Broadcast("ToastyPreviewSound", {path = soundPath})
+		end
+	end
+	
 	MESSAGEMAN:Broadcast("UpdateAssetDisplay")
 	ms.ok(string.format(THEME:GetString("AssetSettings", "AppliedFormatted"), THEME:GetString("AssetSettings", HV.Capitalize(type)), name))
 end
@@ -96,7 +115,16 @@ local t = Def.ActorFrame {
 	end,
 	RefreshCommand = function(self)
 		MESSAGEMAN:Broadcast("UpdateAssetDisplay")
-	end
+	end,
+	
+	Def.Sound {
+		Name = "PreviewSound",
+		ToastyPreviewSoundMessageCommand = function(self, params)
+			if params.path then
+				self:stop():load(params.path):play()
+			end
+		end
+	}
 }
 
 -- Background
@@ -285,6 +313,15 @@ t[#t+1] = Def.Actor {
 										selectedIndex = idx
 										lastClickTime = now
 										lastClickIdx = idx
+										
+										if assetTypes[curType] == "toasty" then
+											local path = assetFolders["toasty"] .. assetTable[idx]
+											local soundPath = getToastySoundPath(path)
+											if soundPath then
+												MESSAGEMAN:Broadcast("ToastyPreviewSound", {path = soundPath})
+											end
+										end
+										
 										MESSAGEMAN:Broadcast("UpdateAssetDisplay")
 									end
 									return true
@@ -295,9 +332,7 @@ t[#t+1] = Def.Actor {
 				end
 			end
 		end)
-	end,
-	-- Custom mouse cursor
-	LoadActor("../_cursor")
+	end
 }
 
 return t

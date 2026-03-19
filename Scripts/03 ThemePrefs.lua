@@ -1,7 +1,147 @@
 --- Holographic Void: Theme Preferences
 -- @module 03_ThemePrefs
--- Uses the _Fallback ThemePrefs system to register and manage
--- theme-specific preferences saved to Save/ThemePrefs.ini.
+
+-- ==========================================================================
+-- ThemePrefs Relocation & Migration System
+-- ==========================================================================
+-- We override the global ThemePrefs system to use a theme-specific folder.
+-- This prevents settings from being overwritten by other themes and 
+-- allows for better organization.
+
+local HVThemePrefsPath = "Save/Holographic Void_settings/themeConfig.lua"
+local NewIniPath = "Save/Holographic Void_settings/ThemePrefs.ini"
+local OldIniPath = "Save/ThemePrefs.ini"
+
+-- Internal storage for preferences (since _fallback's table is local to its script)
+local PrefsTable = {}
+local FallbackTheme = "_fallback"
+
+local function GetThemeName()
+	return (themeInfo and themeInfo.Name) or THEME:GetThemeDisplayName()
+end
+
+-- Resolve which section a preference belongs to
+local function ResolveTable(pref)
+	local name = GetThemeName()
+	if PrefsTable[name] and PrefsTable[name][pref] ~= nil then
+		return PrefsTable[name]
+	end
+	if PrefsTable[FallbackTheme] and PrefsTable[FallbackTheme][pref] ~= nil then
+		return PrefsTable[FallbackTheme]
+	end
+	for section, _ in pairs(PrefsTable) do
+		if PrefsTable[section][pref] ~= nil then
+			return PrefsTable[section]
+		end
+	end
+	return nil
+end
+
+-- Helper to load a Lua config file safely
+local function load_lua_config(path)
+	local file = RageFileUtil.CreateRageFile()
+	local ret = nil
+	if file:Open(path, 1) then -- READ
+		local content = file:Read()
+		local data = loadstring(content)
+		if data then
+			setfenv(data, {})
+			local success, data_ret = pcall(data)
+			if success then
+				ret = data_ret
+			end
+		end
+		file:Close()
+	end
+	file:destroy()
+	return ret
+end
+
+-- Re-implement ThemePrefs with the new path
+ThemePrefs = {
+	NeedsSaved = false,
+	Init = function(prefs, bLoadFromDisk)
+		if bLoadFromDisk then
+			ThemePrefs.Load()
+		end
+		local section = GetThemeName()
+		PrefsTable[section] = PrefsTable[section] or {}
+		for k, tbl in pairs(prefs) do
+			if PrefsTable[section][k] == nil then
+				PrefsTable[section][k] = tbl.Default
+			end
+		end
+	end,
+	Load = function()
+		-- 1. Try new .lua path first
+		if FILEMAN:DoesFileExist(HVThemePrefsPath) then
+			local data = load_lua_config(HVThemePrefsPath)
+			if type(data) == "table" then
+				PrefsTable = data
+				return true
+			end
+		end
+
+		-- 2. Fall back to theme-specific .ini for migration
+		if FILEMAN:DoesFileExist(NewIniPath) then
+			if IniFile then
+				Trace("Holographic Void: Migrating settings from " .. NewIniPath)
+				PrefsTable = IniFile.ReadFile(NewIniPath)
+				ThemePrefs.NeedsSaved = true
+				ThemePrefs.Save()
+				return true
+			end
+		end
+
+		-- 3. Fall back to legacy .ini for migration
+		if FILEMAN:DoesFileExist(OldIniPath) then
+			if IniFile then
+				Trace("Holographic Void: Migrating legacy settings from " .. OldIniPath)
+				PrefsTable = IniFile.ReadFile(OldIniPath)
+				ThemePrefs.NeedsSaved = true
+				ThemePrefs.Save()
+				return true
+			end
+		end
+
+		PrefsTable = {}
+		return true
+	end,
+	Save = function()
+		if ThemePrefs.NeedsSaved then
+			local file = RageFileUtil.CreateRageFile()
+			if file:Open(HVThemePrefsPath, 2) then -- WRITE
+				local output = "return " .. lua_table_to_string(PrefsTable)
+				file:Write(output)
+				file:Close()
+				ThemePrefs.NeedsSaved = false
+			else
+				Warn("Holographic Void: Could not open '" .. HVThemePrefsPath .. "' for writing.")
+			end
+			file:destroy()
+		end
+	end,
+	ForceSave = function()
+		ThemePrefs.NeedsSaved = true
+		ThemePrefs.Save()
+	end,
+	Get = function(name)
+		local tbl = ResolveTable(name)
+		return tbl and tbl[name] or nil
+	end,
+	Set = function(name, value)
+		local tbl = ResolveTable(name)
+		if tbl then
+			ThemePrefs.NeedsSaved = true
+			tbl[name] = value
+		end
+	end
+}
+
+-- Update global aliases
+GetThemePref = ThemePrefs.Get
+SetThemePref = ThemePrefs.Set
+
 
 -- Preference definitions: each key maps to a table with a Default value.
 -- These are registered with the _Fallback ThemePrefs.Init system.

@@ -428,7 +428,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			local dir = navigationBtns[btn] or gameBtnDirs[logicalBtn]
 			
 			if dir then
-				if HV.ActiveTab ~= "" then
+				if HV.ActiveTab ~= "" and HV.ActiveTab ~= "SEARCH" then
 					if evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat" then
 						if HV.ActiveTab == "PROFILE" then
 							if dir < 0 then MESSAGEMAN:Broadcast("PrevScorePage")
@@ -440,7 +440,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					return true 
 				end
 				
-				if evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat" then
+				if HV.ActiveTab ~= "SEARCH" and (evType == "InputEventType_FirstPress" or evType == "InputEventType_Repeat") then
 					if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_mousewheel down" then
 						local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
 						if now - lastWheelMove < wheelLockTime then return true end
@@ -526,7 +526,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 				-- Handle Typing (Lenient character detection)
 				local shifted = INPUTFILTER:IsBeingPressed("left shift") or INPUTFILTER:IsBeingPressed("right shift")
-				local c = event.char or DeviceBtnToChar(btn, shifted)
+				local c = (event.char and event.char ~= "") and event.char or DeviceBtnToChar(btn, shifted)
 				
 				if c and c ~= "" then
 					if evType ~= "InputEventType_Release" then
@@ -1348,29 +1348,64 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			BlinkCommand = function(self)
 				self:stoptweening():diffusealpha(1):sleep(0.5):linear(0.1):diffusealpha(0):sleep(0.3):queuecommand("Blink")
 			end
-		}
+		},
 	},
 
 	-- Nth Stage Display (Top Right)
-	LoadFont("Common Normal") .. {
-		Name = "StageDisplay",
+	Def.ActorFrame {
+		Name = "StageDisplayFrame",
 		InitCommand = function(self)
-			self:halign(1):valign(0.5):xy(SCREEN_WIDTH - 20, headerH / 2):zoom(0.4):diffuse(accentColor)
+			self:xy(SCREEN_WIDTH - 20, headerH / 2)
 		end,
-		OnCommand = function(self) self:playcommand("Set") end,
-		SetCommand = function(self)
+		OnCommand = function(self)
+			self:playcommand("UpdateStageDisplay")
+		end,
+		UpdateStageDisplayCommand = function(self)
+			local stageLabel = self:GetChild("StageDisplay")
+			local sessionLabel = self:GetChild("SessionGradeDisplay")
+			if not stageLabel or not sessionLabel then 
+				return 
+			end
+
+			-- Update Stage Number
 			local stageIdx = GAMESTATE:GetCurrentStageIndex() + 1
 			local text = "STAGE " .. stageIdx
-			
-			-- Safely check for GetCurrentStage as it might be nil in some Etterna contexts
 			if GAMESTATE.GetCurrentStage then
 				local stage = GAMESTATE:GetCurrentStage()
 				if stage == "Stage_Extra1" then text = "EXTRA STAGE"
 				elseif stage == "Stage_Extra2" then text = "ENCORE EXTRA"
 				end
 			end
-			self:settext(text)
-		end
+			stageLabel:settext(text)
+
+			-- Update Session Grades
+			local gradeParts = {}
+			if GRADECOUNTERSTORAGE then
+				local grades = {"session_AAAAA", "session_AAAA", "session_AAA", "session_AA", "session_A", "session_UnderA"}
+				local labels = {"AAAAA", "AAAA", "AAA", "AA", "A", "<A"}
+				for i, g in ipairs(grades) do
+					local count = GRADECOUNTERSTORAGE[g] or 0
+					if count > 0 then
+						table.insert(gradeParts, labels[i] .. ": " .. count)
+					end
+				end
+			end
+			local gradeStr = #gradeParts > 0 and table.concat(gradeParts, "  |  ") or ""
+			sessionLabel:settext(gradeStr)
+		end,
+
+		LoadFont("Common Normal") .. {
+			Name = "StageDisplay",
+			InitCommand = function(self)
+				self:halign(1):valign(1):zoom(0.4):diffuse(accentColor)
+			end,
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SessionGradeDisplay",
+			InitCommand = function(self)
+				self:halign(1):valign(0):y(2):zoom(0.3):diffuse(accentColor)
+			end,
+		}
 	}
 }
 

@@ -3,49 +3,66 @@
 -- Features clickable swatches with a live preview panel that updates in real time.
 
 local accentChoices = {
-	{ name = "Ice Blue",       hex = "#5ABAFF" },
-	{ name = "White",          hex = "#FFFFFF" },
-	{ name = "Warm Gold",      hex = "#FFD080" },
-	{ name = "Soft Red",       hex = "#FF8080" },
-	{ name = "Mint",           hex = "#80FFB0" },
-	{ name = "Violet",         hex = "#B080FF" },
-	{ name = "Pure Gray",      hex = "#808080" },
-	{ name = "Neon Pink",      hex = "#FF3399" },
-	{ name = "Cyber Purple",   hex = "#7000FF" },
-	{ name = "Emerald",        hex = "#00D050" },
-	{ name = "Sunset Orange",  hex = "#FF7A00" },
-	{ name = "Electric Indigo",hex = "#4B0082" },
-	{ name = "Crimson",        hex = "#DC143C" },
-	{ name = "Cyan",           hex = "#00FFFF" },
+	-- Cool Colors (Blues/Cyans/Greens)
+	{ name = "Ice Blue",        hex = "#5ABAFF" },     -- Default
+	{ name = "Arctic Blue",     hex = "#4A9AEF" },
+	{ name = "Deep Ocean",      hex = "#2E5F8A" },
+	{ name = "Cyan",            hex = "#00FFFF" },
+	{ name = "Teal",            hex = "#008B8B" },
+	{ name = "Mint",            hex = "#80FFB0" },
+	{ name = "Emerald",         hex = "#00D050" },
+	{ name = "Forest Green",    hex = "#228B22" },
+	{ name = "Sky Blue",        hex = "#87CEEB" },      -- Extended cool color
+	
+	-- Warm Colors (Yellows/Oranges/Reds)
+	{ name = "Warm Gold",       hex = "#FFD080" },
+	{ name = "Golden",          hex = "#FFD700" },
+	{ name = "Sunset Orange",   hex = "#FF7A00" },
+	{ name = "Coral",           hex = "#FF6B6B" },
+	{ name = "Soft Red",        hex = "#FF8080" },
+	{ name = "Crimson",         hex = "#DC143C" },
+	{ name = "Rose",            hex = "#FF007F" },
+	{ name = "Amber",           hex = "#FFBF00" },      -- Extended warm color
+	
+	-- Purple/Violet Spectrum
+	{ name = "Lavender",        hex = "#b6b6ff" },
+	{ name = "Violet",          hex = "#B080FF" },
+	{ name = "Electric Indigo", hex = "#4B0082" },
+	{ name = "Cyber Purple",    hex = "#7000FF" },
+	{ name = "Magenta",         hex = "#FF00FF" },
+	{ name = "Orchid",          hex = "#DA70D6" },      -- Extended purple color
+	
+	-- Neutral/Grayscale
+	{ name = "Pure Gray",       hex = "#808080" },
+	{ name = "Silver",          hex = "#C0C0C0" },
+	{ name = "Platinum",        hex = "#E5E4E2" },
+	{ name = "White",           hex = "#FFFFFF" },
+	{ name = "Charcoal",        hex = "#333b40" },      -- Extended neutral color
 }
 
 -- Layout constants
 local cols = 7
 local rows = math.ceil(#accentChoices / cols)
-local swatchSize = 56
-local swatchGapX = 20
-local swatchGapY = 54
+local swatchSize = 50
+local swatchGapX = 16
+local swatchGapY = 44
 local totalSwatchW = cols * (swatchSize + swatchGapX) - swatchGapX
-local swatchStartX = SCREEN_CENTER_X - totalSwatchW / 2 + swatchSize / 2
+local swatchStartX = SCREEN_LEFT + 60 + swatchSize / 2
 local swatchStartY = SCREEN_CENTER_Y - 110
+
+-- Preview panel constants (right side chunks)
+local previewStartX = SCREEN_RIGHT - 180
+local previewStartY = SCREEN_CENTER_Y - 120
+local chunkW = 280
+local chunkH = 55
 
 local function getSwatchPos(i)
 	local r = math.ceil(i / cols) - 1
 	local c = (i - 1) % cols
-	local rowCount = cols
-	if r == rows - 1 and #accentChoices % cols ~= 0 then
-		rowCount = #accentChoices % cols
-	end
-	local rowW = rowCount * (swatchSize + swatchGapX) - swatchGapX
-	local sx = SCREEN_CENTER_X - rowW / 2 + swatchSize / 2 + c * (swatchSize + swatchGapX)
-	local sy = swatchStartY + r * (swatchSize + swatchGapY)
+	sx = swatchStartX + c * (swatchSize + swatchGapX)
+	sy = swatchStartY + r * (swatchSize + swatchGapY)
 	return sx, sy
 end
-
--- Preview panel constants
-local previewY = SCREEN_CENTER_Y + 95
-local previewW = 400
-local previewH = 120
 
 -- State
 local selectedIdx = 1
@@ -177,23 +194,23 @@ local t = Def.ActorFrame {
 -- HEADER
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
-	InitCommand = function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP + 50) end,
+	InitCommand = function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP + 30) end,
 
 	LoadFont("Common Large") .. {
 		InitCommand = function(self)
-			self:zoom(0.6):diffuse(color("1,1,1,1"))
+			self:zoom(0.55):diffuse(color("1,1,1,1"))
 			self:settext("COLOR THEME")
 		end
 	},
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:y(28):zoom(0.32):diffuse(color("0.45,0.45,0.45,1"))
+			self:y(24):zoom(0.28):diffuse(color("0.45,0.45,0.45,1"))
 			self:settext("Select an accent color for the Holographic Void experience")
 		end
 	},
 	Def.Quad {
 		InitCommand = function(self)
-			self:y(44):zoomto(SCREEN_WIDTH * 0.5, 1)
+			self:y(38):zoomto(SCREEN_WIDTH * 0.4, 1)
 				:diffuse(HVColor.Accent):diffusealpha(0.3)
 		end,
 		ColorThemeChangedMessageCommand = function(self)
@@ -254,7 +271,7 @@ for i, choice in ipairs(accentChoices) do
 		LoadFont("Common Normal") .. {
 			Name = "Check",
 			InitCommand = function(self)
-				self:y(swatchSize/2 + 2):zoom(0.5):diffuse(color("1,1,1,0"))
+				self:y(swatchSize/2 + 2):zoom(0.45):diffuse(color("1,1,1,0"))
 				self:settext("●")
 			end,
 			ColorThemeChangedMessageCommand = function(self)
@@ -274,7 +291,7 @@ for i, choice in ipairs(accentChoices) do
 		-- Label
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:y(swatchSize/2 + 16):zoom(0.3)
+				self:y(swatchSize/2 + 14):zoom(0.28)
 					:diffuse(color("0.65,0.65,0.65,1"))
 				self:settext(choice.name)
 			end,
@@ -290,105 +307,202 @@ for i, choice in ipairs(accentChoices) do
 end
 
 -- ============================================================
--- LIVE PREVIEW PANEL
+-- FEATURE PREVIEW CHUNKS (Right Side)
+-- ============================================================
+
+-- Helper to create a preview chunk
+local function createChunk(name, yOffset, iconChar, titleText, descText, showProgress)
+	return Def.ActorFrame {
+		Name = "Chunk_" .. name,
+		InitCommand = function(self) self:xy(previewStartX, previewStartY + yOffset) end,
+		
+		-- Chunk background
+		Def.Quad {
+			InitCommand = function(self)
+				self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9"))
+			end
+		},
+		
+		-- Left accent bar
+		Def.Quad {
+			Name = "ChunkAccentBar",
+			InitCommand = function(self)
+				self:halign(0):x(-chunkW/2):zoomto(3, chunkH)
+					:diffuse(color(getActiveHex())):diffusealpha(0.8)
+			end,
+			ColorThemeChangedMessageCommand = function(self)
+				self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8)
+			end
+		},
+		
+		-- Icon
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(-chunkW/2 + 18, 0):zoom(0.4)
+					:diffuse(color(getActiveHex()))
+				self:settext(iconChar)
+			end,
+			ColorThemeChangedMessageCommand = function(self)
+				self:stoptweening():linear(0.15):diffuse(previewColor)
+			end
+		},
+		
+		-- Title
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(-chunkW/2 + 38, -8):halign(0):zoom(0.32)
+					:diffuse(color("1,1,1,1"))
+				self:settext(titleText)
+			end
+		},
+		
+		-- Description
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(-chunkW/2 + 38, 8):halign(0):zoom(0.24)
+					:diffuse(color("0.65,0.65,0.65,1"))
+				self:settext(descText)
+			end
+		},
+		
+		-- Optional progress bar
+		showProgress and Def.ActorFrame {
+			InitCommand = function(self) self:y(16) end,
+			Def.Quad {
+				InitCommand = function(self)
+					self:halign(0):x(-chunkW/2 + 38):zoomto(80, 4)
+						:diffuse(color("0.18,0.18,0.18,1"))
+				end
+			},
+			Def.Quad {
+				Name = "ProgressBar",
+				InitCommand = function(self)
+					self:halign(0):x(-chunkW/2 + 38):zoomto(55, 4)
+						:diffuse(color(getActiveHex())):diffusealpha(0.7)
+				end,
+				ColorThemeChangedMessageCommand = function(self)
+					self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.7)
+				end
+			}
+		} or nil
+	}
+end
+
+-- Add feature demonstration chunks
+t[#t + 1] = createChunk("Header", 0, "H", "Title Header", "Sample header text styling", false)
+t[#t + 1] = createChunk("Button", 62, "B", "Active Button", "Interactive button states", false)
+t[#t + 1] = createChunk("Progress", 124, "P", "Progress Bar", "Progress indicators", true)
+t[#t + 1] = createChunk("Accent", 186, "A", "Accent Elements", "Selection & highlights", false)
+t[#t + 1] = createChunk("Grade", 248, "G", "Grade Display", "Performance grades", false)
+
+-- ============================================================
+-- DIFFICULTY COLOR PREVIEW CHUNK
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
-	Name = "PreviewPanel",
-	InitCommand = function(self) self:xy(SCREEN_CENTER_X, previewY) end,
-
-	-- Panel background
+	Name = "Chunk_Difficulty",
+	InitCommand = function(self) self:xy(previewStartX, previewStartY + 310) end,
+	
+	-- Background
 	Def.Quad {
 		InitCommand = function(self)
-			self:zoomto(previewW, previewH):diffuse(color("0.06,0.06,0.06,0.95"))
+			self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9"))
 		end
 	},
-
-	-- Left accent bar (live preview)
+	
+	-- Left accent bar
 	Def.Quad {
-		Name = "AccentBar",
 		InitCommand = function(self)
-			self:halign(0):x(-previewW/2):zoomto(3, previewH)
+			self:halign(0):x(-chunkW/2):zoomto(3, chunkH)
 				:diffuse(color(getActiveHex())):diffusealpha(0.8)
 		end,
 		ColorThemeChangedMessageCommand = function(self)
 			self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8)
 		end
 	},
-
-	-- "PREVIEW" label
+	
+	-- Icon
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(-previewW/2 + 20, -previewH/2 + 14):halign(0):zoom(0.25)
-				:diffuse(color("0.45,0.45,0.45,1"))
-			self:settext("LIVE PREVIEW")
-		end
-	},
-
-	-- Sample header text
-	LoadFont("Common Normal") .. {
-		Name = "SampleHeader",
-		InitCommand = function(self)
-			self:xy(0, -previewH/2 + 36):zoom(0.55):diffuse(color("1,1,1,1"))
-			self:settext("HOLOGRAPHIC VOID")
-		end
-	},
-
-	-- Sample accent line
-	Def.Quad {
-		Name = "SampleLine",
-		InitCommand = function(self)
-			self:y(-previewH/2 + 52):zoomto(previewW * 0.6, 2)
-				:diffuse(color(getActiveHex())):diffusealpha(0.6)
-		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.6)
-		end
-	},
-
-	-- Sample body text
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(0, -previewH/2 + 70):zoom(0.3):diffuse(color("0.65,0.65,0.65,1"))
-			self:settext("Song Title — Artist Name")
-		end
-	},
-
-	-- Sample accent-colored element (simulated button)
-	Def.Quad {
-		Name = "SampleBtn",
-		InitCommand = function(self)
-			self:xy(-60, previewH/2 - 22):zoomto(80, 24)
-				:diffuse(color(getActiveHex())):diffusealpha(0.3)
-		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.3)
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "SampleBtnTxt",
-		InitCommand = function(self)
-			self:xy(-60, previewH/2 - 22):zoom(0.3)
+			self:xy(-chunkW/2 + 18, 0):zoom(0.4)
 				:diffuse(color(getActiveHex()))
-			self:settext("START")
+			self:settext("D")
 		end,
 		ColorThemeChangedMessageCommand = function(self)
 			self:stoptweening():linear(0.15):diffuse(previewColor)
 		end
 	},
-
-	-- Second sample button
-	Def.Quad {
-		InitCommand = function(self)
-			self:xy(60, previewH/2 - 22):zoomto(80, 24)
-				:diffuse(color("0.12,0.12,0.12,1"))
-		end
-	},
+	
+	-- Title
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(60, previewH/2 - 22):zoom(0.3)
-				:diffuse(color("0.65,0.65,0.65,1"))
-			self:settext("OPTIONS")
+			self:xy(-chunkW/2 + 38, -8):halign(0):zoom(0.32)
+				:diffuse(color("1,1,1,1"))
+			self:settext("Difficulty Colors")
 		end
+	},
+	
+
+	
+	-- Difficulty color boxes (Beginner, Easy, Medium, Hard, Challenge + Accent blend)
+	Def.ActorFrame {
+		InitCommand = function(self) self:y(8) end,
+		
+		-- Beginner (light blue-gray)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(-80):zoomto(22, 14):diffuse(color("#98B8CF"))
+			end
+		},
+		
+		-- Easy (green-gray)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(-54):zoomto(22, 14):diffuse(color("#A0CFAB"))
+			end
+		},
+		
+		-- Medium (gold-gray)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(-28):zoomto(22, 14):diffuse(color("#CFD198"))
+			end
+		},
+		
+		-- Hard (red-gray)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(-2):zoomto(22, 14):diffuse(color("#CF9898"))
+			end
+		},
+		
+		-- Challenge (purple-gray)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(24):zoomto(22, 14):diffuse(color("#B898CF"))
+			end
+		},
+		
+		-- Edit with accent blend (shows how accent integrates)
+		Def.Quad {
+			InitCommand = function(self)
+				self:x(50):zoomto(22, 14):diffuse(color(getActiveHex())):diffusealpha(0.5)
+			end,
+			ColorThemeChangedMessageCommand = function(self)
+				self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.5)
+			end
+		},
+		
+		-- Accent indicator
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:x(76):y(-8):zoom(0.2):halign(0)
+					:diffuse(color(getActiveHex()))
+				self:settext("ACCENT")
+			end,
+			ColorThemeChangedMessageCommand = function(self)
+				self:stoptweening():linear(0.15):diffuse(previewColor)
+			end
+		}
 	}
 }
 
@@ -398,7 +512,7 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "CurrentLabel",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, previewY + previewH/2 + 30):zoom(0.35)
+		self:xy(swatchStartX + totalSwatchW/2 - swatchSize/2, swatchStartY + 4 * (swatchSize + swatchGapY) + 20):zoom(0.32)
 			:diffuse(color("0.65,0.65,0.65,1"))
 	end,
 	ColorThemeChangedMessageCommand = function(self)

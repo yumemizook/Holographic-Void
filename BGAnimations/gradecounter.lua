@@ -20,6 +20,12 @@ if GRADECOUNTERSTORAGE == nil then
         AAA = 0,
         AA = 0,
         A = 0,
+        session_AAAAA = 0,
+        session_AAAA = 0,
+        session_AAA = 0,
+        session_AA = 0,
+        session_A = 0,
+        session_UnderA = 0,
         initialized = false,
         lastProfileName = ""
     }
@@ -61,13 +67,31 @@ local function CountGrade(tiers, grades)
     return count
 end
 
--- increments the grade count
 function GRADECOUNTERSTORAGE:increment(grade)
     if grade == "AAAAA" then self.AAAAA = self.AAAAA + 1 end
     if grade == "AAAA" then self.AAAA = self.AAAA + 1 end
     if grade == "AAA" then self.AAA = self.AAA + 1 end
     if grade == "AA" then self.AA = self.AA + 1 end
     if grade == "A" then self.A = self.A + 1 end
+end
+
+-- increments session-specific grade count
+function GRADECOUNTERSTORAGE:incrementSession(grade)
+    if not grade then return end
+    local tier = ToEnumShortString(grade)
+    if tier == "Tier01" then
+        self.session_AAAAA = self.session_AAAAA + 1
+    elseif tier == "Tier02" or tier == "Tier03" or tier == "Tier04" then
+        self.session_AAAA = self.session_AAAA + 1
+    elseif tier == "Tier05" or tier == "Tier06" or tier == "Tier07" then
+        self.session_AAA = self.session_AAA + 1
+    elseif tier == "Tier08" or tier == "Tier09" or tier == "Tier10" then
+        self.session_AA = self.session_AA + 1
+    elseif tier == "Tier11" or tier == "Tier12" or tier == "Tier13" then
+        self.session_A = self.session_A + 1
+    elseif tier == "Failed" or tier == "Tier14" or tier == "Tier15" or tier == "Tier16" or tier == "Tier17" then
+        self.session_UnderA = self.session_UnderA + 1
+    end
 end
 
 -- parse the xml and initialize the grade counts
