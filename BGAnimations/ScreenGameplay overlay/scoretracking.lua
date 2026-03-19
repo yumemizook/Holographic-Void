@@ -1,4 +1,4 @@
--- Holographic Void: Score Tracking (adapted from Fatigue)
+-- Holographic Void: Score Tracking
 -- Broadcasts timing messages for the pacemaker and other overlay elements.
 
 local startFlag = false

@@ -106,10 +106,13 @@ for i = 0, numProfiles - 1 do
 			end
 		},
 		
-		-- Rating
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
 				self:xy(-cardW/2 + 105, 12):halign(0):zoom(0.4)
+				if not HV.ShowMSD() then
+					self:visible(false)
+					return
+				end
 				local r = profile:GetPlayerRating()
 				self:settextf(THEME:GetString("ScreenSelectProfile", "RatingFormatted"), r)
 				self:diffuse(HVColor.GetMSDRatingColor(r))

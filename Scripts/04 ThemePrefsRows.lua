@@ -105,8 +105,8 @@ local HVPrefRows = {
 		Values = {false, true},
 	},
 
-	-- Show Mini Text Pacemaker
-	HV_ShowTextPacemaker = {
+	-- Show Mini Text Goal Tracker (formerly Pacemaker)
+	HV_ShowGoalTracker = {
 		Default = true,
 		Choices = {"Off", "On"},
 		Values = {false, true},
@@ -303,21 +303,75 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowTextPacemaker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
 	return l
 end
 
 -- Wrap ThemePrefRow to ensure it saves to disk immediately when changed
+-- Robustly wrap ThemePrefRow to ensure it correctly loads and saves boolean values
 local function HVThemePrefRow(name, title)
 	local row = ThemePrefRow(name, title)
+	local hvPref = HVPrefRows[name]
+	
+	-- Explicitly set choices and values if we have them in our local table
+	if hvPref then
+		row.Choices = hvPref.Choices
+		row.Values = hvPref.Values
+	end
+	
 	row.ExportOnChange = true
 	
-	local baseSave = row.SaveSelections
-	row.SaveSelections = function(self, list, pn)
-		baseSave(self, list, pn)
-		ThemePrefs.Save()
+	-- Define a robust load function that handles string/boolean mismatch
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get(name)
+		local found = false
+		for i, v in ipairs(self.Values) do
+			if v == val or tostring(v) == tostring(val) then
+				list[i] = true
+				found = true
+				break
+			end
+		end
+		-- If not found, default based on truthiness or fallback to first index
+		if not found then
+			if val == "true" or val == true or val == 1 or val == "1" then
+				list[#list] = true -- Usually 'On'
+			else
+				list[1] = true -- Usually 'Off'
+			end
+		end
 	end
+
+	-- Define a robust save function that ensures disk persistence
+	row.SaveSelections = function(self, list, pn)
+		local val = nil
+		for i, selected in ipairs(list) do
+			if selected then
+				val = self.Values[i]
+				break
+			end
+		end
+		ThemePrefs.Set(name, val)
+		ThemePrefs.ForceSave() -- Bypass NeedsSaved check to be certain
+	end
+	
 	return row
+end
+
+function OptionRowShowMSD()
+	return HVThemePrefRow("HV_ShowMSD", "Show MSD Ratings")
+end
+
+function OptionRowShowProfileStats()
+	return HVThemePrefRow("HV_ShowProfileStats", "Show Profile Stats")
+end
+
+function OptionRowShowNPS()
+	return HVThemePrefRow("HV_ShowNPS", "Show NPS Counter")
+end
+
+function OptionRowShowMean()
+	return HVThemePrefRow("HV_ShowMean", "Show Mean on Notefield")
 end
 
 function OptionRowPacemakerType()
@@ -328,8 +382,8 @@ function OptionRowPacemakerGoal()
 	return HVThemePrefRow("HV_PacemakerTargetGoal", "Pacemaker Target Goal")
 end
 
-function OptionRowShowTextPacemaker()
-	return HVThemePrefRow("HV_ShowTextPacemaker", "Text Pacemaker")
+function OptionRowShowGoalTracker()
+	return HVThemePrefRow("HV_ShowGoalTracker", "Goal Tracker")
 end
 
 -- ScreenPlayerOptions Helpers

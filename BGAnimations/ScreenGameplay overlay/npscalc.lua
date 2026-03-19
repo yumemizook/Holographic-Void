@@ -6,8 +6,7 @@ local pn = GAMESTATE:GetEnabledPlayers()[1]
 local countNotesSeparately = GAMESTATE:CountNotesSeparately()
 
 -- Check preferences
-local showNPS = (ThemePrefs.Get("HV_ShowNPS") == "true" or ThemePrefs.Get("HV_ShowNPS") == true)
-if not showNPS then
+if not HV.ShowNPS() then
 	return Def.ActorFrame {}
 end
 

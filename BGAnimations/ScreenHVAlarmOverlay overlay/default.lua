@@ -1,6 +1,7 @@
 -- Global Alarm Overlay
 -- Handles checking current time or decrementing timer
 -- Displaying non-intrusive notifications across the theme
+-- Needs testing, please do.
 
 local lastMinute = -1
 local triggeredThisSession = false

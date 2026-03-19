@@ -1,3 +1,4 @@
+-- this is purely sc-wh. will be changed later.
 local bannerWidth = 256
 local bannerHeight = 80
 local borderWidth = 2

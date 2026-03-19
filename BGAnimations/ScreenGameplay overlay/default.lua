@@ -5,14 +5,11 @@ local t = Def.ActorFrame {
 	InitCommand = function(self)
 		-- Apply Mini mod (Receptor Size)
 		local miniValue = tonumber(ThemePrefs.Get("HV_Mini")) or 100
-		-- Etterna's 'Mini' mod is 100% at mini=1.0, 0% at mini=0.0 (normal size).
-		-- We use a simpler direct % conversion:
 		local miniPct = 100 - miniValue
 		local modStr = miniPct .. "% mini"
 		
 		-- Apply Measure Lines (Beat Bars) mod
-		local showMeasure = (ThemePrefs.Get("HV_ShowMeasureLines") == "true" or ThemePrefs.Get("HV_ShowMeasureLines") == true)
-		local beatBarMod = showMeasure and "beatbars" or "nobeatbars"
+		local beatBarMod = HV.ShowMeasureLines() and "beatbars" or "nobeatbars"
 		
 		for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
 			local ps = GAMESTATE:GetPlayerState(pn)
@@ -52,8 +49,6 @@ local judgmentTNS = {
 -- ============================================================
 -- FRAME UPDATER (for time-based elements: life bar, progress bar)
 -- ============================================================
--- Remove the global broadcaster as we'll use per-component high-freq updates for critical elements
--- (Keeping the ActorFrame for any future global needs but removing the broadcast)
 t[#t + 1] = Def.ActorFrame {
 	BeginCommand = function(self)
 		self:SetUpdateFunction(function(self)
@@ -280,7 +275,7 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "ScoreValue",
 		InitCommand = function(self)
 			self:zoom(0.45):diffuse(brightText):diffusealpha(0.7)
-			self:settext("0.00%")
+			self:settext("0.0000%")
 		end,
 		JudgmentMessageCommand = function(self, params)
 			self.params = params
@@ -323,10 +318,10 @@ t[#t + 1] = Def.ActorFrame {
 		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
 	}
 }
-end -- End current wife % visibility check
+end
 
 -- ============================================================
--- TEXT GOAL TRACKER (TIL DEATH STYLE)
+-- GOAL TRACKER
 -- ============================================================
 local showGoalTrackerText = HV.ShowGoalTrackerText()
 if showGoalTrackerText then
@@ -369,7 +364,7 @@ if showGoalTrackerText then
 				end
 
 				if tDiff and tDiff >= 0 then
-					self:diffuse(color("#00ff00"))
+					self:diffuse(color("#91ff91ff"))
 				else
 					self:diffuse(HVColor.Negative or color("#ff0000"))
 				end
@@ -382,7 +377,7 @@ if showGoalTrackerText then
 end
 
 -- ============================================================
--- NOTEFIELD MEAN DISPLAY (Dedicated Object)
+-- NOTEFIELD MEAN DISPLAY
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "NotefieldMean",
@@ -418,7 +413,7 @@ t[#t + 1] = Def.ActorFrame {
 	}
 
 -- ============================================================
--- CENTERED COMBO / MISS STREAK (per-note update)
+-- CENTERED COMBO / MISS COMBO
 -- ============================================================
 local showCombo = HV.ShowCombo()
 local missStreak = 0
@@ -1094,7 +1089,7 @@ t[#t + 1] = Def.ActorFrame {
 		}
 	}
 }
-end -- End judge counter visibility check
+end
 
 -- ============================================================
 -- SONG TITLE (BOTTOM of screen)
@@ -1139,6 +1134,7 @@ t[#t + 1] = Def.ActorFrame {
 
 -- ============================================================
 -- TOASTY (fires at combo 250, 500, 750, 1000, ...)
+-- technically it should be every 250 perfect combo but eh
 -- ============================================================
 local lastToastyCombo = 0
 

@@ -1,6 +1,7 @@
 -- Holographic Void: Multiplayer Scoreboard (osu!lazer minimal style)
 -- Minimal floating scoreboard showing player ranks, scores, and accuracy
 -- Only visible when 2+ players are active
+-- to be reformatted so it match leaderboard.lua
 
 local numPlayers = #GAMESTATE:GetEnabledPlayers()
 if numPlayers < 2 then

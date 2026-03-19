@@ -1,7 +1,7 @@
 --- Holographic Void: ScreenEvaluation Decorations
 -- Full-featured evaluation screen ported from spawncamping-wallhack.
--- Features: Life/Combo graphs, Avatar+Player info, Grade+Score with rescoring,
---   SSR display, ClearType comparison, Tap/Hold/Mine judgments, Timing stats (mean/sd),
+-- Features: Life/Combo graphs, Avatar+Player info, Grade+Score with rescoring (needs testing to ensure nothing breaks),
+--   ClearType comparison, Tap/Hold/Mine judgments, Timing stats (mean/sd),
 --   CB L/R breakdown, Paginated Local/Online Scoreboard, Full Offset Plot.
 
 local song = GAMESTATE:GetCurrentSong()
@@ -221,7 +221,9 @@ local judgmentColors = {
 --  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff")] },
 --  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
 --  }
+
 -- [NEW] Life Difficulty Color Helper (1-7 scale)
+-- TODO: Fix me
 local function getLifeDifficultyColor(diff)
 	local c1 = color("#A0CFAB") -- Easy / Green
 	local c2 = color("#CFD198") -- Normal / Gold
@@ -233,7 +235,8 @@ local function getLifeDifficultyColor(diff)
 	end
 end
 
--- [NEW] Combo Streak Calculation Logic (Timeline-aware)
+-- [NEW] Combo Graph Calculation Logic (custom)
+-- The coloring of the text is broken. Get some glasses, i'm not fixing it.
 local function calculateMaxStreaks(dvt, nrv, config)
 	local results = {}
 	for i = 1, #config do
@@ -330,7 +333,6 @@ local t = Def.ActorFrame {
 	ScoreChangedMessageCommand = function(self)
 		pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 		
-		-- In Etterna, viewing a score on the scoreboard sets the SCOREMAN most recent score.
 		local mss = SCOREMAN:GetMostRecentScore()
 		if mss and mss:GetScore() > 0 then
 			curScore = mss
@@ -343,15 +345,13 @@ local t = Def.ActorFrame {
 		self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 		self:RunCommandsOnChildren(function(self) self:playcommand("On") end)
 		
-		-- Force rescoredPercentage update based on new dvt and curScore before SetJudge triggers completely 
 		local rst = getRescoreElements(pss, curScore)
 		rst.dvt = dvt -- Inject correct offset vector
 		rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 	end
 }
 
--- Rescore data + rescore now delegate to the corrected global functions in 08 EtternaUtils.lua.
--- getRescoreElements(pss, curScore) is used in place of the old local getRescoreElems().
+-- Rescore data + rescore delegate to the corrected global functions in 08 EtternaUtils.lua.
 
 
 ------------------------------------------------------------
@@ -550,10 +550,15 @@ local function scoreBoard(pn)
 				end,
 				OnCommand = function(self)
 					if steps then
-						local meter = steps:GetMSD(getCurRateValue(), 1)
-						meter = meter == 0 and steps:GetMeter() or meter
-						self:settextf("%.2f", meter)
-						self:diffuse(HVColor.GetMSDRatingColor(meter))
+						if HV.ShowMSD() then
+							local meter = steps:GetMSD(getCurRateValue(), 1)
+							meter = meter == 0 and steps:GetMeter() or meter
+							self:settextf("%.2f", meter)
+							self:diffuse(HVColor.GetMSDRatingColor(meter))
+						else
+							self:settext(tostring(steps:GetMeter()))
+							self:diffuse(brightText)
+						end
 					end
 				end
 			}
@@ -608,10 +613,15 @@ local function scoreBoard(pn)
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):valign(0):xy(10, 45):zoom(0.8):diffuse(subText):diffusealpha(0) end,
 			OnCommand = function(self)
-				local ssr = curScore:GetSkillsetSSR("Overall")
-				self:settextf("%.2f", ssr)
-				self:diffuse(HVColor.GetMSDRatingColor(ssr))
-				self:sleep(0.4):linear(0.2):diffusealpha(1)
+				if HV.ShowMSD() then
+					local ssr = curScore:GetSkillsetSSR("Overall")
+					self:settextf("%.2f", ssr)
+					self:diffuse(HVColor.GetMSDRatingColor(ssr))
+					self:sleep(0.4):linear(0.2):diffusealpha(1)
+				else
+					self:settext("")
+					self:visible(false)
+				end
 			end
 		},
 
@@ -1383,9 +1393,6 @@ t[#t + 1] = Def.ActorFrame {
 						InitCommand = function(self)
 							self:halign(0):xy(startX, 0):zoomto(barW, laneH - 2)
 							self:diffuse(conf.color):diffusealpha(0.6)
-							-- Draw at depth 1 and write it.
-							-- Since background is 0, this will pass LessEqual if we aren't careful.
-							-- Actually, we use ztest(false) to ensure it always draws on Pass 3.
 							self:ztest(false):zwrite(true):z(1)
 							if isHighest then
 								self:glow(color("1,1,1,0.2")):diffusealpha(0.8)
@@ -1397,10 +1404,6 @@ t[#t + 1] = Def.ActorFrame {
 					LoadFont("Common Normal") .. {
 						InitCommand = function(self)
 							self:zoom(0.32):settext(conf.name):halign(0):x(5)
-							-- ztest(true) uses LessEqual. 
-							-- We are at z=1. 
-							-- If depth is 0 (no bar): 1 <= 0 is FALSE. 
-							-- If depth is 1 (bar): 1 <= 1 is TRUE.
 							self:diffuse(color("0,0,0,1")):ztest(true):z(1)
 						end
 					},
@@ -1423,7 +1426,7 @@ t[#t + 1] = Def.ActorFrame {
 	},
 
 	-- ============================================================
-	-- OFFSET PLOT (MOVED HERE)
+	-- OFFSET PLOT
 	-- ============================================================
 	Def.ActorFrame {
 		Name = "OffsetPlotWrapper",

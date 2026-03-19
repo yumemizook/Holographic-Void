@@ -1,6 +1,7 @@
 --- Holographic Void: ScreenColorTheme Overlay
 -- Custom Lua UI for selecting the theme's accent color.
 -- Features clickable swatches with a live preview panel that updates in real time.
+-- We use color presets for now. the proper color config screen will be here at some point.
 
 local accentChoices = {
 	-- Cool Colors (Blues/Cyans/Greens)

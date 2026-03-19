@@ -1,5 +1,5 @@
 --- Holographic Void: ScreenColorTheme Background
--- Simple OLED black with subtle grid lines.
+
 
 local t = Def.ActorFrame {}
 

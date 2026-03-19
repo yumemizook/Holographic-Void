@@ -1,5 +1,5 @@
 --Version: 09.16.24 19:34
---For Til Death
+--For Til Death, tailored for Holographic Void
 local t = Def.ActorFrame {}
 
 local score = SCOREMAN:GetMostRecentScore()

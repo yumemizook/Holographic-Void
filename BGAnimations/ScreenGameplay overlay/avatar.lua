@@ -136,6 +136,7 @@ local t = Def.ActorFrame {
 	},
 
 	-- Life % counter
+	-- it took me 30 hours to make sure it properly works.
 	LoadFont("Common Normal") .. {
 		Name = "LifePct",
 		InitCommand = function(self)

@@ -25,9 +25,6 @@ local allplaylistsactive = true
 local currentPlaylistPage = 1
 local currentChartPage = 1
 
--- Guard against double-loading logic
--- (Removed: we must rebuild state on every reload to avoid stale actor references)
-
 -- Active playlist data
 local pl = nil
 local chartlist = {}

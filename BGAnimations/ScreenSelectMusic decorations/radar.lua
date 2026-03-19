@@ -142,6 +142,7 @@ local displayFn = {
 -- tooltip hover
 
 local function showTooltips()
+	if not HV.ShowMSD() then return end
 	hoverActive = true
 	for i = 1, 6 do
 		if tooltipActors[i] then

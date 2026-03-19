@@ -93,9 +93,13 @@ local o = Def.ActorFrame {
 		OnCommand = function(self)
 			self:queuecommand("SelectionChanged")
 		end,
-		SelectionChangedCommand = function(self)
-			self:settext(bundleDesc[ind])
+	SelectionChangedCommand = function(self)
+		local desc = bundleDesc[ind]
+		if not HV.ShowMSD() then
+			desc = desc:gsub(" %(.* MSD%)", "")
 		end
+		self:settext(desc)
+	end
 	},
 	LoadFont("Common normal") .. {
 		InitCommand = function(self)

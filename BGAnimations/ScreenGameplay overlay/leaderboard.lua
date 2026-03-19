@@ -1,6 +1,7 @@
 -- Holographic Void: In-Game Leaderboard (Single Player)
 -- Shows local or online high scores for the current song during gameplay
 -- Top-left corner, individual score cards + live current score
+-- THe judgement display is not shown here.
 
 local leaderboardMode = HV.ShowInGameLeaderboard() -- "Off", "Local", or "Online"
 if leaderboardMode == "Off" then

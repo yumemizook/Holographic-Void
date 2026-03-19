@@ -7,6 +7,7 @@
 --   - Average difficulty, song count, play count columns
 --   - Real-time download progress
 -- Keyboard navigable
+-- Basically what you expect from other themes. Tags filtering will be added soon
 
 local t = Def.ActorFrame {
 	Name = "PackDownloaderUI"
@@ -252,6 +253,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(1):x(colAvgX):zoom(0.24):diffuse(dimText):settext("AVG MSD")
+			if not HV.ShowMSD() then self:visible(false) end
 		end
 	},
 	LoadFont("Common Normal") .. {
@@ -396,6 +398,10 @@ for i = 1, packsPerPage do
 					:zoom(0.38):diffuse(subText)
 			end,
 			["UpdateRow" .. i .. "Command"] = function(self)
+				if not HV.ShowMSD() then
+					self:visible(false)
+					return
+				end
 				local pack = currentPacks[i]
 				if pack then
 					local avg = pack:GetAvgDifficulty()
@@ -408,7 +414,7 @@ for i = 1, packsPerPage do
 						self:settext("-")
 						self:diffuse(subText)
 					end
-					self:visible(true)
+					self:visible(HV.ShowMSD())
 				else
 					self:visible(false)
 				end

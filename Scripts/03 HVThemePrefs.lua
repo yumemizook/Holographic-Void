@@ -57,12 +57,13 @@ local function load_lua_config(path)
 	return ret
 end
 
--- Re-implement ThemePrefs with the new path
--- Helper to recursively serialize a Lua table to a string
+-- Helper to serialize a Lua table to a string for saving
 local function lua_table_to_string(tbl)
 	if type(tbl) ~= "table" then
 		if type(tbl) == "string" then return string.format("%q", tbl) end
-		return tostring(tbl)
+		if type(tbl) == "boolean" then return tostring(tbl) end
+		if type(tbl) == "number" then return tostring(tbl) end
+		return "nil"
 	end
 	local res = "{"
 	for k, v in pairs(tbl) do
@@ -72,6 +73,7 @@ local function lua_table_to_string(tbl)
 	return res .. "}"
 end
 
+-- Re-implement ThemePrefs with the new path
 ThemePrefs = {
 	NeedsSaved = false,
 	Init = function(prefs, bLoadFromDisk)
@@ -146,8 +148,9 @@ ThemePrefs = {
 	Set = function(name, value)
 		local tbl = ResolveTable(name)
 		if tbl then
-			ThemePrefs.NeedsSaved = true
 			tbl[name] = value
+			ThemePrefs.NeedsSaved = true
+			ThemePrefs.Save() -- Global Consistency: persist immediately on change
 		end
 	end
 }
@@ -245,7 +248,7 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 
-	-- Gameplay: Toggle Mini Text Goal Tracker (formerly Pacemaker)
+	-- Gameplay: Toggle Mini Goal Tracker (Renamed from Text Pacemaker)
 	HV_ShowGoalTracker = {
 		Default = true,
 		Choices = {"Off", "On"},
@@ -307,6 +310,13 @@ local HVPrefs = {
 	},
 	
 	-- Gameplay: Show Hit Mean Display
+	HV_ShowHitMean = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Gameplay: Show Hit Mean Display (Legacy compatibility)
 	HV_ShowMean = {
 		Default = true,
 		Choices = {"Off", "On"},
@@ -408,14 +418,8 @@ local HVPrefs = {
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
-	-- Gameplay: Assist mode (Clap/Metronome/Both)
-	HV_AssistMode = {
-		Default = "Off",
-		Choices = {"Off", "Clap", "Metronome", "Both"},
-		Values = {"Off", "Clap", "Metronome", "Both"}
-	},
-	-- Redundant Goal Tracker Text alias (using unified HV_ShowGoalTracker instead)
-	HV_GoalTrackerText = {
+	-- Gameplay: Goal Tracker (renamed from HV_GoalTrackerText)
+	HV_ShowGoalTracker = {
 		Default = true,
 		Choices = {"Off", "On"},
 		Values = {false, true}
@@ -430,9 +434,11 @@ if HVColor and HVColor.RefreshAccent then
 	HVColor.RefreshAccent()
 end
 
--- Private helper for consistent boolean evaluation
+-- ==========================================================================
+-- Consistency Helpers
+-- ==========================================================================
 local function isTrue(val)
-	return val == "true" or val == true or val == 1 or val == "1"
+	return val == "true" or val == true
 end
 
 --- Get the current accent color as a color table.
@@ -507,6 +513,11 @@ function HV.ShowInGameLeaderboard()
 	return val
 end
 
+--- Check if real-time NPS should be shown.
+function HV.ShowNPS()
+	return isTrue(ThemePrefs.Get("HV_ShowNPS"))
+end
+
 --- Check if NPS graph should be shown.
 function HV.ShowNPSGraph()
 	return isTrue(ThemePrefs.Get("HV_ShowNPSGraph"))
@@ -528,6 +539,11 @@ function HV.GetAssistMode()
 	return ThemePrefs.Get("HV_AssistMode") or "Off"
 end
 
+--- Check if the full goal tracker graph should be shown.
+function HV.ShowGoalTrackerGraph()
+	return isTrue(ThemePrefs.Get("HV_ShowPacemakerGraph"))
+end
+
 --- Check if goal tracker text should be shown.
 function HV.ShowGoalTrackerText()
 	return isTrue(ThemePrefs.Get("HV_ShowGoalTracker"))
@@ -536,12 +552,6 @@ end
 --- Check if hit mean display should be shown.
 function HV.ShowHitMean()
 	return isTrue(ThemePrefs.Get("HV_ShowMean"))
-end
-
---- Check if NPS counter should be shown.
-function HV.ShowNPS()
-	local val = ThemePrefs.Get("HV_ShowNPS")
-	return val == "true" or val == true
 end
 
 Trace("Holographic Void: 03 ThemePrefs.lua loaded.")

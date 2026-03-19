@@ -1,11 +1,4 @@
 --- Holographic Void: ScreenSelectMusic Decorations
--- Dashboard-style song info panel on the LEFT side with:
---   - Banner display
---   - Song title, artist, pack name
---   - MSD (difficulty calculator) ratings with hover skillset breakdown
---   - BPM, length, chart info
---   - Player profile + avatar at bottom-left
---   - Overall rating display with hover skillset tooltip
 
 -- ============================================================
 -- LAYOUT CONSTANTS
@@ -22,13 +15,12 @@ local bgCard = color("0.06,0.06,0.06,0.9")
 local headerH = 40
 local footerH = 40
 
-local profileOverlayActor = nil -- Local reference for the overlay
+local profileOverlayActor = nil
 
 local t = Def.ActorFrame {
 	Name = "SelectMusicDecorations"
 }
 
--- ClickDebug was moved to overlay/default.lua for better visibility
 
 HV.LoginState = HV.LoginState or {
 	visible = false,
@@ -489,18 +481,18 @@ t[#t + 1] = Def.ActorFrame {
 				-- < 1:00 = white, 1:00-3:30 = green to yellow, 3:30-7:00 = yellow to red, 7:00-10:00 = red to purple, > 10:00 = purple
 				if len < 60 then
 					self:diffuse(color("1,1,1,1"))  -- White
-				elseif len < 210 then  -- 3:30
-					local t = (len - 60) / 150  -- 0 to 1 over 2.5 minutes
-					local g = 1 - t * 0.5  -- 1 to 0.5
+				elseif len < 210 then  
+					local t = (len - 60) / 150 
+					local g = 1 - t * 0.5
 					self:diffuse(color("0.5,"..g..",0.5,1"))  -- Green to Yellow
-				elseif len < 420 then  -- 7:00
-					local t = (len - 210) / 210  -- 0 to 1 over 3.5 minutes
-					local r = 0.5 + t * 0.5  -- 0.5 to 1
-					local g = 0.5 - t * 0.5  -- 0.5 to 0
+				elseif len < 420 then  
+					local t = (len - 210) / 210 
+					local r = 0.5 + t * 0.5 
+					local g = 0.5 - t * 0.5 
 					self:diffuse(color(r..","..g..",0.5,1"))  -- Yellow to Red
-				elseif len < 600 then  -- 10:00
-					local t = (len - 420) / 180  -- 0 to 1 over 3 minutes
-					local b = 0.5 + t * 0.5  -- 0.5 to 1
+				elseif len < 600 then  
+					local t = (len - 420) / 180 
+					local b = 0.5 + t * 0.5 
 					self:diffuse(color("1,0,"..b..",1"))  -- Red to Purple
 				else
 					self:diffuse(color("0.7,0,1,1"))  -- Purple
@@ -1288,7 +1280,8 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		SetCommand = function(self)
 			local showProfileStats = HV.ShowProfileStats()
-			if not (showProfileStats == "true" or showProfileStats == true) then
+			local showMSD = HV.ShowMSD()
+			if not (showProfileStats == "true" or showProfileStats == true) or not showMSD then
 				self:visible(false)
 				return
 			end
@@ -1324,7 +1317,8 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		SetCommand = function(self)
 			local showProfileStats = HV.ShowProfileStats()
-			if not (showProfileStats == "true" or showProfileStats == true) then
+			local showMSD = HV.ShowMSD()
+			if not (showProfileStats == "true" or showProfileStats == true) or not showMSD then
 				self:settext("")
 				return
 			end
@@ -1425,10 +1419,6 @@ t[#t + 1] = Def.ActorFrame {
 	}
 }
 
--- ============================================================
--- PROFILE OVERLAY
--- ============================================================
--- profileOverlay was moved to overlay/default.lua for better layering
 
 -- ============================================================
 -- MUSIC RATE DISPLAY
@@ -1436,8 +1426,6 @@ t[#t + 1] = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "RateDisplay",
 	InitCommand = function(self) 
-		-- Right of song info, above the banner 
-		-- Banner is at panelX, panelY+12. Above banner is panelY
 		self:xy(panelX + panelW - 40, panelY + 4) 
 	end,
 	LoadFont("Common Normal") .. {
@@ -1462,10 +1450,8 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- RADAR INTEGRATION
 -- ============================================================
--- Add the radar component to visually track step characteristics
 t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
-		-- Centered directly above the profile card
 		self:xy(compactProfileX + 85, compactProfileY - 80)
 		self:zoom(1.0)
 	end,
@@ -1513,8 +1499,7 @@ t[#t + 1] = Def.ActorFrame {
 		if not creditTooltipActor then return end
 		local song = HV.CurrentSongData.song
 		if not song then creditTooltipActor:visible(false) return end
-		
-		-- Use a slightly looser hover check to avoid constant recalculation
+
 		local isHovering = IsMouseOver(panelX + 16, infoY, panelW - 16, 75)
 		
 		if isHovering then

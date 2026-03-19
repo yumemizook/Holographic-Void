@@ -1,4 +1,4 @@
---- Holographic Void: Local Scoreboard (ported from Fatigue / spawncamping-wallhack)
+--- Holographic Void: Local Scoreboard (ported from spawncamping-wallhack)
 -- Displays paginated local high-scores for the chart at the current rate.
 -- Features: SSR, Judgment tally (no labels), ClearType lamp, sort by SSR.
 -- NEW: Clickable score cards to view different score data
@@ -208,6 +208,10 @@ local function scoreItem(i)
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:xy(290, 8):zoom(0.45):halign(1) end,
 			SetScoreCommand = function(self, params)
+				if not HV.ShowMSD() then
+					self:settext("")
+					return
+				end
 				local ssr = hsTable[params.index]:GetSkillsetSSR("Overall")
 				if ssr > 0 then
 					self:settextf("%.2f", ssr)
@@ -273,14 +277,16 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self) self:xy(0, -18):zoom(0.35):halign(0):diffuse(accentColor) end,
 		OnCommand = function(self)
-			self:settextf("Local Scores (sorted by SSR) — %d total", #hsTable)
+			local label = HV.ShowMSD() and "Local Scores (sorted by SSR)" or "Local Scores"
+			self:settextf("%s — %d total", label, #hsTable)
 		end,
 		UpdateLocalScoreboardMessageCommand = function(self)
 			-- Show indicator if viewing a different score
 			if selectedScoreIndex > 0 and selectedScoreIndex ~= scoreIndex then
 				self:settextf("Viewing Score #%d (Click current play to return)", selectedScoreIndex)
 			else
-				self:settextf("Local Scores (sorted by SSR) — %d total", #hsTable)
+				local label = HV.ShowMSD() and "Local Scores (sorted by SSR)" or "Local Scores"
+				self:settextf("%s — %d total", label, #hsTable)
 			end
 		end
 	},

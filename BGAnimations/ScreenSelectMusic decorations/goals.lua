@@ -1,6 +1,4 @@
 --- Holographic Void: Goals Tab
--- Rebuilt with granular score adjustment and refined UI
--- Per-goal priority/rate editing, delete, and click-to-find-song
 
 local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")

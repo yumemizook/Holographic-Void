@@ -1,5 +1,6 @@
---- Holographic Void: ScreenChartPreview Overlay (PREMIUM RE-IMPLEMENTATION)
+-- Holographic Void: ScreenChartPreview Overlay
 -- Integrated sc-wh logic with HV Aesthetics (Glassmorphism, Accents, OLED Blacks).
+-- oh yea the hovering on CDgraph is broken. i might or might not fix it
 
 local pn = PLAYER_1
 local song = GAMESTATE:GetCurrentSong()
@@ -214,7 +215,7 @@ local function updateSync(self)
 			end
 		end
 		
-		if hoveredSteps then
+		if hoveredSteps and HV.ShowMSD() then
 			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
 			msdTooltipActor:visible(true):xy(mx + 5, my - 15)
 			msdTooltipActor:playcommand("SetHover", {steps = hoveredSteps})
@@ -387,6 +388,9 @@ local function skillsetPanel()
 	local skillsets = {"Overall", "Stream", "Jumpstream", "Handstream", "Stamina", "JackSpeed", "Chordjack", "Technical"}
 	return Def.ActorFrame {
 		Name = "SkillsetPanel",
+		InitCommand = function(self)
+			self:visible(HV.ShowMSD())
+		end,
 		Def.Quad { InitCommand = function(self) self:zoomto(sidePanelWidth, 300):diffuse(bgCard):diffusealpha(0.8) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:y(-135):settext("SKILLSETS"):zoom(0.4):diffuse(accentColor) end },
 		Def.ActorFrame {
@@ -512,8 +516,12 @@ local function chartPanel()
 							local panel = self:GetParent():GetParent():GetParent()
 							local s = panel.available and panel.available[d]
 							if s then
-								local val = s:GetMSD(getCurRateValue(), 1)
-								self:settextf("%.2f", val):diffuse(HVColor.GetMSDRatingColor(val)):visible(true)
+								if HV.ShowMSD() then
+									local val = s:GetMSD(getCurRateValue(), 1)
+									self:settextf("%.2f", val):diffuse(HVColor.GetMSDRatingColor(val)):visible(true)
+								else
+									self:settext(tostring(s:GetMeter())):diffuse(textMain):visible(true)
+								end
 							else
 								self:visible(false)
 							end

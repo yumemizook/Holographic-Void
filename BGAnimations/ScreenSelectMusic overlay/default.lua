@@ -714,6 +714,7 @@ local profileOverlay = Def.ActorFrame {
 				Name = "Rating",
 				InitCommand = function(self) self:y(56):zoom(0.35):diffuse(accentColor) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
+					if not HV.ShowMSD() then self:visible(false); return end
 					local val = 0
 					local prof = PROFILEMAN:GetProfile(PLAYER_1)
 					if DLMAN:IsLoggedIn() and profileOverlayActor.isOnlineMode then 
@@ -721,7 +722,7 @@ local profileOverlay = Def.ActorFrame {
 					elseif prof then
 						val = prof:GetPlayerRating()
 					end
-					self:settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
+					self:visible(true):settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
 				end
 			}
 		},
@@ -759,6 +760,7 @@ local profileOverlay = Def.ActorFrame {
 						Name = "Val",
 						InitCommand = function(self) self:halign(1):x(profileSidebarW/2 - 20):zoom(0.32):diffuse(mainText) end,
 						UpdateOverlaySkillsetsMessageCommand = function(self)
+							if not HV.ShowMSD() then self:visible(false); return end
 							local val = 0
 							local prof = PROFILEMAN:GetProfile(PLAYER_1)
 							if DLMAN:IsLoggedIn() and profileOverlayActor.isOnlineMode then 
@@ -767,7 +769,7 @@ local profileOverlay = Def.ActorFrame {
 								if ss == "Overall" then val = prof:GetPlayerRating()
 								else val = prof:GetPlayerSkillsetRating(i-2) or 0 end
 							end
-							self:settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
+							self:visible(true):settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
 						end
 					},
 					SetUpdateFunction = function(af)
@@ -1117,7 +1119,8 @@ local profileOverlay = Def.ActorFrame {
 					metadata = string.format("%s  |  %d/%d/%d/%d/%d/%d", THEME:GetString("ClearTypes", ct), w1, w2, w3, w4, w5, m)
 				end
 				
-				row:GetChild("SSR"):settext(string.format("%.2f", ssr)):diffuse(HVColor.GetMSDRatingColor(ssr))
+				local ssrLabel = row:GetChild("SSR")
+				ssrLabel:settext(string.format("%.2f", ssr)):diffuse(HVColor.GetMSDRatingColor(ssr)):visible(HV.ShowMSD())
 				row:GetChild("Title"):settext(title)
 				row:GetChild("Details"):settext(string.format("%s · %.2fx · %s", diff, rate, date))
 				
