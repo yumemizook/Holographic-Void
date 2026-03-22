@@ -550,11 +550,10 @@ local function scoreBoard(pn)
 				end,
 				OnCommand = function(self)
 					if steps then
-						if HV.ShowMSD() then
-							local meter = steps:GetMSD(getCurRateValue(), 1)
-							meter = meter == 0 and steps:GetMeter() or meter
-							self:settextf("%.2f", meter)
-							self:diffuse(HVColor.GetMSDRatingColor(meter))
+						local msd = steps:GetMSD(getCurRateValue(), 1)
+						if HV.ShowMSD() and msd > 0 then
+							self:settextf("%.2f", msd)
+							self:diffuse(HVColor.GetMSDRatingColor(msd))
 						else
 							self:settext(tostring(steps:GetMeter()))
 							self:diffuse(brightText)

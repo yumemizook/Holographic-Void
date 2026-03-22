@@ -102,9 +102,12 @@ local t = Def.ActorFrame {
 		SetCommand = function(self)
 			local steps = GAMESTATE:GetCurrentSteps()
 			local meter = steps:GetMSD(getCurRateValue(), 1)
-			meter = meter == 0 and steps:GetMeter() or meter
-			self:settextf("%5.2f", meter)
-			self:diffuse(HVColor.GetMSDRatingColor(meter))
+			local showMSD = HV.ShowMSD() and meter > 0
+			self:visible(showMSD)
+			if showMSD then
+				self:settextf("%5.2f", meter)
+				self:diffuse(HVColor.GetMSDRatingColor(meter))
+			end
 		end,
 		CurrentRateChangedMessageCommand = function(self) self:queuecommand("Set") end,
 		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Set") end,
