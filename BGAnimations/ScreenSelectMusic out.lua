@@ -15,6 +15,7 @@ local t = Def.ActorFrame {}
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
 		self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
+		HV.XPEarningAllowed = true
 	end,
 	OnCommand = function(self)
 		self:diffuse(color("0,0,0,0")):sleep(0.1):linear(0.15):diffusealpha(1)

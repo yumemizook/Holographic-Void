@@ -710,9 +710,77 @@ local profileOverlay = Def.ActorFrame {
 					self:settext(name)
 				end
 			},
+			-- Level Badge
+			Def.ActorFrame {
+				Name = "PlayerLevelBadge",
+				InitCommand = function(self) self:y(54) end,
+				UpdateOverlaySkillsetsMessageCommand = function(self)
+					local prof = PROFILEMAN:GetProfile(PLAYER_1)
+					if prof and HV.GetLevelColor then
+						local level = HV.GetLevel(prof)
+						self:GetChild("Badge"):diffuse(HV.GetLevelColor(level))
+						self:GetChild("Txt"):settextf("Lv. %d", level)
+						self:visible(true)
+					elseif prof then
+						self:GetChild("Badge"):diffuse(color("#666666"))
+						self:GetChild("Txt"):settextf("Lv. %d", HV.GetLevel(prof))
+						self:visible(true)
+					else
+						self:visible(false)
+					end
+				end,
+				-- Badge Quad
+				Def.Quad {
+					Name = "Badge",
+					InitCommand = function(self)
+						self:zoomto(36, 12):diffusealpha(0.8)
+					end
+				},
+				-- Level Text
+				LoadFont("Common Normal") .. {
+					Name = "Txt",
+					InitCommand = function(self)
+						self:zoom(0.32):diffuse(color("#000000"))
+					end
+				}
+			},
+			-- Progress Bar
+			Def.ActorFrame {
+				Name = "LevelProgress",
+				InitCommand = function(self) self:y(64) end,
+				UpdateOverlaySkillsetsMessageCommand = function(self)
+					local prof = PROFILEMAN:GetProfile(PLAYER_1)
+					if prof and HV.GetLevelProgress then
+						local progress, cur, total = HV.GetLevelProgress(prof)
+						self:GetChild("Bar"):smooth(0.5):zoomx(60 * progress)
+						self:GetChild("Num"):settextf("%d / %d XP", cur, total)
+						self:visible(true)
+					elseif prof then
+						self:GetChild("Bar"):zoomx(0)
+						self:GetChild("Num"):settext("")
+						self:visible(true)
+					else
+						self:visible(false)
+					end
+				end,
+				-- Bar BG
+				Def.Quad {
+					InitCommand = function(self) self:zoomto(60, 3):diffuse(0,0,0,0.5) end
+				},
+				-- Bar Fill
+				Def.Quad {
+					Name = "Bar",
+					InitCommand = function(self) self:halign(0):x(-30):zoomto(0, 3):diffuse(color("#FF4081")) end
+				},
+				-- Numbers
+				LoadFont("Common Normal") .. {
+					Name = "Num",
+					InitCommand = function(self) self:y(8):zoom(0.22):diffuse(subText) end
+				}
+			},
 			LoadFont("Common Normal") .. {
 				Name = "Rating",
-				InitCommand = function(self) self:y(56):zoom(0.35):diffuse(accentColor) end,
+				InitCommand = function(self) self:y(78):zoom(0.35):diffuse(accentColor) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
 					if not HV.ShowMSD() then self:visible(false); return end
 					local val = 0

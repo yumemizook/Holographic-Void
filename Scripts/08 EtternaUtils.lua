@@ -888,4 +888,148 @@ end
 
 -- Initialize custom grades
 
+------------------------------------------------------------
+-- LEVELLING LOGIC
+------------------------------------------------------------
+HV.XPFile = "Save/Holographic Void_settings/profileXP.lua"
+HV.XPData = nil
+
+function HV.LoadXPData()
+	if HV.XPData then return HV.XPData end
+	if FILEMAN:DoesFileExist(HV.XPFile) then
+		local file = RageFileUtil.CreateRageFile()
+		if file:Open(HV.XPFile, 1) then
+			local content = file:Read()
+			local data = loadstring(content)
+			if data then
+				setfenv(data, {})
+				local success, ret = pcall(data)
+				if success and type(ret) == "table" then
+					HV.XPData = ret
+				end
+			end
+			file:Close()
+		end
+		file:destroy()
+	end
+	HV.XPData = HV.XPData or {}
+	return HV.XPData
+end
+
+function HV.SaveXPData()
+	if not HV.XPData then return end
+	local file = RageFileUtil.CreateRageFile()
+	if file:Open(HV.XPFile, 2) then
+		local output = "return {\n"
+		for guid, xp in pairs(HV.XPData) do
+			output = output .. string.format("\t[%q] = %d,\n", guid, xp)
+		end
+		output = output .. "}"
+		file:Write(output)
+		file:Close()
+	end
+	file:destroy()
+end
+
+function HV.GetXP(profile)
+	if not profile then return 0 end
+	local data = HV.LoadXPData()
+	local guid = profile:GetGUID()
+	local xp = data[guid]
+	
+	if not xp then
+		-- Migration: Initialize with raw note counts if no custom XP exists
+		xp = profile:GetTotalTapsAndHolds() or 0
+		data[guid] = xp
+		HV.SaveXPData()
+	end
+	return tonumber(xp) or 0
+end
+
+function HV.SetXP(profile, value)
+	if not profile then return end
+	local data = HV.LoadXPData()
+	local guid = profile:GetGUID()
+	data[guid] = value
+	HV.SaveXPData()
+end
+
+function HV.CalculateXPGain(pss, msd)
+	if not pss or pss:GetFailed() then return 0 end
+	
+	-- Base: Taps + Holds
+	local base = pss:GetTotalTaps()
+	-- Holds are usually separate in pss, let's just use taps as the primary driver 
+	-- as hold counts are already reflected in some engine total taps if combined.
+	-- But to be safe, let's assume pss:GetTotalTaps() is our currency.
+	
+	-- MSD Factor: 1.0 at 15 MSD, scales up/down
+	msd = msd or 0
+	local msdFactor = math.max(1, msd / 15)
+	
+	-- Accuracy Factor: Rewards high percentage, penalizes low
+	local score = pss:GetWifeScore() or 0
+	local accFactor = math.pow(score / 0.93, 2)
+	
+	local gain = math.floor(base * msdFactor * accFactor)
+	return math.max(0, gain)
+end
+
+function HV.GetLevelFromXP(xp)
+	if not xp or xp < 0 then return 1 end
+	-- Level = 90 * ln(XP / 5000 + 1) + 1
+	-- Since custom XP scales differently, we might need to adjust the divisor (5000)
+	-- but let's keep it consistent for now.
+	return math.floor(90 * math.log(xp / 5000 + 1)) + 1
+end
+
+function HV.GetLevel(profile)
+	if not profile then return 1 end
+	return HV.GetLevelFromXP(HV.GetXP(profile))
+end
+
+function HV.GetXPForLevel(level)
+	if level <= 1 then return 0 end
+	-- XP = 5000 * (math.exp((level - 1) / 90) - 1)
+	return 5000 * (math.exp((level - 1) / 90) - 1)
+end
+
+function HV.GetLevelProgressFromXP(xp)
+	if not xp or xp < 0 then return 0, 0, 0 end
+	local level = HV.GetLevelFromXP(xp)
+	local xpCurrentLevel = HV.GetXPForLevel(level)
+	local xpNextLevel = HV.GetXPForLevel(level + 1)
+	
+	local progress = (xp - xpCurrentLevel) / (xpNextLevel - xpCurrentLevel)
+	local currentXPInLevel = math.floor(xp - xpCurrentLevel)
+	local totalXPNeededForLevel = math.floor(xpNextLevel - xpCurrentLevel)
+	
+	return progress, currentXPInLevel, totalXPNeededForLevel
+end
+
+function HV.GetLevelProgress(profile)
+	if not profile then return 0, 0, 0 end
+	return HV.GetLevelProgressFromXP(HV.GetXP(profile))
+end
+
+function HV.GetLevelColor(level)
+	if level >= 1000 then return color("#FFFFFF")    -- Rainbow/Diamond
+	elseif level >= 900 then return color("#403010") -- Black/Gold
+	elseif level >= 800 then return color("#404040") -- Black/Silver
+	elseif level >= 700 then return color("#5C629E") -- Dark Blue
+	elseif level >= 600 then return color("#5C9E62") -- Dark Green
+	elseif level >= 500 then return color("#9E5C5C") -- Dark Red
+	elseif level >= 400 then return color("#8B5C9E") -- Deep Purple
+	elseif level >= 300 then return color("#98CFCE") -- Cyan/Aqua
+	elseif level >= 250 then return color("#CF9898") -- Pink/Red
+	elseif level >= 200 then return color("#CFD198") -- Orange/Gold
+	elseif level >= 150 then return color("#CFA0CF") -- Purple
+	elseif level >= 100 then return color("#80C0CF") -- Blue
+	elseif level >= 50 then return color("#A0CFAB")  -- Green
+	else return color("#A6A6A6") end                 -- Gray
+end
+
+HV.LastTotalXP = 0
+HV.XPEarningAllowed = false
+
 Trace("Holographic Void: 08 EtternaUtils.lua loaded (expanded).")

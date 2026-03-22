@@ -473,18 +473,203 @@ local function scoreBoard(pn)
 			InitCommand = function(self) self:halign(0):valign(0):zoomto(frameW, frameH):diffuse(bgCard) end
 		},
 
-		Def.Sprite {
-			Name = "Banner",
-			InitCommand = function(self) self:halign(0.5):valign(0):xy(frameW/2, pad + 10):diffusealpha(0) end,
-			OnCommand = function(self)
-				if song then
-					local bpath = song:GetBannerPath()
-					if not bpath then bpath = THEME:GetPathG("Common", "fallback banner") end
-					self:LoadBackground(bpath)
-					self:scaletofit(0, 0, frameW - pad*2, 60)
+		-- Banner + Profile Display
+		Def.ActorFrame {
+			Name = "TopHeader",
+			InitCommand = function(self) self:xy(0, pad + 10) end,
+
+			Def.Sprite {
+				Name = "Banner",
+				InitCommand = function(self) self:halign(0):valign(0):xy(pad, 0):diffusealpha(0) end,
+				OnCommand = function(self)
+					if song then
+						local bpath = song:GetBannerPath()
+						if not bpath then bpath = THEME:GetPathG("Common", "fallback banner") end
+						self:LoadBackground(bpath)
+						self:scaletofit(0, 0, (frameW - pad * 3) * 0.5, 60)
+					end
+					self:sleep(0.05):linear(0.25):diffusealpha(1)
 				end
-				self:sleep(0.05):linear(0.25):diffusealpha(1)
-			end
+			},
+
+			Def.ActorFrame {
+				Name = "ProfileDisplay",
+				InitCommand = function(self) 
+					self:xy(pad + (frameW - pad * 3) * 0.5 + pad, 0):diffusealpha(0) 
+				end,
+				OnCommand = function(self)
+					self:sleep(0.1):linear(0.25):diffusealpha(1)
+				end,
+
+				-- Avatar
+				Def.Sprite {
+					Name = "Avatar",
+					InitCommand = function(self) self:halign(0):valign(0):zoomto(60, 60) end,
+					BeginCommand = function(self)
+						self:Load(getAvatarPath(pn))
+						self:zoomto(60, 60)
+					end
+				},
+
+				-- Name
+				LoadFont("Common Normal") .. {
+					Name = "PlayerName",
+					InitCommand = function(self) 
+						self:xy(65, 8):zoom(0.45):halign(0):maxwidth(((frameW - pad * 3) * 0.5 - 65) / 0.45) 
+					end,
+					OnCommand = function(self)
+						if profile then
+							self:settext(profile:GetDisplayName())
+						end
+					end
+				},
+
+				-- Level Badge
+				Def.ActorFrame {
+					Name = "PlayerLevelBadge",
+					InitCommand = function(self) self:xy(65, 23) end,
+					
+					-- Badge Quad
+					Def.Quad {
+						Name = "BadgeQuad",
+						InitCommand = function(self)
+							self:halign(0):zoomto(38, 14):diffusealpha(0.8)
+						end,
+						OnCommand = function(self)
+							if profile and HV.GetLevelColor then
+								-- XP CALCULATION (Custom System)
+								local steps = GAMESTATE:GetCurrentSteps()
+								local msd = (steps and steps:GetMSD(getCurRateValue(), 1)) or 0
+								local gain = HV.CalculateXPGain(pss, msd)
+								local xpOld = HV.GetXP(profile)
+								local xpNew = xpOld
+								
+								if HV.XPEarningAllowed and gain > 0 then
+									xpNew = xpOld + gain
+									HV.SetXP(profile, xpNew)
+									
+									local levelOld = HV.GetLevelFromXP(HV.LastTotalXP)
+									local levelNew = HV.GetLevelFromXP(xpNew)
+									
+									self:diffuse(HV.GetLevelColor(levelNew))
+									
+									-- Level Up Animation
+									if levelNew > levelOld and HV.LastTotalXP > 0 then
+										self:zoom(1.5):smooth(0.5):zoom(1)
+										self:glow(1,1,1,1):linear(0.5):glow(1,1,1,0)
+										MESSAGEMAN:Broadcast("HVLevelUp", {newLevel = levelNew})
+									end
+									
+									-- Update global state
+									HV.LastTotalXP = xpNew
+									HV.XPEarningAllowed = false -- Only once per play
+									
+									-- Broadcast gain for other actors (e.g. Floating XP)
+									MESSAGEMAN:Broadcast("HVXPCalculated", {gain = gain})
+								else
+									-- Non-earning state: just show current level color
+									local level = HV.GetLevel(profile)
+									self:diffuse(HV.GetLevelColor(level))
+								end
+							else
+								self:diffuse(color("#666666"))
+							end
+						end
+					},
+					
+					-- Level Text
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:halign(0):x(4):zoom(0.32):diffuse(color("#FFFFFF"))
+						end,
+						OnCommand = function(self)
+							if profile then
+								self:settextf("Lv. %d", HV.GetLevel(profile))
+							end
+						end
+					},
+
+					-- Level Up Text
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:halign(0):y(-12):zoom(0.4):diffusealpha(0):settext("LEVEL UP!")
+						end,
+						HVLevelUpMessageCommand = function(self)
+							self:stoptweening():diffusealpha(0):y(-12)
+								:sleep(0.2):linear(0.3):diffusealpha(1):y(-18):sleep(1):linear(0.5):diffusealpha(0)
+						end
+					}
+				},
+
+				-- Progress Bar
+				Def.ActorFrame {
+					Name = "LevelProgress",
+					InitCommand = function(self) self:xy(65, 34) end,
+					
+					-- Bar BG
+					Def.Quad {
+						InitCommand = function(self)
+							self:halign(0):zoomto(frameW * 0.18, 4):diffuse(0,0,0,0.5)
+						end
+					},
+					-- Bar Fill
+					Def.Quad {
+						InitCommand = function(self)
+							self:halign(0):zoomto(0, 4):diffuse(color("#FF4081"))
+						end,
+						OnCommand = function(self)
+							if profile and HV.GetLevelProgress then
+								local progress = HV.GetLevelProgress(profile)
+								self:smooth(0.8):zoomx(frameW * 0.18 * progress)
+							end
+						end
+					},
+					-- Progress Numbers
+					LoadFont("Common Normal") .. {
+						Name = "ProgressText",
+						InitCommand = function(self)
+							self:halign(0):xy(0, 8):zoom(0.22):diffuse(subText)
+						end,
+						OnCommand = function(self)
+							if profile and HV.GetLevelProgress then
+								local _, cur, total = HV.GetLevelProgress(profile)
+								self:settextf("%d / %d XP", cur, total)
+							else
+								self:settext("")
+							end
+						end
+					},
+					-- Floating +XP Gain Animation
+					LoadFont("Common Normal") .. {
+						InitCommand = function(self)
+							self:halign(0):xy(50, 8):zoom(0.22):diffuse(color("#00FF00")):diffusealpha(0)
+						end,
+						HVXPCalculatedMessageCommand = function(self, params)
+							if params.gain and params.gain > 0 then
+								local progressText = self:GetParent():GetChild("ProgressText")
+								local startX = (progressText and progressText:GetZoomedWidth() or 80) + 10
+								self:stoptweening():x(startX):settextf("+ %d XP", params.gain)
+								self:diffusealpha(0):sleep(0.5):linear(0.5):x(startX + 15):diffusealpha(1):linear(0.8):x(startX + 30):diffusealpha(0)
+							end
+						end
+					}
+				},
+
+				-- Rating (Player SSR)
+				LoadFont("Common Large") .. {
+					Name = "PlayerRating",
+					InitCommand = function(self) 
+						self:xy(65, 53):zoom(0.45):halign(0) 
+					end,
+					OnCommand = function(self)
+						if profile then
+							local val = profile:GetPlayerRating()
+							self:settextf("%.2f", val)
+							self:diffuse(HVColor.GetMSDRatingColor(val))
+						end
+					end
+				}
+			}
 		},
 
 		-- Song Title

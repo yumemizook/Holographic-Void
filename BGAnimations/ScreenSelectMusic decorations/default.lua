@@ -1202,6 +1202,10 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "SmallProfileFrame",
 	InitCommand = function(self)
 		self:xy(compactProfileX, compactProfileY)
+		local profile = PROFILEMAN:GetProfile(PLAYER_1)
+		if profile then
+			HV.LastTotalXP = HV.GetXP(profile)
+		end
 	end,
 
 	-- Card background for profile
@@ -1249,7 +1253,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "ProfileName",
 		InitCommand = function(self)
-			self:halign(0):valign(0):x(56):y(0):zoom(0.40):diffuse(mainText)
+			self:halign(0):valign(0):x(56):y(-4):zoom(0.40):diffuse(mainText)
 		end,
 		SetCommand = function(self)
 			local profile = PROFILEMAN:GetProfile(PLAYER_1)
@@ -1269,6 +1273,100 @@ t[#t + 1] = Def.ActorFrame {
 		LogOutMessageCommand = function(self) self:playcommand("Set") end,
 		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
+	},
+
+	-- Level Badge
+	Def.ActorFrame {
+		Name = "PlayerLevelBadge",
+		InitCommand = function(self) self:xy(56, 12) end,
+		SetCommand = function(self)
+			local showProfileStats = HV.ShowProfileStats()
+			self:visible(showProfileStats == "true" or showProfileStats == true)
+		end,
+		
+		-- Badge Quad
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):zoomto(32, 10):diffusealpha(0.8)
+			end,
+			SetCommand = function(self)
+				local profile = PROFILEMAN:GetProfile(PLAYER_1)
+				if profile and HV.GetLevelColor then
+					local level = HV.GetLevel(profile)
+					self:diffuse(HV.GetLevelColor(level))
+				else
+					self:diffuse(color("#666666"))
+				end
+			end
+		},
+		
+		-- Level Text
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):x(2):zoom(0.28):diffuse(color("#000000"))
+			end,
+			SetCommand = function(self)
+				local profile = PROFILEMAN:GetProfile(PLAYER_1)
+				if profile then
+					self:settextf("Lv. %d", HV.GetLevel(profile))
+				end
+			end
+		},
+		LoginMessageCommand = function(self) self:playcommand("Set") end,
+		LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		OnCommand = function(self) self:playcommand("Set") end
+	},
+
+	-- Progress Bar
+	Def.ActorFrame {
+		Name = "LevelProgress",
+		InitCommand = function(self) self:xy(56, 24) end,
+		SetCommand = function(self)
+			local showProfileStats = HV.ShowProfileStats()
+			self:visible(showProfileStats == "true" or showProfileStats == true)
+		end,
+		
+		-- Bar BG
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):zoomto(60, 3):diffuse(0,0,0,0.5)
+			end
+		},
+		-- Bar Fill
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):zoomto(0, 3):diffuse(color("#FF4081"))
+			end,
+			SetCommand = function(self)
+				local profile = PROFILEMAN:GetProfile(PLAYER_1)
+				if profile and HV.GetLevelProgress then
+					local progress = HV.GetLevelProgress(profile)
+					self:smooth(0.5):zoomx(60 * progress)
+				elseif profile then
+					self:zoomx(0)
+				end
+			end
+		},
+		-- Progress Numbers
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:halign(0):xy(0, 8):zoom(0.22):diffuse(subText)
+			end,
+			SetCommand = function(self)
+				local profile = PROFILEMAN:GetProfile(PLAYER_1)
+				if profile and HV.GetLevelProgress then
+					local _, cur, total = HV.GetLevelProgress(profile)
+					self:settextf("%d / %d XP", cur, total)
+				else
+					self:settext("")
+				end
+			end
+		},
+		LoginMessageCommand = function(self) self:playcommand("Set") end,
+		LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		OnCommand = function(self) self:playcommand("Set") end
 	},
 
