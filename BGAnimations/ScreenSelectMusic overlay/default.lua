@@ -69,7 +69,7 @@ local main_af = Def.ActorFrame {
 		HV = HV or {}
 		HV.SSM = SCREENMAN:GetTopScreen()
 		HV.ActiveTab = ""
-		HV.XPEarningAllowed = false
+		HV.GameplaySessionValid = false
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)

@@ -957,18 +957,35 @@ end
 function HV.CalculateXPGain(pss, msd)
 	if not pss or pss:GetFailed() then return 0 end
 	
-	-- Base: Taps + Holds
-	local base = pss:GetTotalTaps()
-	-- Holds are usually separate in pss, let's just use taps as the primary driver 
-	-- as hold counts are already reflected in some engine total taps if combined.
-	-- But to be safe, let's assume pss:GetTotalTaps() is our currency.
+	local base = 0
+	if type(pss.GetTotalTaps) == "function" then
+		base = pss:GetTotalTaps() or 0
+	end
+	if base <= 0 then
+		local possible = pss:GetRadarPossible()
+		if possible then base = possible:GetValue("RadarCategory_TapsAndHolds") or 0 end
+	end
+	if base <= 0 then
+		local steps = GAMESTATE:GetCurrentSteps()
+		if steps then base = steps:GetRadarValues(GAMESTATE:GetEnabledPlayers()[1]):GetValue("RadarCategory_TapsAndHolds") or 0 end
+	end
+	if base <= 0 then base = 500 end -- completely fallback
 	
-	-- MSD Factor: 1.0 at 15 MSD, scales up/down
-	msd = msd or 0
-	local msdFactor = math.max(1, msd / 15)
+	local msdFactor = math.max(1, (msd or 0) / 15)
 	
-	-- Accuracy Factor: Rewards high percentage, penalizes low
-	local score = pss:GetWifeScore() or 0
+	local score = 0
+	if type(pss.GetWifeScore) == "function" then
+		score = pss:GetWifeScore() or 0
+	end
+	
+	-- Normalization: If score > 1.5, it's returning raw points rather than percentage.
+	if score > 1.5 then
+		score = score / (base * 2)
+	end
+	
+	-- Safeguard against negative percentage
+	score = math.max(0, score)
+	
 	local accFactor = math.pow(score / 0.93, 2)
 	
 	local gain = math.floor(base * msdFactor * accFactor)
@@ -1030,6 +1047,6 @@ function HV.GetLevelColor(level)
 end
 
 HV.LastTotalXP = 0
-HV.XPEarningAllowed = false
+HV.GameplaySessionValid = false
 
 Trace("Holographic Void: 08 EtternaUtils.lua loaded (expanded).")

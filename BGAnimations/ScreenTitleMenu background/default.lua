@@ -596,7 +596,7 @@ t[#t + 1] = Def.ActorFrame {
 				name:settext(DLMAN:GetUsername())
 				local r = DLMAN:GetSkillsetRating("Overall")
 				local showStats = HV.ShowProfileStats()
-				rating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+				rating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
 				rank:visible(showStats):settextf("#%d", DLMAN:GetSkillsetRank("Overall")):diffuse(subText)
 				if bg then bg:diffuse(color("0.1,0.28,0.15,0.85")) end
 
@@ -617,7 +617,7 @@ t[#t + 1] = Def.ActorFrame {
 						name:settext(profile:GetDisplayName())
 						local r = profile:GetPlayerRating()
 						local showStats = HV.ShowProfileStats()
-						rating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+						rating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
 						rank:visible(false)
 
 						local path = getAssetPathFromProfileID("avatar", profileID)
@@ -664,7 +664,7 @@ t[#t + 1] = Def.ActorFrame {
 							if cRating and p then
 								local r = p:GetPlayerRating()
 								local showStats = HV.ShowProfileStats()
-								cRating:visible(showStats):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+								cRating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
 							end
 							if cAvatar and pid then
 								local apath = getAssetPathFromProfileID("avatar", pid)

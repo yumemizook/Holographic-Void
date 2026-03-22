@@ -18,12 +18,8 @@ local t = Def.ActorFrame {
 			po:FromString(beatBarMod)
 		end
 		
-		-- XP Earning: Only for real plays (not practice, not replays)
-		if not GAMESTATE:IsPracticeMode() and not GAMESTATE:IsReplay() then
-			HV.XPEarningAllowed = true
-		else
-			HV.XPEarningAllowed = false
-		end
+		HV.LastGameplayTime = os.time()
+		HV.GameplaySessionValid = true
 	end,
 	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end,
 	PracticeModeReloadMessageCommand = function(self) self:playcommand("Init") end

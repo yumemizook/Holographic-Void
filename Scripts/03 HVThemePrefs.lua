@@ -465,7 +465,6 @@ end
 
 --- Check if player profile stats should be shown.
 function HV.ShowProfileStats()
-	if not HV.ShowMSD() then return false end
 	return isTrue(ThemePrefs.Get("HV_ShowProfileStats"))
 end
 

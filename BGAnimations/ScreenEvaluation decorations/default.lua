@@ -12,7 +12,23 @@ local profile = PROFILEMAN:GetProfile(pn)
 
 -- State variables (declared early for function visibility)
 local curScore = pss:GetHighScore()
-local judge = (PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty())
+local judge = 4
+local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
+	local scale = curScore:GetJudgeScale()
+	if scale then
+		scale = math.floor(scale * 100 + 0.5) / 100
+		for k, v in pairs(ms.JudgeScalers) do
+			if math.floor(v * 100 + 0.5) / 100 == scale then
+				judge = k
+				if judge >= 4 then break end
+			end
+		end
+		judge = math.max(4, math.min(9, judge))
+	end
+else
+	judge = GetTimingDifficulty()
+end
 local judges = {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"}
 
 -- Rescoring/offset plot state
@@ -397,7 +413,23 @@ local function scoreBoard(pn)
 				rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 			end
 			if params.Name == "ResetJudge" then
-				judge = PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty()
+				judge = 4
+				local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+				if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
+					local scale = curScore:GetJudgeScale()
+					if scale then
+						scale = math.floor(scale * 100 + 0.5) / 100
+						for k, v in pairs(ms.JudgeScalers) do
+							if math.floor(v * 100 + 0.5) / 100 == scale then
+								judge = k
+								if judge >= 4 then break end
+							end
+						end
+						judge = math.max(4, math.min(9, judge))
+					end
+				else
+					judge = GetTimingDifficulty()
+				end
 				clampJudge()
 				self:RunCommandsOnChildren(function(self) self:playcommand("ResetJudge") end)
 			elseif params.Name ~= "ToggleHands" then
@@ -537,14 +569,18 @@ local function scoreBoard(pn)
 						end,
 						OnCommand = function(self)
 							if profile and HV.GetLevelColor then
-								-- XP CALCULATION (Custom System)
 								local steps = GAMESTATE:GetCurrentSteps()
 								local msd = (steps and steps:GetMSD(getCurRateValue(), 1)) or 0
 								local gain = HV.CalculateXPGain(pss, msd)
 								local xpOld = HV.GetXP(profile)
 								local xpNew = xpOld
 								
-								if HV.XPEarningAllowed and gain > 0 then
+								local timeDiff = os.time() - (HV.LastGameplayTime or 0)
+								local pc = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerController()
+								local isHuman = (pc == "PlayerController_Human")
+								local isRealPlay = HV.GameplaySessionValid and timeDiff >= 0 and timeDiff < 86400 and isHuman and not GAMESTATE:IsPracticeMode()
+								
+								if isRealPlay and gain > 0 then
 									xpNew = xpOld + gain
 									HV.SetXP(profile, xpNew)
 									
@@ -555,14 +591,14 @@ local function scoreBoard(pn)
 									
 									-- Level Up Animation
 									if levelNew > levelOld and HV.LastTotalXP > 0 then
-										self:zoom(1.5):smooth(0.5):zoom(1)
-										self:glow(1,1,1,1):linear(0.5):glow(1,1,1,0)
+										self:GetParent():stoptweening():zoom(1.5):smooth(0.5):zoom(1)
+										self:GetParent():glow(1,1,1,1):linear(0.5):glow(1,1,1,0)
 										MESSAGEMAN:Broadcast("HVLevelUp", {newLevel = levelNew})
 									end
 									
 									-- Update global state
 									HV.LastTotalXP = xpNew
-									HV.XPEarningAllowed = false -- Only once per play
+									HV.GameplaySessionValid = false -- Only once per play
 									
 									-- Broadcast gain for other actors (e.g. Floating XP)
 									MESSAGEMAN:Broadcast("HVXPCalculated", {gain = gain})
@@ -662,6 +698,7 @@ local function scoreBoard(pn)
 						self:xy(65, 53):zoom(0.45):halign(0) 
 					end,
 					OnCommand = function(self)
+						if not HV.ShowMSD() then self:visible(false); return end
 						if profile then
 							local val = profile:GetPlayerRating()
 							self:settextf("%.2f", val)
@@ -766,6 +803,8 @@ local function scoreBoard(pn)
 			SetJudgeCommand = function(self) self:settextf("Judge: %d", judge) end,
 			ResetJudgeCommand = function(self) self:settextf("Judge: %d", judge) end
 		},
+
+
 
 		-- Separator
 		Def.Quad {
@@ -880,7 +919,24 @@ local function scoreBoard(pn)
 				end,
 				SetJudgeCommand = function(self)
 					if usingCustomWindows then return end
-					local playedJudge = PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty()
+					local playedJudge = 4
+					local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+					if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
+						local scale = curScore:GetJudgeScale()
+						if scale then
+							scale = math.floor(scale * 100 + 0.5) / 100
+							for k, v in pairs(ms.JudgeScalers) do
+								if math.floor(v * 100 + 0.5) / 100 == scale then
+									playedJudge = k
+									if playedJudge >= 4 then break end
+								end
+							end
+							playedJudge = math.max(4, math.min(9, playedJudge))
+						end
+					else
+						playedJudge = GetTimingDifficulty()
+					end
+
 					if playedJudge > 4 then
 						local rst = getRescoreElements(pss, curScore)
 						rst.dvt = dvt

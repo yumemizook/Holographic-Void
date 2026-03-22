@@ -432,12 +432,13 @@ for i = 1, pageSize do
 						if scale then
 							scale = math.floor(scale * 100 + 0.5) / 100
 							local j = 4
-							for k, v in ipairs(ms.JudgeScalers) do
+							for k, v in pairs(ms.JudgeScalers) do
 								if math.floor(v * 100 + 0.5) / 100 == scale then
 									j = k
-									break
+									if j >= 4 then break end
 								end
 							end
+							j = math.max(4, math.min(9, j))
 							judgeIndex = "J" .. j
 						end
 					end

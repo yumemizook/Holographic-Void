@@ -1081,12 +1081,13 @@ t[#t + 1] = Def.ActorFrame {
 						if scale then
 							scale = math.floor(scale * 100 + 0.5) / 100 -- safe round
 							local jIndex = 4
-							for k, v in ipairs(ms.JudgeScalers) do
+							for k, v in pairs(ms.JudgeScalers) do
 								if math.floor(v * 100 + 0.5) / 100 == scale then
 									jIndex = k
-									break
+									if jIndex >= 4 then break end
 								end
 							end
+							jIndex = math.max(4, math.min(9, jIndex))
 							text = text .. " J" .. jIndex
 						end
 					end
@@ -1527,8 +1528,7 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		SetCommand = function(self)
 			local showProfileStats = HV.ShowProfileStats()
-			local showMSD = HV.ShowMSD()
-			if not (showProfileStats == "true" or showProfileStats == true) or not showMSD then
+			if not (showProfileStats == "true" or showProfileStats == true) then
 				self:visible(false)
 				return
 			end

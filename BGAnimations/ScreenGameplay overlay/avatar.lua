@@ -92,6 +92,32 @@ local t = Def.ActorFrame {
 			self:diffuse(color("1,1,1,1"))
 		end
 	},
+	
+	-- Judge Display (Customized)
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:xy(panelW - 6, 22):zoom(fontZoomSmall):halign(1)
+		end,
+
+		BeginCommand = function(self) self:queuecommand("Set") end,
+		SetCommand = function(self)
+			local j = GetTimingDifficulty()
+
+			local names = {
+				[4] = "Normal",
+				[5] = "Pro",
+				[6] = "Master",
+				[7] = "Insane",
+				[8] = "Godly",
+				[9] = "Justice"
+			}
+			local name = names[j] or "Custom"
+			self:settext(string.format("%s (J%d)", name, j))
+			self:diffuse(accentColor)
+		end
+
+	},
+
 
 	-- MSD value
 	LoadFont("Common Normal") .. {
