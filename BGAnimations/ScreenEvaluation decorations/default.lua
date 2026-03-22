@@ -873,7 +873,7 @@ local function scoreBoard(pn)
 
 			LoadFont("Common Normal") .. {
 				Name = "J4WifeScoreLabel",
-				InitCommand = function(self) self:halign(0):valign(0):xy(0,-16):zoom(0.4):diffuse(color("#FF6666")):diffusealpha(0) end,
+				InitCommand = function(self) self:halign(0):valign(0):xy(2,-10):zoom(0.4):diffuse(color("#FF6666")):diffusealpha(0) end,
 				OnCommand = function(self)
 					self:playcommand("SetJudge")
 					self:sleep(0.35):linear(0.15):diffusealpha(1)
