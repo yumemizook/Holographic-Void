@@ -791,6 +791,15 @@ local function scoreBoard(pn)
 				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
 				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
 				self:sleep(0.3):linear(0.2):zoom(0.7):diffusealpha(1)
+			end,
+			SetJudgeCommand = function(self)
+				if usingCustomWindows then return end
+				if rescoredPercentage then
+					local grade = GetGradeFromPercent(rescoredPercentage / 100)
+					if grade and not grade:find("^Grade_") then grade = "Grade_" .. grade end
+					self:settext(HV.GetGradeName(ToEnumShortString(grade)))
+					self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
+				end
 			end
 		},
 		-- SSR
@@ -861,6 +870,36 @@ local function scoreBoard(pn)
 				self:SetUpdateFunction(nil)
 				self:playcommand("On") 
 			end,
+
+			LoadFont("Common Normal") .. {
+				Name = "J4WifeScoreLabel",
+				InitCommand = function(self) self:halign(0):valign(0):xy(0,-16):zoom(0.4):diffuse(color("#FF6666")):diffusealpha(0) end,
+				OnCommand = function(self)
+					self:playcommand("SetJudge")
+					self:sleep(0.35):linear(0.15):diffusealpha(1)
+				end,
+				SetJudgeCommand = function(self)
+					if usingCustomWindows then return end
+					local playedJudge = PREFSMAN:GetPreference("SortBySSRNormPercent") and 4 or GetTimingDifficulty()
+					if playedJudge > 4 then
+						local rst = getRescoreElements(pss, curScore)
+						rst.dvt = dvt
+						local j4Pct = getRescoredWife3Judge(3, 4, rst)
+						if j4Pct then
+							if j4Pct >= 99 then
+								self:settextf("J4: %.4f%%", math.floor(j4Pct * 10000) / 10000)
+							else
+								self:settextf("J4: %.2f%%", math.floor(j4Pct * 100) / 100)
+							end
+							self:visible(judge ~= 4)
+						else
+							self:visible(false)
+						end
+					else
+						self:visible(false)
+					end
+				end,
+			},
 
 			LoadFont("Common Large") .. {
 				Name = "WifeScoreLabel",

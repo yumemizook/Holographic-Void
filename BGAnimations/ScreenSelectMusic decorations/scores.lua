@@ -363,6 +363,7 @@ for i = 1, pageSize do
 		LoadFont("Common Normal") .. { Name = "Rank", InitCommand = function(self) self:halign(0):valign(0.5):y(rowH/2):zoom(0.35):diffuse(dimText) end },
 		LoadFont("Common Normal") .. { Name = "Player", InitCommand = function(self) self:halign(0):valign(0.5):x(30):y(rowH/2):zoom(0.42):diffuse(mainText):maxwidth(150 / 0.42) end },
 		LoadFont("Common Normal") .. { Name = "Wife", InitCommand = function(self) self:halign(0):valign(0.5):x(190):y(rowH/2 - 5):zoom(0.40):diffuse(brightText) end },
+		LoadFont("Common Normal") .. { Name = "Judge", InitCommand = function(self) self:halign(1):valign(0.5):x(185):y(rowH/2 - 5):zoom(0.30):diffuse(subText) end },
 		LoadFont("Common Normal") .. { Name = "Judgments", InitCommand = function(self) self:halign(0):valign(0.5):x(190):y(rowH/2 + 8):zoom(0.22):diffuse(subText) end },
 		LoadFont("Common Normal") .. { Name = "SSR", InitCommand = function(self) self:halign(0):valign(0.5):x(280):y(rowH/2):zoom(0.40):diffuse(brightText):visible(HV.ShowMSD()) end },
 		LoadFont("Common Normal") .. { Name = "Grade", InitCommand = function(self) self:halign(0):valign(0.5):x(345):y(rowH/2):zoom(0.38) end },
@@ -423,6 +424,24 @@ for i = 1, pageSize do
 					else
 						self:GetChild("Wife"):settextf("%.2f%%", wife)
 					end
+					
+					local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+					local judgeIndex = ""
+					if not norm and type(s.GetJudgeScale) == "function" then
+						local scale = s:GetJudgeScale()
+						if scale then
+							scale = math.floor(scale * 100 + 0.5) / 100
+							local j = 4
+							for k, v in ipairs(ms.JudgeScalers) do
+								if math.floor(v * 100 + 0.5) / 100 == scale then
+									j = k
+									break
+								end
+							end
+							judgeIndex = "J" .. j
+						end
+					end
+					self:GetChild("Judge"):settext(judgeIndex)
 
 					local ssr = 0
 					if s.GetSkillsetSSR then ssr = s:GetSkillsetSSR("Overall")
@@ -460,6 +479,8 @@ for i = 1, pageSize do
 						else
 							self:GetChild("Wife"):settextf("%.2f%%", wife)
 						end
+						
+						self:GetChild("Judge"):settext("")
 
 						local ssr = 0
 						if s.GetSkillsetSSR then ssr = s:GetSkillsetSSR("Overall")

@@ -957,11 +957,67 @@ t[#t + 1] = Def.ActorFrame {
 -- PERSONAL BEST DISPLAY (Under MSD rating in sidebar)
 -- ============================================================
 local pbY = msdY + 60
+local function getRescoreElementsFromScore(score)
+	local o = {}
+	if not score:HasReplayData() then return nil end
+	local replay = score:GetReplay()
+	local ok = pcall(function() replay:LoadAllData() end)
+	if not ok then return nil end
+	
+	local dvtTmp = replay:GetOffsetVector()
+	local tvt = replay:GetTapNoteTypeVector()
+	local dvt = {}
+	if tvt ~= nil and #tvt > 0 then
+		for i, d in ipairs(dvtTmp) do
+			local ty = tvt[i]
+			if ty == "TapNoteType_Tap" or ty == "TapNoteType_HoldHead" or ty == "TapNoteType_Lift" then
+				dvt[#dvt+1] = d
+			end
+		end
+	else
+		dvt = dvtTmp
+	end
+	o["dvt"] = dvt
+	
+	o["misses"] = score:GetTapNoteScore("TapNoteScore_Miss")
+	o["holdsMissed"] = score:GetHoldNoteScore("HoldNoteScore_LetGo")
+	o["rollsMissed"] = 0
+	o["minesHit"] = score:GetTapNoteScore("TapNoteScore_HitMine")
+	
+	local hits = 0
+	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
+		hits = hits + score:GetTapNoteScore("TapNoteScore_"..name)
+	end
+	o["tapsHit"] = hits
+	o["notesPassed"] = hits + o["misses"]
+	
+	local steps = GAMESTATE:GetCurrentSteps()
+	local radar = steps and steps:GetRadarValues(PLAYER_1)
+	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or score:GetHoldNoteScore("HoldNoteScore_Held") + o["holdsMissed"]
+	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
+	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or score:GetTapNoteScore("TapNoteScore_AvoidMine") + o["minesHit"]
+	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
+	
+	return o
+end
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "PersonalBestFrame",
 	InitCommand = function(self)
 		self:xy(panelX + 16, pbY)
+		self.isHovering = false
+	end,
+	OnCommand = function(self)
+		self:queuecommand("Tick")
+	end,
+	TickCommand = function(self)
+		local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+		local isH = mx >= (panelX + 10) and mx <= (panelX + panelW - 22) and my >= (pbY - 4) and my <= (pbY + 110)
+		if isH ~= self.isHovering then
+			self.isHovering = isH
+			self:playcommand("Set")
+		end
+		self:sleep(0.05):queuecommand("Tick")
 	end,
 
 	Def.Quad {
@@ -976,7 +1032,18 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "PBHeader",
 		InitCommand = function(self)
 			self:halign(0):valign(0):y(2):zoom(0.28):diffuse(accentColor)
-			self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest"))
+		end,
+		OnCommand = function(self)
+			self:playcommand("Set")
+		end,
+		SetCommand = function(self)
+			if self:GetParent().isHovering then
+				self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest") .. " (J4)")
+				self:diffuse(color("#FF6666"))
+			else
+				self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest"))
+				self:diffuse(accentColor)
+			end
 		end
 	},
 	
@@ -1004,7 +1071,27 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
 			if score then
-				self:settext("Wife3")
+				if self:GetParent().isHovering then
+					self:settext("")
+				else
+					local text = "Wife3"
+					local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+					if not norm and type(score.GetJudgeScale) == "function" then
+						local scale = score:GetJudgeScale()
+						if scale then
+							scale = math.floor(scale * 100 + 0.5) / 100 -- safe round
+							local jIndex = 4
+							for k, v in ipairs(ms.JudgeScalers) do
+								if math.floor(v * 100 + 0.5) / 100 == scale then
+									jIndex = k
+									break
+								end
+							end
+							text = text .. " J" .. jIndex
+						end
+					end
+					self:settext(text)
+				end
 			else
 				self:settext("")
 			end
@@ -1037,6 +1124,12 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local wifePct = score:GetWifeScore() * 100
+				if self:GetParent().isHovering and score:HasReplayData() then
+					local rst = getRescoreElementsFromScore(score)
+					wifePct = rst and getRescoredWife3Judge(3, 4, rst) or wifePct
+				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
+					wifePct = score:GetRescoredWifeScore(4) * 100
+				end
 				if wifePct >= 99 then
 					self:settext(string.format("%.4f%%", wifePct))
 				else
@@ -1060,6 +1153,16 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local gradeStr = score:GetWifeGrade()
+				local wifePct = score:GetWifeScore() * 100
+				if self:GetParent().isHovering and score:HasReplayData() then
+					local rst = getRescoreElementsFromScore(score)
+					wifePct = rst and getRescoredWife3Judge(3, 4, rst) or wifePct
+					gradeStr = GetGradeFromPercent(wifePct / 100)
+				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
+					wifePct = score:GetRescoredWifeScore(4) * 100
+					gradeStr = GetGradeFromPercent(wifePct / 100)
+				end
+				
 				-- gradeStr may be "Grade_Tier09" or "Tier09"; normalize
 				if gradeStr and not gradeStr:find("^Grade_") then
 					gradeStr = "Grade_" .. gradeStr
@@ -1082,8 +1185,44 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local ct = getDetailedClearType(score)
-				local ctStr = THEME:GetString("ClearTypes", ct)
 				
+				if self:GetParent().isHovering and score:HasReplayData() then
+					local rst = getRescoreElementsFromScore(score)
+					if rst then
+						local w1 = getRescoredJudge(rst.dvt, 4, 1)
+						local w2 = getRescoredJudge(rst.dvt, 4, 2)
+						local w3 = getRescoredJudge(rst.dvt, 4, 3)
+						local w4 = getRescoredJudge(rst.dvt, 4, 4)
+						local w5 = getRescoredJudge(rst.dvt, 4, 5)
+						local miss = getRescoredJudge(rst.dvt, 4, 6)
+						
+						local pct = getRescoredWife3Judge(3, 4, rst) or 0
+						if pct <= 0 then
+							ct = "Failed"
+						else
+							local cb = miss + w5 + w4
+							if cb > 0 then
+								if cb == 1 then ct = "MF"
+								elseif cb < 10 then ct = "SDCB"
+								else ct = "Clear" end
+							elseif w3 > 0 then
+								if w3 == 1 then ct = "BF"
+								elseif w3 < 10 then ct = "SDG"
+								else ct = "FC" end
+							elseif w2 > 0 then
+								if w2 == 1 then ct = "WF"
+								elseif w2 < 10 then ct = "SDP"
+								else ct = "PFC" end
+							else
+								ct = "MFC"
+							end
+						end
+					end
+				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
+					-- Cannot easily construct ClearType without vectors safely, fallback
+				end
+				
+				local ctStr = THEME:GetString("ClearTypes", ct)
 				self:settext(ctStr)
 				self:diffuse(HVColor.GetClearTypeColor(ct))
 			else
@@ -1135,6 +1274,16 @@ t[#t + 1] = Def.ActorFrame {
 				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
 				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
 			}
+			
+			if self:GetParent().isHovering and score:HasReplayData() then
+				local rst = getRescoreElementsFromScore(score)
+				if rst then
+					for i=1, 6 do
+						judges[i].val = getRescoredJudge(rst.dvt, 4, i)
+					end
+				end
+			end
+			
 			for i, j in ipairs(judges) do
 				local block = self:GetChild("Blocks"):GetChild("Block_" .. i)
 				local bg = block:GetChild("Bg")
