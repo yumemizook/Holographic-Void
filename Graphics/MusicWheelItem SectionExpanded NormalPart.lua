@@ -14,12 +14,10 @@ t[#t + 1] = Def.Quad {
 		self:zoomto(wheelItemW, 38):diffuse(color("0.10,0.10,0.10,1"))
 	end,
 	GainFocusCommand = function(self)
-		self:stoptweening():linear(0.1)
-			:diffuse(color("0.16,0.16,0.16,1"))
+		-- Removed focus-based highlighting to match fixed scroll
 	end,
 	LoseFocusCommand = function(self)
-		self:stoptweening():linear(0.1)
-			:diffuse(color("0.10,0.10,0.10,1"))
+		-- Removed focus-based highlighting to match fixed scroll
 	end
 }
 

@@ -90,6 +90,8 @@ local pBtnW = 240
 local pBtnH = 70
 local pBtnCX = (SCREEN_RIGHT - 10) - pBtnW/2
 local pBtnCY = 10 + pBtnH/2
+local maxCompactProfiles = 4
+local compactRowH = 28
 
 -- Media Player Constants
 local mpBarH = 40
@@ -107,6 +109,20 @@ local mpNextPath = THEME:GetPathG("", "mp_next")
 local t = Def.ActorFrame {
 	InitCommand = function(self)
 		self:SetUpdateFunction(function(af)
+			local screen = SCREENMAN:GetTopScreen()
+			if screen then
+				local sName = screen:GetName()
+				local isSelect = sName == "ScreenSelectProfile"
+				local prof = af:GetChild("ProfileChip")
+				local online = af:GetChild("OnlineProfileChip")
+				local mp = af:GetChild("MediaPlayer")
+				local quotes = af:GetChild("QuotesOverlay")
+				if prof then prof:visible(not isSelect) end
+				if online then online:visible(not isSelect) end
+				if mp then mp:visible(not isSelect) end
+				if quotes then quotes:visible(not isSelect) end
+			end
+			
 			local virtualX = INPUTFILTER:GetMouseX()
 			local virtualY = INPUTFILTER:GetMouseY()
 
@@ -561,12 +577,57 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. { Name="D", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+14):halign(0):zoom(0.5):diffuse(subText) end },
 	LoadFont("Common Normal") .. { Name="T", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+30):halign(0):zoom(0.35):diffuse(subText) end },
 	LoadFont("Common Normal") .. { Name="S", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+44):halign(0):zoom(0.3):diffuse(dimText) end },
-	LoadFont("Common Normal") .. { Name="A", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+58):halign(0):zoom(0.3):diffuse(dimText) end }
+	LoadFont("Common Normal") .. { Name="A", InitCommand=function(self) self:xy(SCREEN_LEFT+16, SCREEN_TOP+58):halign(0):zoom(0.3):diffuse(dimText) end },
+	
+	-- Online Profile Display (Under Alarm)
+	Def.ActorFrame {
+		Name = "OnlineProfileChip",
+		InitCommand = function(self)
+			self:xy(SCREEN_LEFT + 16, SCREEN_TOP + 80):visible(false)
+			self:SetUpdateFunction(function(af)
+				local loggedIn = DLMAN:IsLoggedIn()
+				af:visible(loggedIn)
+				if not loggedIn then return end
+				
+				local nameTxt = af:GetChild("Name")
+				local ratingTxt = af:GetChild("Rating")
+				local avatar = af:GetChild("Avatar")
+				
+				nameTxt:settext(DLMAN:GetUsername())
+				local r = DLMAN:GetSkillsetRating("Overall")
+				local showStats = HV.ShowProfileStats()
+				ratingTxt:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+				
+				local path = getAvatarPath()
+				if path and path ~= avatar.lastPath then
+					avatar:Load(path)
+					avatar:scaletoclipped(22, 22)
+					avatar.lastPath = path
+				end
+			end)
+		end,
+		
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):zoomto(pBtnW, compactRowH):diffuse(color("0.08,0.22,0.1,0.85")):diffuseleftedge(accentColor)
+			end
+		},
+		Def.Sprite {
+			Name = "Avatar",
+			InitCommand = function(self) self:xy(12, 0):zoomto(22, 22) end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Name",
+			InitCommand = function(self) self:xy(28, -4):halign(0):zoom(0.32):diffuse(brightText) end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rating",
+			InitCommand = function(self) self:xy(28, 8):halign(0):zoom(0.26):diffuse(dimText) end
+		}
+	}
 }
 
 -- Profile chip (Top right) + Inline Profile List
-local maxCompactProfiles = 4  -- max compact rows to show
-local compactRowH = 28
 local compactRowW = pBtnW
 
 t[#t + 1] = Def.ActorFrame {
@@ -575,7 +636,6 @@ t[#t + 1] = Def.ActorFrame {
 		self:xy(SCREEN_RIGHT - 10, 10 + pBtnH/2)
 		self:SetUpdateFunction(function(af)
 			if not af then return end
-			local loggedIn = DLMAN:IsLoggedIn()
 			local status = af:GetChild("Status")
 			local name = af:GetChild("Name")
 			local rating = af:GetChild("Rating")
@@ -591,62 +651,44 @@ t[#t + 1] = Def.ActorFrame {
 			-- Clamp selection
 			if selIdx >= numLocal then selIdx = 0; HV.TitleState.selectedProfile = 0 end
 
-			if loggedIn then
-				status:settext(THEME:GetString("ScreenTitleMenu", "Online")):diffuse(color("0.65,1,0.72,1"))
-				name:settext(DLMAN:GetUsername())
-				local r = DLMAN:GetSkillsetRating("Overall")
-				local showStats = HV.ShowProfileStats()
-				rating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
-				rank:visible(showStats):settextf("#%d", DLMAN:GetSkillsetRank("Overall")):diffuse(subText)
-				if bg then bg:diffuse(color("0.1,0.28,0.15,0.85")) end
+			-- Main Chip: Always show local profile selected via TitleState
+			status:settext(THEME:GetString("ScreenTitleMenu", "Local")):diffuse(dimText)
+			if numLocal > 0 then
+				local profile = PROFILEMAN:GetLocalProfileFromIndex(selIdx)
+				local profileID = PROFILEMAN:GetLocalProfileIDFromIndex(selIdx)
+				if profile then
+					name:settext(profile:GetDisplayName())
+					local r = profile:GetPlayerRating()
+					local showStats = HV.ShowProfileStats()
+					rating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
+					rank:visible(false)
 
-				local path = getAvatarPath()
-				if path and path ~= avatar.lastPath then
-					avatar:Load(path)
-					avatar:scaletoclipped(50, 50)
-					avatar.lastPath = path
-				end
-				avatar:visible(true)
-			else
-				status:settext(THEME:GetString("ScreenTitleMenu", "Offline")):diffuse(dimText)
-
-				if numLocal > 0 then
-					local profile = PROFILEMAN:GetLocalProfileFromIndex(selIdx)
-					local profileID = PROFILEMAN:GetLocalProfileIDFromIndex(selIdx)
-					if profile then
-						name:settext(profile:GetDisplayName())
-						local r = profile:GetPlayerRating()
-						local showStats = HV.ShowProfileStats()
-						rating:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
-						rank:visible(false)
-
-						local path = getAssetPathFromProfileID("avatar", profileID)
-						if path and path ~= avatar.lastPath then
-							avatar:Load(path)
-							avatar:scaletoclipped(50, 50)
-							avatar.lastPath = path
-						end
-						avatar:visible(true)
-					else
-						name:settext(THEME:GetString("ScreenTitleMenu", "NoProfile"))
-						rating:visible(false)
-						rank:visible(false)
-						avatar:visible(false)
+					local path = getAssetPathFromProfileID("avatar", profileID)
+					if path and path ~= avatar.lastPath then
+						avatar:Load(path)
+						avatar:scaletoclipped(50, 50)
+						avatar.lastPath = path
 					end
+					avatar:visible(true)
 				else
-					name:settext(THEME:GetString("ScreenTitleMenu", "GuestPlayer"))
+					name:settext(THEME:GetString("ScreenTitleMenu", "NoProfile"))
 					rating:visible(false)
 					rank:visible(false)
 					avatar:visible(false)
 				end
-				if bg then bg:diffuse(color("0.12,0.12,0.12,0.85")) end
+			else
+				name:settext(THEME:GetString("ScreenTitleMenu", "GuestPlayer"))
+				rating:visible(false)
+				rank:visible(false)
+				avatar:visible(false)
 			end
+			if bg then bg:diffuse(color("0.12,0.12,0.12,0.85")) end
 
-			-- Update compact profile rows
+			-- Update compact profile rows (other local profiles)
 			for ci = 0, maxCompactProfiles - 1 do
 				local row = af:GetChild("CompactRow_" .. ci)
 				if row then
-					if loggedIn or numLocal <= 1 then
+					if numLocal <= 1 then
 						row:visible(false)
 					else
 						-- Map compact row index to profile index (skip selected)
@@ -689,7 +731,20 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. { Name="Name", InitCommand=function(self) self:xy(-pBtnW + 10, -5):halign(0):zoom(0.45):diffuse(brightText) end },
 	LoadFont("Common Large") .. { Name="Rating", InitCommand=function(self) self:xy(-pBtnW + 10, 18):halign(0):zoom(0.4) end },
 	LoadFont("Common Normal") .. { Name="Rank", InitCommand=function(self) self:xy(-110, 18):halign(0):zoom(0.4) end },
-	Def.Sprite { Name="Avatar", InitCommand=function(self) self:xy(-35, 0):zoomto(50, 50) end }
+	Def.Sprite { Name="Avatar", InitCommand=function(self) self:xy(-35, 0):zoomto(50, 50) end },
+	-- Click detector for main chip
+	UIElements.QuadButton(1) .. {
+		InitCommand = function(self) self:x(-pBtnW/2):zoomto(pBtnW, pBtnH):diffusealpha(0) end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				local idx = HV.TitleState.selectedProfile or 0
+				HV.DirectLaunchProfileIdx = idx
+				SCREENMAN:GetTopScreen():SetNextScreenName("ScreenSelectProfile")
+				SCREENMAN:GetTopScreen():StartTransitioningScreen("SM_GoToNextScreen")
+				SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
+			end
+		end
+	}
 }
 
 -- Add compact profile rows below the main chip
@@ -725,6 +780,21 @@ for ci = 0, maxCompactProfiles - 1 do
 			Name = "CRating",
 			InitCommand = function(self)
 				self:xy(-pBtnW + 36, 8):halign(0):zoom(0.26):diffuse(dimText)
+			end
+		},
+		-- Click detector
+		UIElements.QuadButton(1) .. {
+			InitCommand = function(self) self:x(-pBtnW/2):zoomto(pBtnW, compactRowH):diffusealpha(0) end,
+			MouseDownCommand = function(self, params)
+				if params.event == "DeviceButton_left mouse button" then
+					local idx = self:GetParent().profileIdx
+					if idx then
+						HV.DirectLaunchProfileIdx = idx
+						SCREENMAN:GetTopScreen():SetNextScreenName("ScreenSelectProfile")
+						SCREENMAN:GetTopScreen():StartTransitioningScreen("SM_GoToNextScreen")
+						SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
+					end
+				end
 			end
 		}
 	}

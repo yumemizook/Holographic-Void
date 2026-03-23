@@ -12,6 +12,9 @@ local function Update(self)
 		self:SetUpdateFunction(Update)
 	end
 	local curSecond = GAMESTATE:GetSongPosition():GetMusicSeconds()
+	if HV then
+		HV.LastPlayedSecond = curSecond
+	end
 
 	if not startFlag and (firstSecond - curSecond < 2 or curSecond > 1) then
 		MESSAGEMAN:Broadcast("SongStarting")

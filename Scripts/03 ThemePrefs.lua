@@ -167,6 +167,13 @@ local HVPrefs = {
 		Values = {0, 1, 2}
 	},
 
+	-- Music Select: Song Preview Mode (1=SM, 2=osu! New, 3=osu! Old)
+	HV_SongPreview = {
+		Default = 1,
+		Choices = {"SM Style", "osu! Style (New)", "osu! Style (Old)"},
+		Values = {1, 2, 3}
+	},
+
 	-- Gameplay: Show MSD ratings on music wheel
 	HV_ShowMSD = {
 		Default = true,

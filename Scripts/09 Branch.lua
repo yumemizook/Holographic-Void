@@ -11,4 +11,16 @@ Branch.AfterInit = function()
 	return "ScreenTitleMenu"
 end
 
+Branch.TitleMenu = function()
+	return "ScreenTitleMenu"
+end
+
+Branch.AfterTitleMenu = function()
+	return "ScreenSelectProfile"
+end
+
+Branch.AfterSelectProfile = function()
+	return "ScreenSelectMusic"
+end
+
 Trace("Holographic Void: 09 Branch.lua loaded.")

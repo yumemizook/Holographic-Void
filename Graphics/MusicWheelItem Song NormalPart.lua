@@ -14,11 +14,7 @@ t[#t + 1] = Def.Quad {
 		self:zoomto(wheelItemW, 38):diffuse(color("0.03,0.03,0.03,1"))
 	end,
 	SetMessageCommand = function(self, params)
-		if params and params.HasFocus then
-			self:stoptweening():linear(0.12):diffuse(color("0.10,0.10,0.12,1"))
-		else
-			self:stoptweening():linear(0.12):diffuse(color("0.03,0.03,0.03,1"))
-		end
+		-- Removed focus-based background lift to match fixed highlight
 	end
 }
 
@@ -34,8 +30,7 @@ t[#t + 1] = Def.Quad {
 			local diff = ToEnumShortString(curSteps:GetDifficulty())
 			local dc = (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
 			if dc then
-				local alpha = (params and params.HasFocus) and 1.0 or 0.5
-				self:diffuse(dc):diffusealpha(alpha)
+				self:diffuse(dc):diffusealpha(0.6) -- Constant alpha for uniform look
 				return
 			end
 		end

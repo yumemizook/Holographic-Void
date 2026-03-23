@@ -70,6 +70,7 @@ local main_af = Def.ActorFrame {
 		HV.SSM = SCREENMAN:GetTopScreen()
 		HV.ActiveTab = ""
 		HV.GameplaySessionValid = false
+		HV.LastPlayedSecond = HV.LastPlayedSecond or 0
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
@@ -578,6 +579,36 @@ main_af[#main_af + 1] = Def.ActorFrame {
 		end -- end of HV.OverlayInputCallback
 		screen:AddInputCallback(HV.OverlayInputCallback)
 	end
+}
+
+
+-- ============================================================
+-- MUSIC WHEEL FIXED HIGHLIGHT
+-- ============================================================
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "MusicWheelHighlight",
+	InitCommand = function(self)
+		self:xy(SCREEN_WIDTH - 180, SCREEN_CENTER_Y)
+	end,
+	
+	-- The main highlight box - fixed in center
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(280, 40)
+				:diffuse(accentColor):diffusealpha(0.12)
+		end,
+		OnCommand = function(self)
+			self:playcommand("Pulse")
+		end,
+		PulseCommand = function(self)
+			self:stoptweening()
+				:linear(0.8):diffusealpha(0.2)
+				:linear(0.8):diffusealpha(0.12)
+				:queuecommand("Pulse")
+		end
+	},
+	
+
 }
 
 
@@ -1663,6 +1694,9 @@ main_af[#main_af + 1] = Def.ActorFrame {
 		end)
 	end
 }
+
+-- 4. Song Preview Logic (Ported from spawncamping-wallhack)
+main_af[#main_af + 1] = LoadActor("bgm.lua")
 
 return main_af
 

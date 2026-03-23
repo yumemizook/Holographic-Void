@@ -102,7 +102,10 @@ function GRADECOUNTERSTORAGE:init()
 
     if not self.initialized or self.lastProfileName ~= currentProfileName then
         local xmlData = File.Read(PROFILEMAN:GetProfileDir(1) .. "Etterna.xml")
-        local grades = ParseXML(xmlData)
+        local grades = {}
+        if xmlData then
+            grades = ParseXML(xmlData)
+        end
 		
         self.AAAAA = CountGrade({"Tier01"}, grades)
         self.AAAA = CountGrade({"Tier02", "Tier03", "Tier04"}, grades)

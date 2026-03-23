@@ -25,6 +25,13 @@ local HVPrefRows = {
 		Values = {0, 1, 2},
 	},
 
+	-- Song Preview Mode
+	HV_SongPreview = {
+		Default = 1,
+		Choices = {"SM Style", "osu! Style (New)", "osu! Style (Old)"},
+		Values = {1, 2, 3},
+	},
+
 
 	-- Show MSD Ratings
 	HV_ShowMSD = {
@@ -232,7 +239,7 @@ local HVPrefRows = {
 		Values = {false, true},
 	},
 	HV_ProgressBarPosition = {
-		Default = "Bottom",
+		Default = "Top",
 		Choices = {"Top", "Bottom", "Off"},
 		Values = {"Top", "Bottom", "Off"},
 	},
@@ -303,7 +310,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_SongPreview,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
 	return l
 end
 
@@ -357,6 +364,11 @@ local function HVThemePrefRow(name, title)
 	
 	return row
 end
+function OptionRowSongPreview()
+	return HVThemePrefRow("HV_SongPreview", "Song Preview Mode")
+end
+_G["OptionRowSongPreview"] = OptionRowSongPreview
+
 
 function OptionRowShowMSD()
 	return HVThemePrefRow("HV_ShowMSD", "Show MSD Ratings")
@@ -385,6 +397,7 @@ end
 function OptionRowShowGoalTracker()
 	return HVThemePrefRow("HV_ShowGoalTracker", "Goal Tracker")
 end
+
 
 -- ScreenPlayerOptions Helpers
 function OptionRowScreenFilter()
