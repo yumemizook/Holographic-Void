@@ -2,9 +2,9 @@
 -- Features a seamless zoom transition from the Title Screen chip.
 -- Uses native ScreenSelectProfile methods for stability.
 
-local pBtnW = 240
+local pBtnW = 260
 local pBtnH = 70
-local compactRowH = 28
+local compactRowH = 40
 local accentColor = HVColor.Accent
 local brightText = color("1,1,1,1")
 local dimText = color("0.45,0.45,0.45,1")
@@ -68,13 +68,21 @@ local t = Def.ActorFrame {
 		-- Start the zoom/slide animation
 		updateRows(self:GetChild("ListContainer"))
 
-		-- Check for direct launch
-		if HV.DirectLaunchProfileIdx then
-			self:sleep(0.05):queuecommand("DirectLaunch")
+		-- Check for direct launch from Title Screen OR single profile auto-skip
+		if HV.DirectLaunchProfileIdx or numProfiles == 1 then
+			-- If single profile, ensure we use index 0
+			if numProfiles == 1 then
+				selectedIdx = 0
+				-- Hide everything during auto-skip
+				self:GetChild("ListContainer"):visible(false)
+				self:GetChild("HeaderText"):visible(false)
+				self:GetChild("Hints"):visible(false)
+			end
+			self:sleep(0.02):queuecommand("DirectLaunch")
 		end
 	end,
 	DirectLaunchCommand = function(self)
-		local directIdx = HV.DirectLaunchProfileIdx
+		local directIdx = HV.DirectLaunchProfileIdx or selectedIdx
 		HV.DirectLaunchProfileIdx = nil
 		local screen = SCREENMAN:GetTopScreen()
 		if screen and screen.SetProfileIndex then
@@ -98,6 +106,7 @@ local t = Def.ActorFrame {
 	
 	-- Header
 	LoadFont("Common Large") .. {
+		Name = "HeaderText",
 		Text = THEME:GetString("ScreenSelectProfile", "HeaderText"),
 		InitCommand = function(self) self:xy(SCREEN_CENTER_X, 60):zoom(0.6):diffuse(accentColor):diffusealpha(0) end,
 		OnCommand = function(self) self:sleep(0.2):linear(0.2):diffusealpha(1) end
@@ -108,6 +117,7 @@ local t = Def.ActorFrame {
 
 	-- Control Hints
 	LoadFont("Common Normal") .. {
+		Name = "Hints",
 		Text = "UP / DOWN: SELECT     START: CONFIRM     BACK: CANCEL",
 		InitCommand = function(self) self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 40):zoom(0.35):diffuse(subText):diffusealpha(0) end,
 		OnCommand = function(self) self:sleep(0.4):linear(0.2):diffusealpha(1) end

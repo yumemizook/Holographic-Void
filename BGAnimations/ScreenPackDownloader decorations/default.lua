@@ -53,6 +53,43 @@ local function updateAvailableBundles()
 	end
 end
 updateAvailableBundles()
+local availableTags = {"All"}
+local currentTagIndex = 1
+local isTagListOpen = false
+local availableTagsOrig = {"All"}
+local function updateAvailableTags()
+	local alltags = DLMAN:GetPackTags()
+	availableTags = {"All"}
+	availableTagsOrig = {"All"}
+	
+	-- Categories from Til Death
+	local categories = {"global_keyCount", "global_skillset", "pack_tag", "etterna_tag"}
+	for _, cat in ipairs(categories) do
+		local tags = alltags[cat]
+		if tags then
+			-- Simple numeric sort for keycount if possible
+			if cat == "global_keyCount" then
+				table.sort(tags, function(a, b)
+					local an = tonumber(a:match("%d+")) or 0
+					local bn = tonumber(b:match("%d+")) or 0
+					return an < bn
+				end)
+			else
+				table.sort(tags)
+			end
+
+			for _, t in ipairs(tags) do
+				local label = t
+				if cat == "global_keyCount" and not t:find("[kK]$") then
+					label = t .. "K"
+				end
+				table.insert(availableTags, label:sub(1,1):upper() .. label:sub(2))
+				table.insert(availableTagsOrig, t)
+			end
+		end
+	end
+end
+updateAvailableTags()
 
 -- Check if a pack is installed locally (same as Til Death)
 local function isPackInstalled(pack)
@@ -183,6 +220,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoom(0.28):diffuse(brightText)
 			self:x(-bundleBtnW / 2 + 45):halign(0)
+			self:settext(availableBundles[currentBundleIndex]:upper())
 		end,
 		UpdateCommand = function(self)
 			self:settext(availableBundles[currentBundleIndex]:upper())
@@ -192,6 +230,58 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:x(bundleBtnW / 2 - 10):zoom(0.3):diffuse(dimText):settext("▼")
+		end
+	}
+}
+
+-- ============================================================
+-- TAG SELECTOR
+-- ============================================================
+local tagBtnW = 100
+local tagBtnX = bundleBtnX + bundleBtnW / 2 + 10 + tagBtnW / 2
+local tagListW = 140
+local tagItemH = 20
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "TagSelector",
+	InitCommand = function(self) self:xy(tagBtnX, searchBarY) end,
+
+	-- Button background
+	Def.Quad {
+		Name = "TagBtnBG",
+		InitCommand = function(self)
+			self:zoomto(tagBtnW, 20):diffuse(color("0.12,0.12,0.12,0.9"))
+		end,
+		UpdateCommand = function(self)
+			if isTagListOpen then
+				self:diffuse(accentColor):diffusealpha(0.4)
+			else
+				self:diffuse(color("0.12,0.12,0.12,0.9"))
+			end
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "TagLabel",
+		InitCommand = function(self)
+			self:zoom(0.26):diffuse(subText):settext("TAG:")
+			self:x(-tagBtnW / 2 + 5):halign(0)
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "CurrentTagText",
+		InitCommand = function(self)
+			self:zoom(0.28):diffuse(brightText)
+			self:x(-tagBtnW / 2 + 35):halign(0)
+			self:settext(availableTags[currentTagIndex]:upper())
+		end,
+		UpdateCommand = function(self)
+			self:settext(availableTags[currentTagIndex]:upper())
+		end
+	},
+	-- Dropdown arrow
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:x(tagBtnW / 2 - 10):zoom(0.3):diffuse(dimText):settext("▼")
 		end
 	}
 }
@@ -597,6 +687,82 @@ end
 
 t[#t + 1] = bundleListFrame
 
+-- Tag List Overlay
+local tagListFrame = Def.ActorFrame {
+	Name = "TagListOverlay",
+	InitCommand = function(self) 
+		self:xy(tagBtnX - tagBtnW / 2 + tagListW / 2, searchBarY + 12 + (tagItemH * #availableTags / 2))
+		self:visible(false)
+	end,
+	UpdateCommand = function(self)
+		self:visible(isTagListOpen)
+		-- Re-center based on number of items
+		self:y(searchBarY + 12 + (tagItemH * #availableTags / 2))
+	end
+}
+
+-- List Background
+tagListFrame[#tagListFrame + 1] = Def.Quad {
+	InitCommand = function(self)
+		self:zoomto(tagListW, tagItemH * #availableTags)
+		self:diffuse(color("0.05,0.05,0.05,0.95"))
+	end,
+	UpdateCommand = function(self)
+		self:zoomto(tagListW, tagItemH * #availableTags)
+	end
+}
+
+for i = 1, 20 do -- Static creation, dynamic visibility
+	tagListFrame[#tagListFrame + 1] = Def.ActorFrame {
+		Name = "TagItem" .. i,
+		InitCommand = function(self)
+			self:y((i - 1 - (10 - 1) / 2) * tagItemH) -- Placeholder Y, will be updated
+		end,
+		UpdateCommand = function(self)
+			local tag = availableTags[i]
+			if tag then
+				self:visible(true)
+				self:y((i - 1 - (#availableTags - 1) / 2) * tagItemH)
+			else
+				self:visible(false)
+			end
+		end,
+
+		Def.Quad {
+			Name = "ItemBG",
+			InitCommand = function(self)
+				self:zoomto(tagListW - 2, tagItemH - 2):diffusealpha(0)
+			end,
+			UpdateCommand = function(self)
+				if i == currentTagIndex then
+					self:diffuse(accentColor):diffusealpha(0.2)
+				else
+					self:diffusealpha(0)
+				end
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Text",
+			InitCommand = function(self)
+				self:zoom(0.28):diffuse(mainText)
+			end,
+			UpdateCommand = function(self)
+				local tag = availableTags[i]
+				if tag then
+					self:settext(tag:upper())
+					if i == currentTagIndex then
+						self:diffuse(brightText)
+					else
+						self:diffuse(mainText)
+					end
+				end
+			end
+		}
+	}
+end
+
+t[#t + 1] = tagListFrame
+
 -- ============================================================
 -- FOOTER
 -- ============================================================
@@ -683,10 +849,46 @@ t[#t + 1] = Def.ActorFrame {
 					return
 				end
 
+				-- Check if tag list is open and click is inside
+				if isTagListOpen then
+					for i = 1, #availableTags do
+						local itemY = searchBarY + 12 + (i - 0.5) * tagItemH
+						if mx >= tagBtnX - tagBtnW / 2 and mx <= tagBtnX - tagBtnW / 2 + tagListW
+							and my >= itemY - tagItemH / 2 and my <= itemY + tagItemH / 2 then
+							currentTagIndex = i
+							isTagListOpen = false
+							self:GetParent():GetChild("TagSelector"):playcommand("Update")
+							self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
+							self:playcommand("DoSearch")
+							return
+						end
+					end
+					-- Clicked outside tag list
+					isTagListOpen = false
+					self:GetParent():GetChild("TagSelector"):playcommand("Update")
+					self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
+					return
+				end
+
 				-- Check if click is on bundle selector button
 				if mx >= bundleBtnX - bundleBtnW / 2 and mx <= bundleBtnX + bundleBtnW / 2
 					and my >= searchBarY - 10 and my <= searchBarY + 10 then
 					isBundleListOpen = not isBundleListOpen
+					isTagListOpen = false -- Close other dropdown
+					self:GetParent():GetChild("BundleSelector"):playcommand("Update")
+					self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+					self:GetParent():GetChild("TagSelector"):playcommand("Update")
+					self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
+					return
+				end
+
+				-- Check if click is on tag selector button
+				if mx >= tagBtnX - tagBtnW / 2 and mx <= tagBtnX + tagBtnW / 2
+					and my >= searchBarY - 10 and my <= searchBarY + 10 then
+					isTagListOpen = not isTagListOpen
+					isBundleListOpen = false -- Close other dropdown
+					self:GetParent():GetChild("TagSelector"):playcommand("Update")
+					self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
 					self:GetParent():GetChild("BundleSelector"):playcommand("Update")
 					self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
 					return
@@ -803,8 +1005,20 @@ t[#t + 1] = Def.ActorFrame {
 		if availableBundles[currentBundleIndex] ~= "All" then
 			table.insert(tags, availableBundles[currentBundleIndex]:lower())
 		end
+		if availableTags[currentTagIndex] ~= "All" then
+			table.insert(tags, availableTagsOrig[currentTagIndex]) -- Use original tag string
+		end
 		packList:FilterAndSearch(nameInput, tags, true, packsPerPage)
 		self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
+	end,
+
+	PackTagsRefreshedMessageCommand = function(self)
+		updateAvailableBundles()
+		updateAvailableTags()
+		self:GetParent():GetChild("BundleSelector"):playcommand("Update")
+		self:GetParent():GetChild("TagSelector"):playcommand("Update")
+		self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+		self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
 	end,
 
 	-- Periodic refresh for download progress

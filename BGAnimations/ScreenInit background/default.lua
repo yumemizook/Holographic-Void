@@ -91,8 +91,28 @@ local textGroup = Def.ActorFrame {
 t[#t + 1] = textGroup
 
 -- 5. Version Subtitle
+local themeVersion = "Unknown"
+local themeName = THEME:GetCurThemeName()
+local paths = {
+	"Themes/" .. themeName .. "/ThemeInfo.ini",
+	"ThemeInfo.ini"
+}
+
+-- Add GetCurrentThemeDirectory only if it exists
+if THEME.GetCurrentThemeDirectory then
+	table.insert(paths, 1, THEME:GetCurrentThemeDirectory() .. "ThemeInfo.ini")
+end
+
+for _, path in ipairs(paths) do
+	local info = IniFile.ReadFile(path)
+	if info and info["ThemeInfo"] and info["ThemeInfo"]["Version"] then
+		themeVersion = info["ThemeInfo"]["Version"]
+		break
+	end
+end
+
 t[#t + 1] = LoadFont("Common Normal") .. {
-	Text = "v0.99",
+	Text = "v" .. themeVersion,
 	InitCommand = function(self) self:Center():y(SCREEN_CENTER_Y + 15):zoom(0.5) end,
 	OnCommand = function(self)
 		self:diffuse(color("0.6,0.6,0.6,1")):diffusealpha(0)
