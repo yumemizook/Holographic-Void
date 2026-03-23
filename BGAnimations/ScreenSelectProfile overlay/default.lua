@@ -139,7 +139,7 @@ local t = Def.ActorFrame {
 					if top and top.SetProfileIndex then
 						top:SetProfileIndex(PLAYER_1, selectedIdx + 1)
 						top:Finish()
-						SOUND:PlayOnce(THEME:GetPathG("Common", "start"))
+						SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
 					end
 				elseif btn == "Back" then
 					local top = SCREENMAN:GetTopScreen()
@@ -245,7 +245,7 @@ for i, p in ipairs(profiles) do
 						if top and top.SetProfileIndex then
 							top:SetProfileIndex(PLAYER_1, selectedIdx + 1)
 							top:Finish()
-							SOUND:PlayOnce(THEME:GetPathG("Common", "start"))
+							SOUND:PlayOnce(THEME:GetPathS("Common", "start"))
 						end
 					else
 						selectedIdx = i - 1

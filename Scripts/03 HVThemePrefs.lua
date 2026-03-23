@@ -241,16 +241,16 @@ local HVPrefs = {
 		Values = {"Off", "Standard", "EWMAOnly", "Both"}
 	},
 
+	-- Gameplay: Error Bar Coloring Mode (J4 or Current Judge)
+	HV_ErrorBarColoringMode = {
+		Default = "Current",
+		Choices = {"J4", "Current Judge"},
+		Values = {"J4", "Current"}
+	},
+
 	-- Gameplay: Toggle Full Pacemaker Graph
 	HV_ShowPacemakerGraph = {
 		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true}
-	},
-
-	-- Gameplay: Toggle Mini Goal Tracker (Renamed from Text Pacemaker)
-	HV_ShowGoalTracker = {
-		Default = true,
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
@@ -428,6 +428,7 @@ local HVPrefs = {
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.
 ThemePrefs.Init(HVPrefs, true)
+ThemePrefs.ForceSave() -- Ensure new defaults are written to disk
 
 -- After loading, refresh accent colors
 if HVColor and HVColor.RefreshAccent then

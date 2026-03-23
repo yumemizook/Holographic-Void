@@ -269,7 +269,7 @@ local t = Def.ActorFrame {
 			
 			if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
 				if msg.TapNoteOffset then
-					local ts = ms.JudgeScalers[PREFSMAN:GetPreference("TimingWindowScale")]
+					local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
 					actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
 				elseif msg.TapNoteScore == "TapNoteScore_Miss" then
 					actual_dp = actual_dp - 5.5

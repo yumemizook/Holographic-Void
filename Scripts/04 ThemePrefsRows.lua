@@ -105,6 +105,13 @@ local HVPrefRows = {
 		Values  = {"Off", "Standard", "EWMAOnly", "Both"},
 	},
 
+	-- Error Bar Coloring Mode
+	HV_ErrorBarColoringMode = {
+		Default = "Current",
+		Choices = {"J4", "Current Judge"},
+		Values  = {"J4", "Current"},
+	},
+
 	-- Show Full Pacemaker Graph
 	HV_ShowPacemakerGraph = {
 		Default = false,
@@ -310,7 +317,7 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_SongPreview,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
+	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_SongPreview,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_ErrorBarColoringMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
 	return l
 end
 
@@ -410,6 +417,40 @@ end
 
 function OptionRowErrorBarMode()
 	return HVThemePrefRow("HV_ErrorBarMode", "Error Bar Mode")
+end
+
+function OptionRowErrorBarColoringMode()
+	local name = "HV_ErrorBarColoringMode"
+	local row = ThemePrefRow(name, "Error Bar Coloring")
+	row.Choices = {"J4", "Current Judge"}
+	row.Values = {"J4", "Current"}
+
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get(name)
+		local found = false
+		for i, v in ipairs(self.Values) do
+			if v == val then
+				list[i] = true
+				found = true
+				break
+			end
+		end
+		if not found then
+			list[2] = true -- Default to index 2 (Current)
+		end
+	end
+
+	row.SaveSelections = function(self, list, pn)
+		local val = "Current"
+		for i, selected in ipairs(list) do
+			if selected then
+				val = self.Values[i]
+				break
+			end
+		end
+		ThemePrefs.Set(name, val)
+	end
+	return row
 end
 
 function OptionRowProgressBarPosition()

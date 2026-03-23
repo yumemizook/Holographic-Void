@@ -86,12 +86,12 @@ local function getIntensitySpeed(base)
 end
 
 -- Hitbox Constants
-local pBtnW = 240
+local pBtnW = 260
 local pBtnH = 70
 local pBtnCX = (SCREEN_RIGHT - 10) - pBtnW/2
 local pBtnCY = 10 + pBtnH/2
 local maxCompactProfiles = 4
-local compactRowH = 28
+local compactRowH = 40
 
 -- Media Player Constants
 local mpBarH = 40
@@ -583,7 +583,7 @@ t[#t + 1] = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "OnlineProfileChip",
 		InitCommand = function(self)
-			self:xy(SCREEN_LEFT + 16, SCREEN_TOP + 80):visible(false)
+			self:xy(SCREEN_LEFT + 16, SCREEN_TOP + 100):visible(false)
 			self:SetUpdateFunction(function(af)
 				local loggedIn = DLMAN:IsLoggedIn()
 				af:visible(loggedIn)
@@ -591,18 +591,16 @@ t[#t + 1] = Def.ActorFrame {
 				
 				local nameTxt = af:GetChild("Name")
 				local ratingTxt = af:GetChild("Rating")
-				local avatar = af:GetChild("Avatar")
+				local rankTxt = af:GetChild("Rank")
 				
 				nameTxt:settext(DLMAN:GetUsername())
 				local r = DLMAN:GetSkillsetRating("Overall")
 				local showStats = HV.ShowProfileStats()
 				ratingTxt:visible(showStats and HV.ShowMSD()):settextf("%.2f", r):diffuse(HVColor.GetMSDRatingColor(r))
 				
-				local path = getAvatarPath()
-				if path and path ~= avatar.lastPath then
-					avatar:Load(path)
-					avatar:scaletoclipped(22, 22)
-					avatar.lastPath = path
+				if rankTxt then
+					local rank = DLMAN:GetSkillsetRank("Overall")
+					rankTxt:visible(showStats and HV.ShowMSD() and rank > 0):settextf("#%d", rank):diffuse(HVColor.GetSkillsetRankColor(rank))
 				end
 			end)
 		end,
@@ -612,17 +610,17 @@ t[#t + 1] = Def.ActorFrame {
 				self:halign(0):zoomto(pBtnW, compactRowH):diffuse(color("0.08,0.22,0.1,0.85")):diffuseleftedge(accentColor)
 			end
 		},
-		Def.Sprite {
-			Name = "Avatar",
-			InitCommand = function(self) self:xy(12, 0):zoomto(22, 22) end
-		},
 		LoadFont("Common Normal") .. {
 			Name = "Name",
-			InitCommand = function(self) self:xy(28, -4):halign(0):zoom(0.32):diffuse(brightText) end
+			InitCommand = function(self) self:xy(10, -6):halign(0):zoom(0.4):diffuse(brightText) end
+		},
+		LoadFont("Common Large") .. {
+			Name = "Rating",
+			InitCommand = function(self) self:xy(8, 8):halign(0):zoom(0.50):diffuse(dimText) end
 		},
 		LoadFont("Common Normal") .. {
-			Name = "Rating",
-			InitCommand = function(self) self:xy(28, 8):halign(0):zoom(0.26):diffuse(dimText) end
+			Name = "Rank",
+			InitCommand = function(self) self:xy(72, 10):halign(0):zoom(0.45):diffuse(dimText) end
 		}
 	}
 }
@@ -712,7 +710,7 @@ t[#t + 1] = Def.ActorFrame {
 								local apath = getAssetPathFromProfileID("avatar", pid)
 								if apath and apath ~= cAvatar.lastPath then
 									cAvatar:Load(apath)
-									cAvatar:scaletoclipped(22, 22)
+									cAvatar:scaletoclipped(32, 32)
 									cAvatar.lastPath = apath
 								end
 							end
@@ -729,7 +727,7 @@ t[#t + 1] = Def.ActorFrame {
 	Def.Quad { Name="Bg", InitCommand=function(self) self:x(-pBtnW/2):zoomto(pBtnW, pBtnH) end },
 	LoadFont("Common Normal") .. { Name="Status", InitCommand=function(self) self:xy(-pBtnW + 10, -22):halign(0):zoom(0.3) end },
 	LoadFont("Common Normal") .. { Name="Name", InitCommand=function(self) self:xy(-pBtnW + 10, -5):halign(0):zoom(0.45):diffuse(brightText) end },
-	LoadFont("Common Large") .. { Name="Rating", InitCommand=function(self) self:xy(-pBtnW + 10, 18):halign(0):zoom(0.4) end },
+	LoadFont("Common Large") .. { Name="Rating", InitCommand=function(self) self:xy(-pBtnW + 10, 18):halign(0):zoom(0.5) end },
 	LoadFont("Common Normal") .. { Name="Rank", InitCommand=function(self) self:xy(-110, 18):halign(0):zoom(0.4) end },
 	Def.Sprite { Name="Avatar", InitCommand=function(self) self:xy(-35, 0):zoomto(50, 50) end },
 	-- Click detector for main chip
@@ -765,21 +763,21 @@ for ci = 0, maxCompactProfiles - 1 do
 		-- Compact avatar
 		Def.Sprite {
 			Name = "CAvatar",
-			InitCommand = function(self) self:xy(-pBtnW + 18, 0):zoomto(22, 22) end
+			InitCommand = function(self) self:xy(-pBtnW + 22, 0):zoomto(32, 32) end
 		},
 		-- Compact name
 		LoadFont("Common Normal") .. {
 			Name = "CName",
 			InitCommand = function(self)
-				self:xy(-pBtnW + 36, -4):halign(0):zoom(0.32):diffuse(subText)
-					:maxwidth((pBtnW - 90) / 0.32)
+				self:xy(-pBtnW + 44, -6):halign(0):zoom(0.4):diffuse(subText)
+					:maxwidth((pBtnW - 90) / 0.4)
 			end
 		},
 		-- Compact rating
 		LoadFont("Common Normal") .. {
 			Name = "CRating",
 			InitCommand = function(self)
-				self:xy(-pBtnW + 36, 8):halign(0):zoom(0.26):diffuse(dimText)
+				self:xy(-pBtnW + 44, 10):halign(0):zoom(0.45):diffuse(dimText)
 			end
 		},
 		-- Click detector

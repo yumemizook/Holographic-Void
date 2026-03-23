@@ -704,6 +704,7 @@ function erf(x)
 end
 
 function wife3(maxms, ts, version)
+	ts = ts or 1.0
 	local max_points = 2
 	local miss_weight = -5.5
 	local ridic = 5 * ts

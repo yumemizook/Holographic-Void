@@ -725,8 +725,14 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		if not showStandard then return end
 		if math.abs(visualOffset) > maxOffset then return end
 
+		local ebColoring = ThemePrefs.Get("HV_ErrorBarColoringMode") or "Current"
+		local jScale = 1
+		if ebColoring == "Current" then
+			jScale = PREFSMAN:GetPreference("TimingWindowScale")
+		end
+
 		local xPos = (visualOffset / maxOffset) * (ebW / 2)
-		local jColor = offsetToJudgeColor(visualOffset)
+		local jColor = offsetToJudgeColor(visualOffset, jScale)
 
 		-- Pooling system: Cycle through child actors
 		local pool = self:GetChild("Pool")
