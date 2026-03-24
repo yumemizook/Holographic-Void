@@ -557,8 +557,9 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoomto(64, 480):x(-96):diffuse(color("1,0,0,0")):diffusealpha(0)
 		end,
-		FlashCommand = function(self)
-			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+		FlashCommand = function(self, params)
+			local c = params and params.color or color("#FF5050")
+			self:diffuse(c):diffusealpha(0.3)
 			self:linear(0.1):diffusealpha(0.5)
 			self:linear(0.2):diffusealpha(0)
 		end
@@ -568,8 +569,9 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoomto(64, 480):x(-32):diffuse(color("1,0,0,0")):diffusealpha(0)
 		end,
-		FlashCommand = function(self)
-			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+		FlashCommand = function(self, params)
+			local c = params and params.color or color("#FF5050")
+			self:diffuse(c):diffusealpha(0.3)
 			self:linear(0.1):diffusealpha(0.5)
 			self:linear(0.2):diffusealpha(0)
 		end
@@ -579,8 +581,9 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoomto(64, 480):x(32):diffuse(color("1,0,0,0")):diffusealpha(0)
 		end,
-		FlashCommand = function(self)
-			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+		FlashCommand = function(self, params)
+			local c = params and params.color or color("#FF5050")
+			self:diffuse(c):diffusealpha(0.3)
 			self:linear(0.1):diffusealpha(0.5)
 			self:linear(0.2):diffusealpha(0)
 		end
@@ -590,8 +593,9 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoomto(64, 480):x(96):diffuse(color("1,0,0,0")):diffusealpha(0)
 		end,
-		FlashCommand = function(self)
-			self:diffuse(color("#FF5050")):diffusealpha(0.3)
+		FlashCommand = function(self, params)
+			local c = params and params.color or color("#FF5050")
+			self:diffuse(c):diffusealpha(0.3)
 			self:linear(0.1):diffusealpha(0.5)
 			self:linear(0.2):diffusealpha(0)
 		end
@@ -607,12 +611,17 @@ t[#t + 1] = Def.ActorFrame {
 							  params.TapNoteScore == "TapNoteScore_W4")
 
 		if isComboBreak and params.Notes then
+			local jColor = color("#FF5050")
+			if params.TapNoteScore == "TapNoteScore_W4" then jColor = judgmentColors[4]
+			elseif params.TapNoteScore == "TapNoteScore_W5" then jColor = judgmentColors[5]
+			elseif params.TapNoteScore == "TapNoteScore_Miss" then jColor = judgmentColors[6] end
+
 			-- Flash lanes that had notes in this judgment
 			for i = 1, 4 do
 				if params.Notes[i] ~= nil then
 					local lane = self:GetChild("Lane" .. i)
 					if lane then
-						lane:stoptweening():playcommand("Flash")
+						lane:stoptweening():playcommand("Flash", {color=jColor})
 					end
 				end
 			end
@@ -826,10 +835,6 @@ t[#t + 1] = Def.ActorFrame {
 			Name = "OKNGDisplay",
 			InitCommand = function(self)
 				self:y(#judgmentLabels * 16 + 4)
-				-- Hide OK/NG in Simple mode
-				if HV.GetJudgmentTallyMode() == "Simple" then
-					self:visible(false)
-				end
 			end,
 
 			LoadFont("Common Normal") .. {
@@ -1289,22 +1294,34 @@ t[#t + 1] = LoadActor("intro")
 -- NG INDICATOR (POPUP)
 -- ============================================================
 if HV.ShowNGIndicator() and not HV.MinimalisticMode() then
-t[#t + 1] = Def.ActorFrame {
-	Name = "NGIndicator",
-	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 20)
-	end,
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:zoom(1.2):diffuse(color("#FF4444")):diffusealpha(0):settext("NG")
-		end,
-		JudgmentMessageCommand = function(self, params)
-			if params.HoldNoteScore == "HoldNoteScore_LetGo" then
-				self:stoptweening():diffusealpha(1):zoom(1.2):linear(0.2):zoom(1.5):linear(0.2):zoom(1.2):sleep(0.5):linear(0.2):diffusealpha(0)
+	local isReverse = GAMESTATE:GetPlayerState(PLAYER_1):GetCurrentPlayerOptions():UsingReverse()
+	local ngY = isReverse and (SCREEN_CENTER_Y + 164 - 40) or (SCREEN_CENTER_Y - 164 + 40)
+	local colOffsets = {-96, -32, 32, 96}
+
+	local ngFrame = Def.ActorFrame { Name = "NGIndicator" }
+	for i = 1, 4 do
+		ngFrame[#ngFrame + 1] = LoadFont("Common Normal") .. {
+			Name = "NG_" .. i,
+			InitCommand = function(self)
+				self:xy(SCREEN_CENTER_X + colOffsets[i], ngY)
+				self:zoom(1.2):diffuse(color("#FF4444")):diffusealpha(0):settext("NG")
+			end,
+			JudgmentMessageCommand = function(self, params)
+				if params.HoldNoteScore == "HoldNoteScore_LetGo" then
+					local laneMatch = false
+					if params.Notes and params.Notes[i] ~= nil then
+						laneMatch = true
+					elseif params.FirstTrack == (i - 1) then
+						laneMatch = true
+					end
+					if laneMatch then
+						self:stoptweening():diffusealpha(1):zoom(1.2):linear(0.2):zoom(1.5):linear(0.2):zoom(1.2):sleep(0.5):linear(0.2):diffusealpha(0)
+					end
+				end
 			end
-		end
-	}
-}
+		}
+	end
+	t[#t + 1] = ngFrame
 end
 
 return t

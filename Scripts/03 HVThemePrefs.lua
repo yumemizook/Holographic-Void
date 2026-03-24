@@ -437,7 +437,7 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 	HV_ComboBreakHighlight = {
-		Default = true,
+		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
