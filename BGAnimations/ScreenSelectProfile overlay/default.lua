@@ -50,6 +50,9 @@ local function updateRows(self)
 			for j = 1, i - 1 do
 				yOffset = yOffset + ((j - 1 == selectedIdx) and (pBtnH + 12) or (compactRowH + 6))
 			end
+			if i - 1 == selectedIdx then
+				yOffset = yOffset + 18
+			end
 			
 			row:stoptweening():decelerate(0.3):y(startY + yOffset):x(SCREEN_CENTER_X)
 		end

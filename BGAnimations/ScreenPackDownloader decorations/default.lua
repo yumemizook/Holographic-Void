@@ -53,8 +53,8 @@ local function updateAvailableBundles()
 	end
 end
 updateAvailableBundles()
-local availableTags = {"All"}
-local currentTagIndex = 1
+local selectedTags = {}    -- {["tag_name"] = true, ...}
+local tagsMatchAny = true  -- true = OR, false = AND
 local isTagListOpen = false
 local availableTagsOrig = {"All"}
 local function updateAvailableTags()
@@ -137,11 +137,12 @@ t[#t + 1] = Def.ActorFrame {
 -- SEARCH BAR
 -- ============================================================
 local searchBarY = 44
-local searchBarW = SCREEN_WIDTH * 0.50
+local searchBarW = SCREEN_WIDTH * 0.45
+local searchBarX = SCREEN_WIDTH * 0.25
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "SearchBar",
-	InitCommand = function(self) self:xy(SCREEN_WIDTH * 0.28, searchBarY) end,
+	InitCommand = function(self) self:xy(searchBarX, searchBarY) end,
 
 	Def.Sprite {
 		Texture = THEME:GetPathG("", "search.png"),
@@ -186,7 +187,7 @@ t[#t + 1] = Def.ActorFrame {
 -- BUNDLE SELECTOR
 -- ============================================================
 local bundleBtnW = 100
-local bundleBtnX = SCREEN_WIDTH * 0.28 + searchBarW / 2 + 10 + bundleBtnW / 2
+local bundleBtnX = searchBarX + searchBarW / 2 + 10 + bundleBtnW / 2
 local bundleListW = 140
 local bundleItemH = 20
 
@@ -237,9 +238,9 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- TAG SELECTOR
 -- ============================================================
-local tagBtnW = 100
+local tagBtnW = 90
 local tagBtnX = bundleBtnX + bundleBtnW / 2 + 10 + tagBtnW / 2
-local tagListW = 140
+local tagListW = 400
 local tagItemH = 20
 
 t[#t + 1] = Def.ActorFrame {
@@ -263,7 +264,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "TagLabel",
 		InitCommand = function(self)
-			self:zoom(0.26):diffuse(subText):settext("TAG:")
+			self:zoom(0.26):diffuse(subText):settext("TAGS:")
 			self:x(-tagBtnW / 2 + 5):halign(0)
 		end
 	},
@@ -271,11 +272,17 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "CurrentTagText",
 		InitCommand = function(self)
 			self:zoom(0.28):diffuse(brightText)
-			self:x(-tagBtnW / 2 + 35):halign(0)
-			self:settext(availableTags[currentTagIndex]:upper())
+			self:x(-tagBtnW / 2 + 40):halign(0)
+			self:settext("SELECT")
 		end,
 		UpdateCommand = function(self)
-			self:settext(availableTags[currentTagIndex]:upper())
+			local count = 0
+			for _ in pairs(selectedTags) do count = count + 1 end
+			if count == 0 then
+				self:settext("ALL"):diffuse(brightText)
+			else
+				self:settextf("%d SEL", count):diffuse(accentColor)
+			end
 		end
 	},
 	-- Dropdown arrow
@@ -291,30 +298,81 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 t[#t + 1] = Def.ActorFrame {
 	Name = "DownloadStatusBar",
-	InitCommand = function(self) self:xy(SCREEN_WIDTH * 0.8, searchBarY) end,
-	OnCommand = function(self)
-		local statusText = self:GetChild("DLStatus")
-		self:SetUpdateFunction(function()
-			local dls = DLMAN:GetDownloads()
-			if dls and #dls > 0 then
-				statusText:settext("DOWNLOAD IN PROGRESS")
-				statusText:diffuse(accentColor)
-			else
-				local queued = DLMAN:GetQueuedPacks()
-				if queued and #queued > 0 then
-					statusText:settextf("%d queued", #queued)
-					statusText:diffuse(subText)
+	InitCommand = function(self) self:xy(SCREEN_WIDTH * 0.92, searchBarY) end,
+
+	-- Cancel Current Button
+	Def.ActorFrame {
+		Name = "CancelCurrent",
+		InitCommand = function(self) self:x(-120) end,
+		Def.Quad {
+			Name = "BG",
+			InitCommand = function(self)
+				self:zoomto(80, 20):diffuse(color("0.15,0.05,0.05,0.8"))
+			end,
+			UpdateCommand = function(self)
+				local dls = DLMAN:GetDownloads()
+				if dls and #dls > 0 then
+					self:diffusealpha(0.8)
 				else
-					statusText:settext("")
+					self:diffusealpha(0.2)
 				end
 			end
-		end)
-	end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:zoom(0.24):settext("CANCEL CUR"):diffuse(mainText)
+			end,
+			UpdateCommand = function(self)
+				local dls = DLMAN:GetDownloads()
+				if dls and #dls > 0 then
+					self:diffuse(color("1,0.5,0.5,1"))
+				else
+					self:diffuse(dimText)
+				end
+			end
+		}
+	},
 
-	LoadFont("Common Normal") .. {
-		Name = "DLStatus",
-		InitCommand = function(self) self:zoom(0.28):diffuse(dimText) end,
-	}
+	-- Cancel All Button
+	Def.ActorFrame {
+		Name = "CancelAll",
+		InitCommand = function(self) self:x(-30) end,
+		Def.Quad {
+			Name = "BG",
+			InitCommand = function(self)
+				self:zoomto(80, 20):diffuse(color("0.15,0.05,0.05,0.8"))
+			end,
+			UpdateCommand = function(self)
+				local queued = DLMAN:GetQueuedPacks()
+				local dls = DLMAN:GetDownloads()
+				if (queued and #queued > 0) or (dls and #dls > 0) then
+					self:diffusealpha(0.8)
+				else
+					self:diffusealpha(0.2)
+				end
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:zoom(0.24):settext("CANCEL ALL"):diffuse(mainText)
+			end,
+			UpdateCommand = function(self)
+				local queued = DLMAN:GetQueuedPacks()
+				local dls = DLMAN:GetDownloads()
+				if (queued and #queued > 0) or (dls and #dls > 0) then
+					self:diffuse(color("1,0.2,0.2,1"))
+				else
+					self:diffuse(dimText)
+				end
+			end
+		}
+	},
+
+	OnCommand = function(self)
+		self:SetUpdateFunction(function()
+			self:playcommand("Update")
+		end)
+	end
 }
 
 -- ============================================================
@@ -687,42 +745,79 @@ end
 
 t[#t + 1] = bundleListFrame
 
--- Tag List Overlay
+-- Tag List Overlay (Grid Layout)
+local tagCols = 4
+local tagItemW = 100
+local tagListW = tagCols * tagItemW
 local tagListFrame = Def.ActorFrame {
 	Name = "TagListOverlay",
 	InitCommand = function(self) 
-		self:xy(tagBtnX - tagBtnW / 2 + tagListW / 2, searchBarY + 12 + (tagItemH * #availableTags / 2))
+		-- Align right edge of menu to right edge of button
+		self:xy(tagBtnX + tagBtnW / 2 - tagListW / 2, searchBarY + 12)
 		self:visible(false)
 	end,
 	UpdateCommand = function(self)
 		self:visible(isTagListOpen)
 		-- Re-center based on number of items
-		self:y(searchBarY + 12 + (tagItemH * #availableTags / 2))
+		local rows = math.ceil(#availableTags / tagCols)
+		self:y(searchBarY + 20 + (tagItemH * rows / 2))
 	end
 }
 
 -- List Background
 tagListFrame[#tagListFrame + 1] = Def.Quad {
+	Name = "ListBG",
 	InitCommand = function(self)
-		self:zoomto(tagListW, tagItemH * #availableTags)
 		self:diffuse(color("0.05,0.05,0.05,0.95"))
 	end,
 	UpdateCommand = function(self)
-		self:zoomto(tagListW, tagItemH * #availableTags)
+		local rows = math.ceil(#availableTags / tagCols)
+		self:zoomto(tagListW, tagItemH * rows + 30) -- +30 for the AND/OR footer
+		self:y(15) -- Shift down to accommodate footer at the top or bottom
 	end
 }
 
-for i = 1, 20 do -- Static creation, dynamic visibility
+-- AND/OR Toggle Button (in the overlay)
+tagListFrame[#tagListFrame + 1] = Def.ActorFrame {
+	Name = "ConditionToggle",
+	InitCommand = function(self)
+		self:y(-10) -- top of list
+	end,
+	UpdateCommand = function(self)
+		local rows = math.ceil(#availableTags / tagCols)
+		self:y(-(tagItemH * rows / 2) + 10)
+	end,
+
+	Def.Quad {
+		Name = "BtnBG",
+		InitCommand = function(self)
+			self:zoomto(tagListW - 10, 18):diffuse(color("0.1,0.1,0.1,1"))
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "BtnText",
+		InitCommand = function(self)
+			self:zoom(0.26)
+		end,
+		UpdateCommand = function(self)
+			self:settextf("MATCHING: %s (CLICK TO TOGGLE)", tagsMatchAny and "ANY (OR)" or "ALL (AND)")
+			self:diffuse(tagsMatchAny and color("0.6,0.8,1,1") or color("1,0.8,0.6,1"))
+		end
+	}
+}
+
+for i = 1, 100 do -- Increased limit for grid
 	tagListFrame[#tagListFrame + 1] = Def.ActorFrame {
 		Name = "TagItem" .. i,
-		InitCommand = function(self)
-			self:y((i - 1 - (10 - 1) / 2) * tagItemH) -- Placeholder Y, will be updated
-		end,
 		UpdateCommand = function(self)
 			local tag = availableTags[i]
 			if tag then
 				self:visible(true)
-				self:y((i - 1 - (#availableTags - 1) / 2) * tagItemH)
+				local rows = math.ceil(#availableTags / tagCols)
+				local r = math.floor((i - 1) / tagCols)
+				local c = (i - 1) % tagCols
+				self:xy((c - (tagCols - 1) / 2) * tagItemW, 
+					    (r - (rows - 1) / 2) * tagItemH + 15)
 			else
 				self:visible(false)
 			end
@@ -731,11 +826,12 @@ for i = 1, 20 do -- Static creation, dynamic visibility
 		Def.Quad {
 			Name = "ItemBG",
 			InitCommand = function(self)
-				self:zoomto(tagListW - 2, tagItemH - 2):diffusealpha(0)
+				self:zoomto(tagItemW - 4, tagItemH - 2):diffusealpha(0)
 			end,
 			UpdateCommand = function(self)
-				if i == currentTagIndex then
-					self:diffuse(accentColor):diffusealpha(0.2)
+				local tag = availableTagsOrig[i]
+				if tag and selectedTags[tag] then
+					self:diffuse(accentColor):diffusealpha(0.3)
 				else
 					self:diffusealpha(0)
 				end
@@ -744,13 +840,14 @@ for i = 1, 20 do -- Static creation, dynamic visibility
 		LoadFont("Common Normal") .. {
 			Name = "Text",
 			InitCommand = function(self)
-				self:zoom(0.28):diffuse(mainText)
+				self:zoom(0.24):diffuse(mainText)
 			end,
 			UpdateCommand = function(self)
 				local tag = availableTags[i]
 				if tag then
 					self:settext(tag:upper())
-					if i == currentTagIndex then
+					local origTag = availableTagsOrig[i]
+					if selectedTags[origTag] then
 						self:diffuse(brightText)
 					else
 						self:diffuse(mainText)
@@ -851,22 +948,50 @@ t[#t + 1] = Def.ActorFrame {
 
 				-- Check if tag list is open and click is inside
 				if isTagListOpen then
+					local rows = math.ceil(#availableTags / tagCols)
+					local gridOriginX = tagBtnX + tagBtnW / 2 - tagListW / 2
+					local gridOriginY = searchBarY + 20 + (tagItemH * rows / 2)
+					local gridStartY = gridOriginY + 15 - (tagItemH * rows / 2)
+					
+					-- Check condition toggle button
+					local toggleY = gridOriginY - (tagItemH * rows / 2) + 10
+					if mx >= gridOriginX - (tagListW - 10) / 2
+						and mx <= gridOriginX + (tagListW - 10) / 2
+						and my >= toggleY - 9 and my <= toggleY + 9 then
+						tagsMatchAny = not tagsMatchAny
+						self:GetParent():playcommand("Update")
+						self:playcommand("DoSearch")
+						return
+					end
+
 					for i = 1, #availableTags do
-						local itemY = searchBarY + 12 + (i - 0.5) * tagItemH
-						if mx >= tagBtnX - tagBtnW / 2 and mx <= tagBtnX - tagBtnW / 2 + tagListW
-							and my >= itemY - tagItemH / 2 and my <= itemY + tagItemH / 2 then
-							currentTagIndex = i
-							isTagListOpen = false
-							self:GetParent():GetChild("TagSelector"):playcommand("Update")
-							self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
+						local r = math.floor((i - 1) / tagCols)
+						local c = (i - 1) % tagCols
+						local itemX = gridOriginX + (c - (tagCols - 1) / 2) * tagItemW
+						local itemY = gridStartY + (r + 0.5) * tagItemH
+						
+						if mx >= itemX - tagItemW/2 and mx <= itemX + tagItemW/2
+							and my >= itemY - tagItemH/2 and my <= itemY + tagItemH/2 then
+							
+							local tag = availableTagsOrig[i]
+							if tag == "All" then
+								selectedTags = {}
+							else
+								if selectedTags[tag] then
+									selectedTags[tag] = nil
+								else
+									selectedTags[tag] = true
+								end
+							end
+							
+							self:GetParent():playcommand("Update")
 							self:playcommand("DoSearch")
 							return
 						end
 					end
 					-- Clicked outside tag list
 					isTagListOpen = false
-					self:GetParent():GetChild("TagSelector"):playcommand("Update")
-					self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
+					self:GetParent():playcommand("Update")
 					return
 				end
 
@@ -887,10 +1012,33 @@ t[#t + 1] = Def.ActorFrame {
 					and my >= searchBarY - 10 and my <= searchBarY + 10 then
 					isTagListOpen = not isTagListOpen
 					isBundleListOpen = false -- Close other dropdown
-					self:GetParent():GetChild("TagSelector"):playcommand("Update")
-					self:GetParent():GetChild("TagListOverlay"):playcommand("Update")
-					self:GetParent():GetChild("BundleSelector"):playcommand("Update")
-					self:GetParent():GetChild("BundleListOverlay"):playcommand("Update")
+					self:GetParent():playcommand("Update")
+					return
+				end
+				
+				-- Check if click is on Cancel Current
+				local ccX = SCREEN_WIDTH * 0.92 - 120
+				if mx >= ccX - 40 and mx <= ccX + 40 and my >= searchBarY - 10 and my <= searchBarY + 10 then
+					local dls = DLMAN:GetDownloads()
+					if dls and dls[1] then
+						dls[1]:Stop()
+					end
+					return
+				end
+
+				-- Check if click is on Cancel All
+				local caX = SCREEN_WIDTH * 0.92 - 30
+				if mx >= caX - 40 and mx <= caX + 40 and my >= searchBarY - 10 and my <= searchBarY + 10 then
+					for _, p in ipairs(DLMAN:GetQueuedPacks()) do
+						p:RemoveFromQueue()
+					end
+					for _, p in ipairs(DLMAN:GetDownloads()) do
+						p:Stop()
+					end
+					for _, p in ipairs(DLMAN:GetDownloadingPacks()) do
+						local dl = p:GetDownload()
+						if dl then dl:Stop() end
+					end
 					return
 				end
 				
@@ -1005,10 +1153,11 @@ t[#t + 1] = Def.ActorFrame {
 		if availableBundles[currentBundleIndex] ~= "All" then
 			table.insert(tags, availableBundles[currentBundleIndex]:lower())
 		end
-		if availableTags[currentTagIndex] ~= "All" then
-			table.insert(tags, availableTagsOrig[currentTagIndex]) -- Use original tag string
+		-- Add multiple selected tags
+		for t, _ in pairs(selectedTags) do
+			table.insert(tags, t)
 		end
-		packList:FilterAndSearch(nameInput, tags, true, packsPerPage)
+		packList:FilterAndSearch(nameInput, tags, tagsMatchAny, packsPerPage)
 		self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
 	end,
 

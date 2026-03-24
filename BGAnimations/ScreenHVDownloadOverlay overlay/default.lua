@@ -161,11 +161,15 @@ t.OnCommand = function(self)
 	local isExpanded = false
 
 	self:SetUpdateFunction(function()
+		local screen = SCREENMAN:GetTopScreen()
+		local screenName = screen and screen:GetName() or ""
+		local isGameplay = screenName:find("Gameplay") ~= nil
+		
 		local dls = DLMAN:GetDownloads()
 		local queued = DLMAN:GetQueuedPacks()
 		local hasDL = dls and #dls > 0
 		local hasQueued = queued and #queued > 0
-		local shouldShow = hasDL or hasQueued
+		local shouldShow = (hasDL or hasQueued) and not isGameplay
 
 		-- Show/hide the compact bar
 		if shouldShow and not wasVisible then
