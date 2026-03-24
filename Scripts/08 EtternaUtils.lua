@@ -422,15 +422,35 @@ function GetDisplayScore()
 	local steps = GAMESTATE:GetCurrentSteps()
 	if not steps then return nil end
 	
-	-- Get scores for the current rate
-	local rate = getCurRateString()
-	local scores = getScoreTable(pn, rate, steps)
-	
-	if scores and #scores > 0 then
-		-- Return the highest wife score
-		return scores[1]
+	local currentRateValue = getCurRateValue()
+	local rateTable = getRateTable(pn, steps)
+	if not rateTable then return nil end
+
+	-- 1. Try current rate first
+	local currentRateStr = getCurRateString()
+	local currentScores = rateTable[currentRateStr]
+	if currentScores and #currentScores > 0 then
+		return currentScores[1]
 	end
-	return nil
+
+	-- 2. No scores for current rate, find the closest one
+	local closestRate = nil
+	local minDiff = math.huge
+	local bestScore = nil
+
+	for rateStr, scores in pairs(rateTable) do
+		if scores and #scores > 0 then
+			local rNum = tonumber((rateStr:gsub("x", ""))) or 0
+			local diff = math.abs(rNum - currentRateValue)
+			if diff < minDiff then
+				minDiff = diff
+				closestRate = rateStr
+				bestScore = scores[1]
+			end
+		end
+	end
+
+	return bestScore
 end
 
 function getScoreGrade(score)

@@ -133,23 +133,33 @@ end
 t[#t + 1] = Def.ActorFrame {
 	OnCommand = function(self)
 		self:xy(NSPreviewX, NSPreviewY)
-		for i = 0, SCREENMAN:GetTopScreen():GetNumRows() - 1 do
-			if SCREENMAN:GetTopScreen():GetOptionRow(i) and
-			   SCREENMAN:GetTopScreen():GetOptionRow(i):GetName() == "NoteSkins" then
-				NoteskinRow = i
+		
+		local top = SCREENMAN:GetTopScreen()
+		if top and top.GetNumRows then
+			for i = 0, top:GetNumRows() - 1 do
+				local row = top:GetOptionRow(i)
+				if row and row:GetName() == "NoteSk" then
+					NoteskinRow = i
+				end
 			end
 		end
+
 		self:SetUpdateFunction(function(self)
-			local row = SCREENMAN:GetTopScreen():GetCurrentRowIndex(PLAYER_1)
-			local pos = 0
-			if row > 4 then
-				pos = NSPreviewY + NoteskinRow * OptionRowHeight -
-				      (SCREENMAN:GetTopScreen():GetCurrentRowIndex(PLAYER_1) - 4) * OptionRowHeight
-			else
-				pos = NSPreviewY + NoteskinRow * OptionRowHeight
+			local currentTop = SCREENMAN:GetTopScreen()
+			if currentTop and currentTop.GetCurrentRowIndex then
+				local row = currentTop:GetCurrentRowIndex(PLAYER_1)
+				if row then
+					local pos = 0
+					if row > 4 then
+						pos = NSPreviewY + NoteskinRow * OptionRowHeight -
+						      (row - 4) * OptionRowHeight
+					else
+						pos = NSPreviewY + NoteskinRow * OptionRowHeight
+					end
+					self:y(pos)
+					self:visible(NoteskinRow - row > -5 and NoteskinRow - row < 7)
+				end
 			end
-			self:y(pos)
-			self:visible(NoteskinRow - row > -5 and NoteskinRow - row < 7)
 		end)
 	end,
 

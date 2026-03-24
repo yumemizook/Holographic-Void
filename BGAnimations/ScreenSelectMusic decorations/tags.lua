@@ -163,6 +163,7 @@ local t = Def.ActorFrame {
 		if params.Tab == "TAGS" then
 			self:visible(not self:GetVisible())
 			if self:GetVisible() then
+				self:stoptweening():diffusealpha(0):linear(0.2):diffusealpha(1)
 				HV.ActiveTab = "TAGS"
 				currentPage = 1
 				RefreshData()

@@ -4,6 +4,15 @@
 -- These rows appear in ScreenOptionsService when theme options are accessed.
 -- Uses _Fallback's ThemePrefsRows.Init system.
 
+-- Generate 5% increment tables for Lane Cover heights (0-100%)
+local laneCoverChoices = {"Off"}
+local laneCoverValues = {0}
+for i = 1, 20 do
+	local val = i * 5
+	table.insert(laneCoverChoices, tostring(val) .. "%")
+	table.insert(laneCoverValues, val)
+end
+
 local HVPrefRows = {
 	-- Auto Login Tokens (Secret, non-visible in menu)
 	HV_Username = {
@@ -71,10 +80,15 @@ local HVPrefRows = {
 	},
 
 	-- Lane Cover
-	HV_LaneCover = {
+	HV_LaneCoverSudden = {
 		Default = 0,
-		Choices = {"Off", "10%", "25%", "40%", "50%", "60%", "75%"},
-		Values = {0, 10, 25, 40, 50, 60, 75},
+		Choices = laneCoverChoices,
+		Values = laneCoverValues,
+	},
+	HV_LaneCoverHidden = {
+		Default = 0,
+		Choices = laneCoverChoices,
+		Values = laneCoverValues,
 	},
 
 	-- Glow Effects
@@ -275,6 +289,33 @@ local HVPrefRows = {
 		Choices = {"Off", "On"},
 		Values = {false, true},
 	},
+
+	-- Minimalistic Mode
+	HV_MinimalisticMode = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- Judgment Tally Mode
+	HV_JudgeCounterMode = {
+		Default = "Full",
+		Choices = {"Full", "Simple"},
+		Values = {"Full", "Simple"},
+	},
+
+	-- NG Indicator
+	HV_ShowNGIndicator = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+	-- Instant Search
+	HV_InstantSearch = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -317,7 +358,31 @@ end
 -- Also register a global function to get all HV option row lines
 -- for use in metrics.ini ScreenOptionsService Lines
 function HVThemeOptionsLines()
-	local l = "HV_BGAnimIntensity,HV_BackgroundEffect,HV_SongPreview,HV_ShowMSD,HV_ShowProfileStats,HV_MSDColorScaleV3,HV_ShowMeasureLines,HV_ShowNPS,HV_NPSWindowSize,HV_ShowPacemakerGraph,HV_ShowGoalTracker,HV_PacemakerTargetType,HV_PacemakerTargetGoal,HV_ShowMean,HV_QuotesMode,HV_ErrorBarMode,HV_ErrorBarColoringMode,HV_Particles,HV_EnableGlow,HV_UseCustomGrades,HV_GradeColorStyle,HV_ShowJudgment,HV_ShowCombo,HV_ShowCurrentWife,HV_ShowJudgeCounter,HV_ShowPlayerInfo,HV_ProgressBarPosition,HV_ShowInGameLeaderboard,HV_ShowNPSGraph,HV_ComboBreakHighlight,HV_AssistMode,HV_GoalTrackerText"
+	-- Logical grouping of theme options
+	local l = table.concat({
+		-- General / Visual
+		"HV_BGAnimIntensity", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
+		
+		-- Music Select
+		-- Music Select
+		"HV_ShowMSD", "HV_MSDColorScaleV3", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
+		
+		-- Gameplay HUD
+		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_ShowCombo", "HV_ShowCurrentWife",
+			"HV_ShowJudgeCounter", "HV_JudgeCounterMode", "HV_ShowNGIndicator",
+		"HV_ShowPlayerInfo", "HV_ProgressBarPosition", "HV_ShowInGameLeaderboard",
+		
+		-- Gameplay Tools
+		"HV_ShowNPS", "HV_NPSWindowSize", "HV_ShowNPSGraph", "HV_ErrorBarMode",
+		"HV_ErrorBarColoringMode", "HV_ShowMean", "HV_ShowMeasureLines",
+		"HV_ComboBreakHighlight", "HV_AssistMode",
+		
+		-- Goal Tracker
+		"HV_ShowGoalTracker",
+		
+		-- Grades
+		"HV_UseCustomGrades", "HV_GradeColorStyle"
+	}, ",")
 	return l
 end
 
@@ -363,7 +428,7 @@ local function HVThemePrefRow(name, title)
 			if selected then
 				val = self.Values[i]
 				break
-			end
+						end
 		end
 		ThemePrefs.Set(name, val)
 		ThemePrefs.ForceSave() -- Bypass NeedsSaved check to be certain
@@ -385,8 +450,12 @@ function OptionRowShowProfileStats()
 	return HVThemePrefRow("HV_ShowProfileStats", "Show Profile Stats")
 end
 
+function OptionRowInstantSearch()
+	return HVThemePrefRow("HV_InstantSearch", "Instant Search")
+end
+
 function OptionRowShowNPS()
-	return HVThemePrefRow("HV_ShowNPS", "Show NPS Counter")
+	return HVThemePrefRow("HV_ShowNPS", "Show NPS")
 end
 
 function OptionRowShowMean()
@@ -411,8 +480,12 @@ function OptionRowScreenFilter()
 	return HVThemePrefRow("HV_ScreenFilter", "Screen Filter")
 end
 
-function OptionRowLaneCover()
-	return HVThemePrefRow("HV_LaneCover", "Lane Cover")
+function OptionRowLaneCoverSudden()
+	return HVThemePrefRow("HV_LaneCoverSudden", "Sudden Height")
+end
+
+function OptionRowLaneCoverHidden()
+	return HVThemePrefRow("HV_LaneCoverHidden", "Hidden Height")
 end
 
 function OptionRowErrorBarMode()
@@ -560,11 +633,23 @@ function OptionRowComboBreakHighlight()
 end
 
 function OptionRowAssistMode()
-	return HVThemePrefRow("HV_AssistMode", "Assist Mode")
+	return HVThemePrefRow("HV_AssistMode", "Assist Clap")
 end
 
 function OptionRowGoalTrackerText()
 	return HVThemePrefRow("HV_GoalTrackerText", "Goal Tracker Text")
+end
+
+function OptionRowMinimalisticMode()
+	return HVThemePrefRow("HV_MinimalisticMode", "Minimalistic Mode")
+end
+
+function OptionRowJudgeCounterMode()
+	return HVThemePrefRow("HV_JudgeCounterMode", "Judgment Tally Mode")
+end
+
+function OptionRowShowNGIndicator()
+	return HVThemePrefRow("HV_ShowNGIndicator", "Show NG Indicator")
 end
 
 -- Listen for pref changes and refresh accent color

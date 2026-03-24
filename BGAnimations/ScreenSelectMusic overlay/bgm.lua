@@ -19,54 +19,50 @@ HV.LastPlayedSecond = 0
 local deltaSum = 0
 local function playMusic(self, delta)
 	deltaSum = deltaSum + delta * musicNotPaused
-	if musicLength + 3 < GAMESTATE:GetSongPosition():GetMusicSeconds() then
+	
+	local tscr = SCREENMAN:GetTopScreen()
+	if not tscr or tscr:GetName() ~= "ScreenSelectMusic" then return end
+
+	local curPos = GAMESTATE:GetSongPosition():GetMusicSeconds()
+	
+	-- If we are in the middle of the preview (part 1) and it's not looping, 
+	-- trigger the transition to part 2 when it nears the end.
+	if loops == 1 and not loop and curPos >= musicLength - 0.2 and musicLength > 0 then
 		goNow = true
 	end
 
 	-- dont override sample music with this if in chart preview mode
-	local tscr = SCREENMAN:GetTopScreen()
-	nah = tscr ~= nil and tscr:GetName() == "ScreenChartPreview"
+	nah = tscr:GetName() == "ScreenChartPreview"
 	if nah then return end
 
-	if (deltaSum > delay and sampleEvent) or goNow then
+	-- Initial start or transition trigger
+	if (deltaSum > delay and sampleEvent and loops == 0) or goNow then
 		goNow = false
-		local s = SCREENMAN:GetTopScreen()
-		if s and s:GetName() == "ScreenSelectMusic" then
-			if s:GetMusicWheel():IsSettled() and loops <= 1 then
-				deltaSum = 0
-				if curSong and curPath then
-					local amountOfWait = 0
-					if startFromPreview then -- When starting from preview point
-						amountOfWait = musicLength - sampleStart
-						
-						SOUND:PlayMusicPart(curPath, sampleStart, amountOfWait, 2, 2, loop, true, true)
-						self:SetUpdateFunctionInterval(amountOfWait)
-
-						if ThemePrefs.Get("HV_SongPreview") == 3 then 
-							startFromPreview = false
-						end
-
-					else -- When starting from start or from exit point.
-						amountOfWait = musicLength - start
-
-						if loops == 1 then
-							SOUND:PlayMusicPart(curPath, start, amountOfWait, 2, 2, true, true, false)
-						else
-							SOUND:PlayMusicPart(curPath, start, amountOfWait, 2, 2, false, true, false)
-						end
-						self:SetUpdateFunctionInterval(math.max(0.02, amountOfWait))
-						start = 0
-
-						if ThemePrefs.Get("HV_SongPreview") == 2 then
-							startFromPreview = true
-						end
-
+		if tscr:GetMusicWheel():IsSettled() and loops <= 1 then
+			if curSong and curPath then
+				if startFromPreview then -- When starting from preview point
+					local duration = musicLength - sampleStart
+					SOUND:PlayMusicPart(curPath, sampleStart, duration, 2, 2, loop, true, true)
+					if ThemePrefs.Get("HV_SongPreview") == 3 then 
+						startFromPreview = false
 					end
-					loops = loops + 1
+				else -- When starting from start or from exit point.
+					local duration = musicLength - start
+					-- If this is the second part of Mode 3, let it loop
+					local shouldLoop = (ThemePrefs.Get("HV_SongPreview") == 3) or loop
+					SOUND:PlayMusicPart(curPath, start, duration, 2, 2, shouldLoop, true, not (loops == 1))
+					start = 0
+					if ThemePrefs.Get("HV_SongPreview") == 2 then
+						startFromPreview = true
+					end
 				end
+				loops = loops + 1
+				-- Always use a small interval to monitor position instead of sleeping
+				self:SetUpdateFunctionInterval(0.025)
 			end
 		end
 	else
+		-- Ensure we keep polling frequently if we are waiting for a transition
 		self:SetUpdateFunctionInterval(0.025)
 	end
 end
@@ -105,17 +101,16 @@ local t = Def.ActorFrame{
 		musicNotPaused = 1
 		goNow = false
 		sampleEvent = true
+		loops = 0
+		deltaSum = 0
 		if not nah and ThemePrefs.Get("HV_SongPreview") ~= 1 then
 			self:SetUpdateFunctionInterval(0.002)
 			SOUND:StopMusic()
 		end
 	end,
 	CurrentRateChangedMessageCommand = function(self)
-		if ThemePrefs.Get("HV_SongPreview") ~= 1 then
-			goNow = true
-			self:SetUpdateFunctionInterval(0.002)
-			SOUND:StopMusic()
-		end
+		-- Removed StopMusic and restart to allow real-time rate update by the engine.
+		-- Position-based monitor in playMusic handles transitions if needed.
 	end,
 	PreviewNoteFieldDeletedMessageCommand = function(self)
 		musicNotPaused = 1

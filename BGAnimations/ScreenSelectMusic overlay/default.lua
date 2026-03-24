@@ -47,7 +47,7 @@ local lastWheelMove = 0
 local wheelLockTime = 0.05
 
 -- Bottom Footer Config (Top-level for scope)
-local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
+local tabs = {"PROFILE", "SCORES", "PLAYLISTS", "FILTERS", "TAGS", "GOALS", "RANDOM"}
 local tabW = 80
 local footerH = 40
 
@@ -139,7 +139,7 @@ local function adjustRate(delta)
 		songOpts:MusicRate(nr)
 		GAMESTATE:GetSongOptionsObject("ModsLevel_Song"):MusicRate(nr)
 		GAMESTATE:GetSongOptionsObject("ModsLevel_Current"):MusicRate(nr)
-		MESSAGEMAN:Broadcast("CurrentRateChanged")
+		MESSAGEMAN:Broadcast("CurrentRateChanged", {rate = nr, oldRate = curRate})
 	end
 end
 
@@ -297,6 +297,25 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					local tx = 10 + (i - 1) * tabW
 					if virtualX >= tx and virtualX <= tx + tabW and virtualY >= footerY and virtualY <= SCREEN_HEIGHT then
 						local target = tabName:upper()
+						
+						if target == "RANDOM" then
+							local groups = SONGMAN:GetSongGroupNames()
+							if groups and #groups > 0 then
+								local group = groups[math.random(#groups)]
+								local songs = SONGMAN:GetSongsInGroup(group)
+								if songs and #songs > 0 then
+									local song = songs[math.random(#songs)]
+									if song then
+										local whee = screen:GetMusicWheel()
+										if whee then
+											whee:SelectSong(song)
+										end
+									end
+								end
+							end
+							return true
+						end
+
 						if target == "PROFILE" then target = "SOCIAL" end 
 						
 						-- Close if the SAME tab is clicked
@@ -464,13 +483,14 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			-- --- SEARCH INPUT HANDLING ---
 			if HV.ActiveTab == "SEARCH" then
 				local whee = top.GetMusicWheel and top:GetMusicWheel() or (HV.SSM and HV.SSM.GetMusicWheel and HV.SSM:GetMusicWheel())
-				
+				local instant = HV.InstantSearch()
+
 				-- Handle Backspace
 				if btn:lower() == "devicebutton_backspace" then
 					if evType ~= "InputEventType_Release" then
 						if #searchString > 0 then
 							searchString = searchString:sub(1, -2)
-							if whee then whee:SongSearch(searchString) end
+							if instant and whee then whee:SongSearch(searchString) end
 							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 						end
 					end
@@ -481,7 +501,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				if btn:lower() == "devicebutton_delete" then
 					if evType ~= "InputEventType_Release" then
 						searchString = ""
-						if whee then whee:SongSearch("") end
+						if instant and whee then whee:SongSearch("") end
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 					end
 					return true
@@ -493,8 +513,9 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				
 				if isEnter then
 					if evType == "InputEventType_FirstPress" then
+						-- Filter now if not instant
+						if not instant and whee then whee:SongSearch(searchString) end
 						-- CLOSE SEARCH but keep filter.
-						-- Broadcasting twice ensuring NO leak to MusicWheel or Screen
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString, applied = true})
 					end
@@ -518,7 +539,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							local clip = Arch.getClipboard()
 							if clip then
 								searchString = searchString .. clip
-								if whee then whee:SongSearch(searchString) end
+								if instant and whee then whee:SongSearch(searchString) end
 								MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 							end
 						end
@@ -533,7 +554,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				if c and c ~= "" then
 					if evType ~= "InputEventType_Release" then
 						searchString = searchString .. c
-						if whee then whee:SongSearch(searchString) end
+						if instant and whee then whee:SongSearch(searchString) end
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 					end
 					return true
@@ -557,11 +578,54 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
 				if ctrl then
-					if btn == "DeviceButton_4" then
+					if btn == "DeviceButton_1" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PROFILE"})
+						return true
+					elseif btn == "DeviceButton_2" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SCORES"})
+						return true
+					elseif btn == "DeviceButton_3" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PLAYLISTS"})
+						return true
+					elseif btn == "DeviceButton_4" then
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SEARCH"})
+						return true
+					elseif btn == "DeviceButton_5" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "TAGS"})
+						return true
+					elseif btn == "DeviceButton_6" then
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "GOALS"})
+						return true
+					elseif btn == "DeviceButton_7" then
+						-- Random Song action
+						local groups = SONGMAN:GetSongGroupNames()
+						if groups and #groups > 0 then
+							local group = groups[math.random(#groups)]
+							local songs = SONGMAN:GetSongsInGroup(group)
+							if songs and #songs > 0 then
+								local song = songs[math.random(#songs)]
+								if song then
+									local whee = screen:GetMusicWheel()
+									if whee then
+										whee:SelectSong(song)
+									end
+								end
+							end
+						end
 						return true
 					elseif btn == "DeviceButton_0" then
 						MESSAGEMAN:Broadcast("ToggleInputDebugger")
+						return true
+					end
+				end
+
+				-- Global Del to clear search
+				if btn:lower() == "devicebutton_delete" then
+					if searchString ~= "" then
+						searchString = ""
+						local whee = top.GetMusicWheel and top:GetMusicWheel() or (HV.SSM and HV.SSM.GetMusicWheel and HV.SSM:GetMusicWheel())
+						if whee then whee:SongSearch("") end
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 						return true
 					end
 				end
@@ -742,10 +806,9 @@ local profileOverlay = Def.ActorFrame {
 					self:settext(name)
 				end
 			},
-			-- Level Badge
 			Def.ActorFrame {
 				Name = "PlayerLevelBadge",
-				InitCommand = function(self) self:y(54) end,
+				InitCommand = function(self) self:xy(-22, 54) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
 					local prof = PROFILEMAN:GetProfile(PLAYER_1)
 					if prof and HV.GetLevelColor then
@@ -779,7 +842,7 @@ local profileOverlay = Def.ActorFrame {
 			-- Progress Bar
 			Def.ActorFrame {
 				Name = "LevelProgress",
-				InitCommand = function(self) self:y(64) end,
+				InitCommand = function(self) self:y(68) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
 					local prof = PROFILEMAN:GetProfile(PLAYER_1)
 					if prof and HV.GetLevelProgress then
@@ -812,7 +875,7 @@ local profileOverlay = Def.ActorFrame {
 			},
 			LoadFont("Common Normal") .. {
 				Name = "Rating",
-				InitCommand = function(self) self:y(78):zoom(0.35):diffuse(accentColor) end,
+				InitCommand = function(self) self:xy(22, 54):zoom(0.55):diffuse(accentColor) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
 					if not HV.ShowMSD() then self:visible(false); return end
 					local val = 0
@@ -1275,14 +1338,33 @@ local profileOverlay = Def.ActorFrame {
 		-- Set input redirection for ALL tabs to block the C++ MusicWheel
 		-- Force redirection if tab is NOT empty, otherwise turn it off
 		local redirected = (targetTab ~= "")
-		SCREENMAN:set_input_redirected(PLAYER_1, redirected)
-		SCREENMAN:set_input_redirected(PLAYER_2, redirected)
+		
+		if redirected then
+			-- Cancel any pending unlock so we don't accidentally unlock if we switch tabs rapidly
+			self:stoptweening()
+			SCREENMAN:set_input_redirected(PLAYER_1, true)
+			SCREENMAN:set_input_redirected(PLAYER_2, true)
+		else
+			-- Delay unlocking redirection by 1 tick (0.01s) to ensure the Enter/Start event 
+			-- that triggered this close is fully swallowed by the input callback.
+			self:stoptweening():sleep(0.01):queuecommand("UnlockInput")
+		end
 
 		if targetTab == "PROFILE" then
-			self:visible(true)
+			self:visible(true):stoptweening()
+				:diffusealpha(0):linear(0.15):diffusealpha(1)
 			self:playcommand("UpdateAllScores")
 		else
-			self:visible(false)
+			self:stoptweening():linear(0.1):diffusealpha(0):queuecommand("Hide")
+		end
+	end,
+	HideCommand = function(self) self:visible(false) end,
+
+	UnlockInputCommand = function(self)
+		-- Only unlock if we are still not in an active tab (safety check)
+		if (HV.ActiveTab or "") == "" then
+			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			SCREENMAN:set_input_redirected(PLAYER_2, false)
 		end
 	end,
 
@@ -1515,7 +1597,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 -- ============================================================
 -- BOTTOM FOOTER & TAB BUTTONS
 -- ============================================================
-local tabs = {"PROFILE", "SCORES", "FILTERS", "PLAYLISTS", "TAGS", "GOALS"}
+local tabs = {"PROFILE", "SCORES", "PLAYLISTS", "FILTERS", "TAGS", "GOALS", "RANDOM"}
 local tabW = 80
 local footerH = 40
 
@@ -1590,7 +1672,14 @@ for i, tabName in ipairs(tabs) do
 			InitCommand = function(self)
 				self:halign(0):valign(0)
 					:zoomto(tabW, footerH)
-					:diffuse(color("0,0,0,0"))
+					:diffuse(accentColor):diffusealpha(0)
+			end,
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == tabName:upper() then
+					self:stoptweening():linear(0.15):diffusealpha(0.25)
+				else
+					self:stoptweening():linear(0.15):diffusealpha(0)
+				end
 			end
 		},
 		LoadFont("Common Normal") .. {
@@ -1599,6 +1688,13 @@ for i, tabName in ipairs(tabs) do
 					:xy(tabW / 2, footerH / 2)
 					:zoom(0.35):diffuse(mainText)
 					:settext(tabName)
+			end,
+			SelectMusicTabChangedMessageCommand = function(self, params)
+				if params.Tab == tabName:upper() then
+					self:stoptweening():smooth(0.15):zoom(0.4):diffuse(brightText)
+				else
+					self:stoptweening():smooth(0.15):zoom(0.35):diffuse(mainText)
+				end
 			end
 		}
 	}

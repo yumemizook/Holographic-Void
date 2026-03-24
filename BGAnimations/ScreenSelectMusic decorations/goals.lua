@@ -68,6 +68,7 @@ local t = Def.ActorFrame {
 		if params.Tab == "GOALS" then
 			self:visible(not self:GetVisible())
 			if self:GetVisible() then
+				self:stoptweening():diffusealpha(0):linear(0.2):diffusealpha(1)
 				HV.ActiveTab = "GOALS"
 				ind = 0
 				RefreshGoals()
@@ -157,7 +158,7 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(385):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "RateColumn")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(465):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "TargetColumn")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(545):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "PBColumn") or "PB") end },
-		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(645):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "StatusColumn")) end },
+		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(605):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "StatusColumn")) end },
 	},
 	Def.Quad {
 		InitCommand = function(self)
@@ -291,10 +292,10 @@ local function makeGoalRow(i)
 			end,
 		},
 
-		-- Status Label
+		-- Status Label (Moved left slightly)
 		LoadFont("Common Normal") .. {
 			Name = "Status",
-			InitCommand = function(self) self:halign(0.5):valign(0.5):x(645):y(rowH/2 - 2):zoom(0.35) end,
+			InitCommand = function(self) self:halign(0.5):valign(0.5):x(605):y(rowH/2 - 2):zoom(0.35) end,
 			GoalTableRefreshCommand = function(self)
 				if sg then
 					if sg:IsVacuous() then self:settext(THEME:GetString("Goals", "Vacuous")):diffuse(color("0.9,0.9,0.3,1"))
@@ -405,12 +406,55 @@ t[#t + 1] = Def.ActorFrame {
 								return true
 							end
 
-							-- Rate
+							-- Rate (Task 3: Constraints + Infinite spawning fix)
 							if hx >= 360 and hx <= 410 then
 								easyInputStringOKCancel(THEME:GetString("Goals", "RateLabel"), 4, false, function(answer)
 									local r = tonumber(answer)
 									if r then
-										pcall(function() sg:SetRate(math.max(0.1, math.min(3.0, r))) end)
+										-- Task 3.1: Validation Warnings
+										local invalid = false
+										if r < 0.05 or r > 3.0 then
+											ms.ok("Rate must be between 0.05 and 3.0")
+											invalid = true
+										elseif math.abs(r*20 - math.floor(r*20 + 0.5)) > 0.0001 then
+											ms.ok("Rate must be a multiple of 0.05")
+											invalid = true
+										end
+										
+										if invalid then return end
+
+										local oldRate = sg:GetRate()
+										if math.abs(r - oldRate) > 0.001 then
+											-- FIX: If rate changes, delete old one and create new one to avoid "spawning" duplicates
+											local ck = sg:GetChartKey()
+											local pct = sg:GetPercent()
+											local prio = sg:GetPriority()
+											
+											pcall(function() sg:Delete() end)
+											local profile = GetProfile()
+											if profile then
+												local newSg = profile:AddGoal(ck)
+												-- Handle newSg being a boolean (true) or a scoregoal object
+												if not newSg or type(newSg) == "boolean" then
+													local gt = profile:GetGoalTable()
+													for _, g in ipairs(gt) do
+														if g:GetChartKey() == ck then
+															newSg = g
+															break
+														end
+													end
+												end
+
+												if newSg and type(newSg) ~= "boolean" then
+													newSg:SetRate(r)
+													newSg:SetPercent(pct)
+													newSg:SetPriority(prio)
+												end
+											end
+										else
+											pcall(function() sg:SetRate(r) end)
+										end
+										RefreshGoals()
 										goalsActor:playcommand("GoalTableRefresh")
 									end
 								end)

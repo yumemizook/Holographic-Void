@@ -3,8 +3,8 @@
 -- Top-left corner, individual score cards + live current score
 -- THe judgement display is not shown here.
 
-local leaderboardMode = HV.ShowInGameLeaderboard() -- "Off", "Local", or "Online"
-if leaderboardMode == "Off" then
+local leaderboardMode = HV.ShowInGameLeaderboard() or "Off"
+if leaderboardMode == "Off" or HV.MinimalisticMode() then
 	return Def.ActorFrame {}
 end
 
@@ -63,14 +63,33 @@ local function UpdateScores()
 	local ck = steps:GetChartKey()
 	if not ck then return end
 
+	-- Get current rate for filtering
+	local curRate = getCurRateValue()
+	local curRateStr = getCurRateString()
+
 	if leaderboardMode == "Online" then
 		-- Fetch from DLMAN
 		local lb = DLMAN:GetChartLeaderBoard(ck)
 		if lb then
-			for i = 1, math.min(maxEntries, #lb) do
+			local filtered = {}
+			for i = 1, #lb do
 				local s = lb[i]
+				-- Filter by current rate (within epsilon)
+				if math.abs(s:GetMusicRate() - curRate) < 0.001 then
+					filtered[#filtered + 1] = s
+				end
+			end
+
+			-- Sort by wife% descending
+			table.sort(filtered, function(a, b)
+				return a:GetWifeScore() > b:GetWifeScore()
+			end)
+
+			for i = 1, math.min(maxEntries, #filtered) do
+				local s = filtered[i]
 				pcall(function()
 					local wife = s:GetWifeScore() * 100
+					local ssr = s:GetSkillsetSSR("Overall") or 0
 					highScores[#highScores + 1] = {
 						rank = i,
 						wife = wife,
@@ -78,12 +97,13 @@ local function UpdateScores()
 						gradeStr = GetGradeStr(wife),
 						name = s:GetDisplayName() or s:GetName() or "???",
 						rate = s:GetMusicRate(),
+						ssr = ssr,
 					}
 				end)
 			end
 		end
 
-		-- If none found, request them (seed for next play or late refresh)
+		-- If none found, request them
 		if #highScores == 0 and DLMAN:IsLoggedIn() then
 			DLMAN:RequestChartLeaderBoardFromOnline(ck, function(lbData)
 				if lbData and #lbData > 0 then
@@ -92,20 +112,16 @@ local function UpdateScores()
 			end)
 		end
 	else
-		-- Local Scores
-		local sl = SCOREMAN:GetScoresByKey(ck)
+		-- Local Scores: Only for current rate
+		local sl = getScoreTable(PLAYER_1, curRateStr)
 		if sl then
-			local allScores = {}
-			for _, scoreList in pairs(sl) do
-				local scoreTable = scoreList:GetScores()
-				if scoreTable then
-					for _, s in ipairs(scoreTable) do allScores[#allScores + 1] = s end
-				end
-			end
-			table.sort(allScores, function(a, b) return a:GetWifeScore() > b:GetWifeScore() end)
-			for i = 1, math.min(maxEntries, #allScores) do
-				local s = allScores[i]
+			-- Already sorted by score usually, but let's be sure it's wife%
+			table.sort(sl, function(a, b) return a:GetWifeScore() > b:GetWifeScore() end)
+			
+			for i = 1, math.min(maxEntries, #sl) do
+				local s = sl[i]
 				local wife = s:GetWifeScore() * 100
+				local ssr = s:GetSkillsetSSR("Overall") or 0
 				highScores[#highScores + 1] = {
 					rank = i,
 					wife = wife,
@@ -113,6 +129,7 @@ local function UpdateScores()
 					gradeStr = GetGradeStr(wife),
 					name = profileName,
 					rate = s:GetMusicRate(),
+					ssr = ssr,
 				}
 			end
 		end
@@ -204,6 +221,17 @@ for i = 1, maxEntries do
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 3):zoom(0.22):diffuse(dimText) end,
 			SetDataCommand = function(self, data) self:settextf("%.2fx", data.rate) end
+		},
+		-- SSR
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 11):zoom(0.24) end,
+			SetDataCommand = function(self, data)
+				if data.ssr > 0 then
+					self:settextf("%.2f", data.ssr):diffuse(HVColor.GetMSDRatingColor(data.ssr))
+				else
+					self:settext("")
+				end
+			end
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(1):valign(0):xy(cardW - 6, 21):zoom(0.22):diffuse(dimText) end,

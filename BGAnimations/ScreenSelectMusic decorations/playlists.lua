@@ -392,6 +392,7 @@ local t = Def.ActorFrame {
 		if params.Tab == "PLAYLISTS" then
 			-- Use explicit visibility to avoid toggle double-triggering
 			self:visible(true)
+			self:stoptweening():diffusealpha(0):linear(0.2):diffusealpha(1)
 			HV.ActiveTab = "PLAYLISTS"
 			singleplaylistactive = false
 			allplaylistsactive = true

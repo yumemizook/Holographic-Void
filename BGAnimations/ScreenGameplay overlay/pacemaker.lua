@@ -58,9 +58,9 @@ local function getBestScoreForCurrentRate()
 	return nil
 end
 
--- Abort completely if disabled via ThemePrefs
-local showPacemakerGraph = (ThemePrefs.Get("HV_ShowPacemakerGraph") == "true" or ThemePrefs.Get("HV_ShowPacemakerGraph") == true)
-if not showPacemakerGraph then
+-- Abort completely if disabled via ThemePrefs or Minimalistic Mode
+local showPacemakerGraph = ThemePrefs.Get("HV_ShowPacemakerGraph")
+if not showPacemakerGraph or HV.MinimalisticMode() then
 	return Def.ActorFrame {}
 end
 

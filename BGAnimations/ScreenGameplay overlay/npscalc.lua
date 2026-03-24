@@ -6,7 +6,7 @@ local pn = GAMESTATE:GetEnabledPlayers()[1]
 local countNotesSeparately = GAMESTATE:CountNotesSeparately()
 
 -- Check preferences
-if not HV.ShowNPS() then
+if not HV.ShowNPS() or HV.MinimalisticMode() then
 	return Def.ActorFrame {}
 end
 

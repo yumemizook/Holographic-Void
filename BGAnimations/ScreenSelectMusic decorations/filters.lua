@@ -118,6 +118,7 @@ local t = Def.ActorFrame {
 		if params.Tab == "FILTERS" then
 			self:visible(not self:GetVisible())
 			if self:GetVisible() then
+				self:stoptweening():diffusealpha(0):linear(0.2):diffusealpha(1)
 				HV.ActiveTab = "FILTERS"
 				active = true
 				self:playcommand("Set")

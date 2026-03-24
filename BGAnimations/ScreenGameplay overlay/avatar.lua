@@ -41,7 +41,7 @@ local t = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(panelX, panelY)
 		-- Check if player info should be shown
-		local showPlayerInfo = HV.ShowPlayerInfo()
+		local showPlayerInfo = HV.ShowPlayerInfo() and not HV.MinimalisticMode()
 		self:visible(showPlayerInfo)
 		actual_dp = 0
 		total_max = 0

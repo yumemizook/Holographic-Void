@@ -160,6 +160,15 @@ GetThemePref = ThemePrefs.Get
 SetThemePref = ThemePrefs.Set
 
 
+-- Generate 5% increment tables for Lane Cover heights (0-100%)
+local laneCoverChoices = {"Off"}
+local laneCoverValues = {0}
+for i = 1, 20 do
+	local val = i * 5
+	table.insert(laneCoverChoices, tostring(val) .. "%")
+	table.insert(laneCoverValues, val)
+end
+
 -- Preference definitions: each key maps to a table with a Default value.
 -- These are registered with the _Fallback ThemePrefs.Init system.
 local HVPrefs = {
@@ -213,11 +222,25 @@ local HVPrefs = {
 		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 	},
 
-	-- Gameplay: Lane Cover percentage (0 = off, 1-100)
-	HV_LaneCover = {
+	-- Gameplay: Sudden Lane Cover height (0-100)
+	HV_LaneCoverSudden = {
 		Default = 0,
-		Choices = {"Off", "10%", "25%", "40%", "50%", "60%", "75%"},
-		Values = {0, 10, 25, 40, 50, 60, 75},
+		Choices = laneCoverChoices,
+		Values = laneCoverValues,
+	},
+
+	-- Gameplay: Hidden Lane Cover height (0-100)
+	HV_LaneCoverHidden = {
+		Default = 0,
+		Choices = laneCoverChoices,
+		Values = laneCoverValues,
+	},
+
+	-- Gameplay: Instant Search (Real-time filtering)
+	HV_InstantSearch = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
 	},
 
 	-- Gameplay: Toggle real-time NPS display
@@ -399,7 +422,7 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 	HV_ProgressBarPosition = {
-		Default = "Bottom",
+		Default = "Top",
 		Choices = {"Top", "Bottom", "Off"},
 		Values = {"Top", "Bottom", "Off"}
 	},
@@ -418,9 +441,23 @@ local HVPrefs = {
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
-	-- Gameplay: Goal Tracker (renamed from HV_GoalTrackerText)
-	HV_ShowGoalTracker = {
-		Default = true,
+	-- Gameplay: Minimalistic Mode
+	HV_MinimalisticMode = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Gameplay: Judgment Tally Mode
+	HV_JudgeCounterMode = {
+		Default = "Simple",
+		Choices = {"Full", "Simple"},
+		Values = {"Full", "Simple"}
+	},
+
+	-- Gameplay: NG Indicator
+	HV_ShowNGIndicator = {
+		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
@@ -513,6 +550,16 @@ function HV.ShowInGameLeaderboard()
 	return val
 end
 
+--- Get Sudden lane cover height (0-100).
+function HV.GetLaneCoverSudden()
+	return tonumber(ThemePrefs.Get("HV_LaneCoverSudden")) or 0
+end
+
+--- Get Hidden lane cover height (0-100).
+function HV.GetLaneCoverHidden()
+	return tonumber(ThemePrefs.Get("HV_LaneCoverHidden")) or 0
+end
+
 --- Check if real-time NPS should be shown.
 function HV.ShowNPS()
 	return isTrue(ThemePrefs.Get("HV_ShowNPS"))
@@ -554,4 +601,24 @@ function HV.ShowHitMean()
 	return isTrue(ThemePrefs.Get("HV_ShowMean"))
 end
 
-Trace("Holographic Void: 03 ThemePrefs.lua loaded.")
+--- Check if minimalistic mode is enabled.
+function HV.MinimalisticMode()
+	return isTrue(ThemePrefs.Get("HV_MinimalisticMode"))
+end
+
+--- Check if instant search is enabled.
+function HV.InstantSearch()
+	return isTrue(ThemePrefs.Get("HV_InstantSearch"))
+end
+
+--- Get judgment tally mode ("Full" or "Simple").
+function HV.GetJudgmentTallyMode()
+	return ThemePrefs.Get("HV_JudgeCounterMode") or "Full"
+end
+
+--- Check if NG indicator should be shown.
+function HV.ShowNGIndicator()
+	return isTrue(ThemePrefs.Get("HV_ShowNGIndicator"))
+end
+
+Trace("Holographic Void: 03 HVThemePrefs.lua loaded.")

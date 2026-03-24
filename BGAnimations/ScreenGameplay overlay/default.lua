@@ -69,7 +69,7 @@ local barW = SCREEN_WIDTH * 0.4
 local barH = 6
 local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bottom" and SCREEN_BOTTOM - 12 or 12)
 
-local showProgressBar = progressBarPosition ~= "Off"
+local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode()
 
 if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
@@ -164,6 +164,7 @@ local lifeBarH = SCREEN_HEIGHT * 0.5
 local lifeBarX = SCREEN_CENTER_X + 220
 local lifeBarY = SCREEN_CENTER_Y
 
+if not HV.MinimalisticMode() then
 t[#t + 1] = Def.ActorFrame {
 	Name = "VerticalLifeBar",
 	InitCommand = function(self)
@@ -261,11 +262,12 @@ t[#t + 1] = Def.ActorFrame {
 		PracticeModeReloadMessageCommand = function(self) self:playcommand("RefreshLifePct") end
 	}
 }
+end -- End Vertical Life Bar
 
 -- ============================================================
 -- SCORE % (REAL-TIME)
 -- ============================================================
-local showCurrentWife = HV.ShowCurrentWife()
+local showCurrentWife = HV.ShowCurrentWife() and not HV.MinimalisticMode()
 
 if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
@@ -326,7 +328,7 @@ end
 -- ============================================================
 -- GOAL TRACKER
 -- ============================================================
-local showGoalTrackerText = HV.ShowGoalTrackerText()
+local showGoalTrackerText = HV.ShowGoalTrackerText() and not HV.MinimalisticMode()
 if showGoalTrackerText then
 	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType")
 	if not pacemakerMode or pacemakerMode == "" then pacemakerMode = "Target" end
@@ -387,7 +389,7 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
 		-- Check if hit mean should be shown
-		local showMean = HV.ShowHitMean()
+		local showMean = HV.ShowHitMean() and not HV.MinimalisticMode()
 		self:visible(showMean)
 	end,
 	OnCommand = function(self)
@@ -418,7 +420,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- CENTERED COMBO / MISS COMBO
 -- ============================================================
-local showCombo = HV.ShowCombo()
+local showCombo = HV.ShowCombo() and not HV.MinimalisticMode()
 local missStreak = 0
 
 if showCombo then
@@ -540,7 +542,7 @@ end -- End combo visibility check
 -- ============================================================
 -- COMBO BREAK LANE HIGHLIGHT
 -- ============================================================
-local showComboBreakHighlight = HV.ComboBreakHighlight()
+local showComboBreakHighlight = HV.ComboBreakHighlight() and not HV.MinimalisticMode()
 
 if showComboBreakHighlight then
 t[#t + 1] = Def.ActorFrame {
@@ -645,6 +647,7 @@ local dotLife = 2.0  -- seconds
 local ewmaValue = 0
 local ewmaAlpha = 0.07
 local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
+if HV.MinimalisticMode() then ebMode = "Off" end
 local showEWMA = (ebMode == "EWMAOnly" or ebMode == "Both")
 local showStandard = (ebMode == "Standard" or ebMode == "Both")
 
@@ -763,12 +766,12 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 -- ============================================================
 -- TWO-COLUMN JUDGMENT TALLY + PERFORMANCE METRICS
 -- ============================================================
-local showJudgeCounter = HV.ShowJudgeCounter()
-local tallyX = SCREEN_CENTER_X + 150
-local tallyY = SCREEN_BOTTOM - 200
 local colSpacing = 70
+local showJudgeCounter = HV.ShowJudgeCounter()
+local tallyX = SCREEN_CENTER_X + 160
+local tallyY = SCREEN_HEIGHT - 176
 
-if showJudgeCounter then
+if showJudgeCounter and not HV.MinimalisticMode() then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
@@ -823,6 +826,10 @@ t[#t + 1] = Def.ActorFrame {
 			Name = "OKNGDisplay",
 			InitCommand = function(self)
 				self:y(#judgmentLabels * 16 + 4)
+				-- Hide OK/NG in Simple mode
+				if HV.GetJudgmentTallyMode() == "Simple" then
+					self:visible(false)
+				end
 			end,
 
 			LoadFont("Common Normal") .. {
@@ -884,6 +891,10 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "Column2_Metrics",
 		InitCommand = function(self)
 			self:x(colSpacing)
+			-- Hide metrics in Simple mode
+			if HV.GetJudgmentTallyMode() == "Simple" then
+				self:visible(false)
+			end
 		end,
 
 		-- Rescored % (J4)
@@ -1103,6 +1114,7 @@ end
 -- ============================================================
 -- SONG TITLE (BOTTOM of screen)
 -- ============================================================
+if not HV.MinimalisticMode() then
 t[#t + 1] = Def.ActorFrame {
 	Name = "SongInfoHUD",
 	InitCommand = function(self)
@@ -1220,28 +1232,49 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	end
 }
+end
 
 -- ============================================================
 -- LANE COVER
 -- ============================================================
-local laneCoverPct = tonumber(ThemePrefs.Get("HV_LaneCover")) or 0
-if laneCoverPct > 0 then
-	t[#t + 1] = Def.ActorFrame {
-		Name = "LaneCoverLayer",
-		InitCommand = function(self)
-			self:Center()
-		end,
+local suddenHeight = HV.GetLaneCoverSudden()
+local hiddenHeight = HV.GetLaneCoverHidden()
 
-		-- Top Cover (Sudden)
-		Def.Quad {
+if suddenHeight > 0 or hiddenHeight > 0 then
+	local isReverse = GAMESTATE:GetPlayerState():GetCurrentPlayerOptions():UsingReverse()
+	
+	-- Helper to create a cover quad (isTop=true for Top, false for Bottom)
+	local function createCover(height, isTop)
+		local h = SCREEN_HEIGHT * (height / 100)
+		return Def.Quad {
 			InitCommand = function(self)
-				local h = SCREEN_HEIGHT * (laneCoverPct / 100)
-				self:valign(0):y(-SCREEN_HEIGHT / 2)
-					:zoomto(SCREEN_WIDTH, h)
+				self:zoomto(SCREEN_WIDTH, h)
 					:diffuse(color("0,0,0,1"))
+				if isTop then
+					self:valign(0):y(-SCREEN_HEIGHT / 2)
+				else
+					self:valign(1):y(SCREEN_HEIGHT / 2)
+				end
 			end
 		}
+	end
+
+	local t_cover = Def.ActorFrame {
+		Name = "LaneCoverLayer",
+		InitCommand = function(self) self:Center() end,
 	}
+
+	-- Sudden: spawn side (Top for Standard, Bottom for Reverse)
+	if suddenHeight > 0 then
+		t_cover[#t_cover + 1] = createCover(suddenHeight, not isReverse)
+	end
+
+	-- Hidden: receptor side (Bottom for Standard, Top for Reverse)
+	if hiddenHeight > 0 then
+		t_cover[#t_cover + 1] = createCover(hiddenHeight, isReverse)
+	end
+	
+	t[#t + 1] = t_cover
 end
 
 t[#t + 1] = LoadActor("scoretracking")
@@ -1251,5 +1284,27 @@ t[#t + 1] = LoadActor("multiplayer")
 t[#t + 1] = LoadActor("leaderboard")
 t[#t + 1] = LoadActor("avatar")
 t[#t + 1] = LoadActor("intro")
+
+-- ============================================================
+-- NG INDICATOR (POPUP)
+-- ============================================================
+if HV.ShowNGIndicator() and not HV.MinimalisticMode() then
+t[#t + 1] = Def.ActorFrame {
+	Name = "NGIndicator",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 20)
+	end,
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self)
+			self:zoom(1.2):diffuse(color("#FF4444")):diffusealpha(0):settext("NG")
+		end,
+		JudgmentMessageCommand = function(self, params)
+			if params.HoldNoteScore == "HoldNoteScore_LetGo" then
+				self:stoptweening():diffusealpha(1):zoom(1.2):linear(0.2):zoom(1.5):linear(0.2):zoom(1.2):sleep(0.5):linear(0.2):diffusealpha(0)
+			end
+		end
+	}
+}
+end
 
 return t

@@ -925,6 +925,10 @@ t[#t + 1] = Def.ActorFrame {
 			if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
 			
 			if event.type ~= "InputEventType_FirstPress" then return false end
+			
+			-- Block input if an overlay tab is active
+			if (HV.ActiveTab and HV.ActiveTab ~= "") then return false end
+
 			local btn = event.DeviceInput.button
 			if btn ~= "DeviceButton_left mouse button" then return false end
 			
@@ -1038,12 +1042,16 @@ t[#t + 1] = Def.ActorFrame {
 			self:playcommand("Set")
 		end,
 		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			local isDifferentRate = score and math.abs(score:GetMusicRate() - getCurRateValue()) > 0.001
+			
 			if self:GetParent().isHovering then
 				self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest") .. " (J4)")
 				self:diffuse(color("#FF6666"))
 			else
 				self:settext(THEME:GetString("ScreenSelectMusic", "PersonalBest"))
-				self:diffuse(accentColor)
+				-- Color header if it's a different rate to highlight why
+				self:diffuse(isDifferentRate and accentColor or accentColor)
 			end
 		end
 	},
@@ -1109,7 +1117,14 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local score = HV.CurrentSongData.pbScore
 			if score then
-				self:settext(string.format("%.2fx", score:GetMusicRate()))
+				local r = score:GetMusicRate()
+				self:settext(string.format("%.2fx", r))
+				-- Color rate if it's NOT the current rate (Task 1)
+				if math.abs(r - getCurRateValue()) > 0.001 then
+					self:diffuse(accentColor)
+				else
+					self:diffuse(mainText)
+				end
 			else
 				self:settext("")
 			end
