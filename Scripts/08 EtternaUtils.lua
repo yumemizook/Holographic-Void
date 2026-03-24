@@ -753,7 +753,7 @@ function getRescoredWife3Judge(version, judgeScale, rst, useCurrent)
 		maxNotes = math.max(0, rst["totalNotes"] or 0)
 		-- For evaluation, we must penalize unplayed notes (from failing early) as misses.
 		local unplayed = math.max(0, maxNotes - (rst["notesPassed"] or 0))
-		totalPoints = totalPoints + (unplayed * 5.5) -- unhit notes are unhit
+		totalPoints = totalPoints - (unplayed * 5.5) -- unhit notes are unhit
 	end
 	
 	if maxNotes <= 0 then return 0 end
