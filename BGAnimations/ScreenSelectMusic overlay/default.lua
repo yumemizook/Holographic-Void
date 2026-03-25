@@ -492,6 +492,9 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							searchString = searchString:sub(1, -2)
 							if instant and whee then whee:SongSearch(searchString) end
 							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+						else
+							-- Backspace on empty search closes (sc-wh behavior)
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						end
 					end
 					return true
@@ -547,15 +550,21 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					return true
 				end
 
-				-- Handle Typing (Lenient character detection)
+				-- Handle Typing (Robust character detection)
 				local shifted = INPUTFILTER:IsBeingPressed("left shift") or INPUTFILTER:IsBeingPressed("right shift")
 				local c = (event.char and event.char ~= "") and event.char or DeviceBtnToChar(btn, shifted)
 				
+				-- Use a whitelist for characters to ensure stability (adapted from spawncamping-wallhack)
+				-- This regex covers letters, numbers, and a wide range of symbols.
+				local whitelist = '[%%%+%-%!%@%#%$%^%&%*%(%)%=%_%.%,%:%;%\'%"%>%<%?%/%~%|%w%[%]%{%}%`%\\]'
+				
 				if c and c ~= "" then
-					if evType ~= "InputEventType_Release" then
-						searchString = searchString .. c
-						if instant and whee then whee:SongSearch(searchString) end
-						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+					if c:match(whitelist) or c == " " then
+						if evType ~= "InputEventType_Release" then
+							searchString = searchString .. c
+							if instant and whee then whee:SongSearch(searchString) end
+							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+						end
 					end
 					return true
 				end

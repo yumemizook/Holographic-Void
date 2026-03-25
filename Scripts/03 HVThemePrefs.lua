@@ -299,7 +299,7 @@ local HVPrefs = {
 			"71%", "72%", "73%", "74%", "75%", "76%", "77%", "78%", "79%", "80%",
 			"81%", "82%", "83%", "84%", "85%", "86%", "87%", "88%", "89%", "90%",
 			"91%", "92%", "93%", "94%", "95%", "96%", "97%", "98%", "99%",
-			"99.50%", "99.70%", "99.80%", "99.90%", "99.95%",
+			"99.50%", "99.60%", "99.70%", "99.80%", "99.90%", "99.95%",
 			"99.96%", "99.97%", "99.98%", "99.99%",
 			"99.990%", "99.991%", "99.992%", "99.993%", "99.994%",
 			"99.995%", "99.996%", "99.997%", "99.998%", "99.999%", "100%"
@@ -315,7 +315,7 @@ local HVPrefs = {
 			71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
 			81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
 			91, 92, 93, 94, 95, 96, 97, 98, 99,
-			99.50, 99.70, 99.80, 99.90, 99.95,
+			99.50, 99.60, 99.70, 99.80, 99.90, 99.95,
 			99.96, 99.97, 99.98, 99.99,
 			99.990, 99.991, 99.992, 99.993, 99.994,
 			99.995, 99.996, 99.997, 99.998, 99.999, 100
@@ -363,8 +363,22 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 	
-	-- Grade Color Style
-	HV_GradeColorStyle = {
+	-- Judgment Color Style
+	HV_JudgmentColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic"},
+		Values = {"Holographic", "Classic"}
+	},
+
+	-- Difficulty Color Style
+	HV_DifficultyColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic"},
+		Values = {"Holographic", "Classic"}
+	},
+
+	-- Clear Type Color Style
+	HV_ClearTypeColorStyle = {
 		Default = "Holographic",
 		Choices = {"Holographic", "Classic"},
 		Values = {"Holographic", "Classic"}
@@ -467,9 +481,13 @@ local HVPrefs = {
 ThemePrefs.Init(HVPrefs, true)
 ThemePrefs.ForceSave() -- Ensure new defaults are written to disk
 
--- After loading, refresh accent colors
-if HVColor and HVColor.RefreshAccent then
-	HVColor.RefreshAccent()
+-- After loading, refresh accent colors and style palettes
+if HVColor then
+	if HVColor.RefreshAccent then HVColor.RefreshAccent() end
+	if HVColor.RefreshDifficultyColors then HVColor.RefreshDifficultyColors() end
+	if HVColor.RefreshJudgmentColors then HVColor.RefreshJudgmentColors() end
+	if HVColor.RefreshClearTypeColors then HVColor.RefreshClearTypeColors() end
+	if HVColor.RefreshGradeColors then HVColor.RefreshGradeColors() end
 end
 
 -- ==========================================================================

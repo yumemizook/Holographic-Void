@@ -53,9 +53,11 @@ local swatchStartY = SCREEN_CENTER_Y - 110
 
 -- Preview panel constants (right side chunks)
 local previewStartX = SCREEN_RIGHT - 180
-local previewStartY = SCREEN_CENTER_Y - 120
+local previewStartY = 118
 local chunkW = 280
-local chunkH = 55
+local chunkH = 44
+local chunkGap = 6
+local function getChunkY(i) return previewStartY + (i-1) * (chunkH + chunkGap) end
 
 local function getSwatchPos(i)
 	local r = math.ceil(i / cols) - 1
@@ -68,41 +70,62 @@ end
 -- Interactivity for chunks
 local gradeStyles = {"Holographic", "Classic"}
 local msdScales = {"Holographic", "Classic", "None", "Monochrome"}
+local judgeStyles = {"Holographic", "Classic"}
+local diffStyles = {"Holographic", "Classic"}
+local ctStyles = {"Holographic", "Classic"}
 
-local function getGradeStyle()
-	return ThemePrefs.Get("HV_GradeColorStyle") or "Holographic"
-end
-
+local function getGradeStyle() return ThemePrefs.Get("HV_GradeColorStyle") or "Holographic" end
 local function cycleGradeStyle()
 	local current = getGradeStyle()
 	local nextStyle = gradeStyles[1]
-	for i, s in ipairs(gradeStyles) do
-		if s == current then
-			nextStyle = gradeStyles[i % #gradeStyles + 1]
-			break
-		end
-	end
+	for i, s in ipairs(gradeStyles) do if s == current then nextStyle = gradeStyles[i % #gradeStyles + 1] break end end
 	ThemePrefs.Set("HV_GradeColorStyle", nextStyle)
 	ThemePrefs.ForceSave()
+	if HVColor and HVColor.RefreshGradeColors then HVColor.RefreshGradeColors() end
 	MESSAGEMAN:Broadcast("GradeStyleChanged")
 end
 
-local function getMSDScale()
-	return ThemePrefs.Get("HV_MSDColorScaleV3") or "Holographic"
-end
-
+local function getMSDScale() return ThemePrefs.Get("HV_MSDColorScaleV3") or "Holographic" end
 local function cycleMSDScale()
 	local current = getMSDScale()
 	local nextScale = msdScales[1]
-	for i, s in ipairs(msdScales) do
-		if s == current then
-			nextScale = msdScales[i % #msdScales + 1]
-			break
-		end
-	end
+	for i, s in ipairs(msdScales) do if s == current then nextScale = msdScales[i % #msdScales + 1] break end end
 	ThemePrefs.Set("HV_MSDColorScaleV3", nextScale)
 	ThemePrefs.ForceSave()
 	MESSAGEMAN:Broadcast("MSDScaleChanged")
+end
+
+local function getJudgeStyle() return ThemePrefs.Get("HV_JudgmentColorStyle") or "Holographic" end
+local function cycleJudgeStyle()
+	local current = getJudgeStyle()
+	local nextStyle = judgeStyles[1]
+	for i, s in ipairs(judgeStyles) do if s == current then nextStyle = judgeStyles[i % #judgeStyles + 1] break end end
+	ThemePrefs.Set("HV_JudgmentColorStyle", nextStyle)
+	ThemePrefs.ForceSave()
+	if HVColor and HVColor.RefreshJudgmentColors then HVColor.RefreshJudgmentColors() end
+	MESSAGEMAN:Broadcast("JudgeStyleChanged")
+end
+
+local function getDiffStyle() return ThemePrefs.Get("HV_DifficultyColorStyle") or "Holographic" end
+local function cycleDiffStyle()
+	local current = getDiffStyle()
+	local nextStyle = diffStyles[1]
+	for i, s in ipairs(diffStyles) do if s == current then nextStyle = diffStyles[i % #diffStyles + 1] break end end
+	ThemePrefs.Set("HV_DifficultyColorStyle", nextStyle)
+	ThemePrefs.ForceSave()
+	if HVColor and HVColor.RefreshDifficultyColors then HVColor.RefreshDifficultyColors() end
+	MESSAGEMAN:Broadcast("DiffStyleChanged")
+end
+
+local function getCTStyle() return ThemePrefs.Get("HV_ClearTypeColorStyle") or "Holographic" end
+local function cycleCTStyle()
+	local current = getCTStyle()
+	local nextStyle = ctStyles[1]
+	for i, s in ipairs(ctStyles) do if s == current then nextStyle = ctStyles[i % #ctStyles + 1] break end end
+	ThemePrefs.Set("HV_ClearTypeColorStyle", nextStyle)
+	ThemePrefs.ForceSave()
+	if HVColor and HVColor.RefreshClearTypeColors then HVColor.RefreshClearTypeColors() end
+	MESSAGEMAN:Broadcast("CTStyleChanged")
 end
 
 -- State
@@ -212,19 +235,16 @@ local t = Def.ActorFrame {
 				-- Interactive Chunks
 				local function isOverChunk(yOff)
 					local cx = previewStartX
-					local cy = previewStartY + yOff
+					local cy = yOff
 					return mx >= cx - chunkW/2 and mx <= cx + chunkW/2
 					   and my >= cy - chunkH/2 and my <= cy + chunkH/2
 				end
 
-				if isOverChunk(248) then -- Grade Chunk
-					cycleGradeStyle()
-					return true
-				end
-				if isOverChunk(310) then -- MSD Chunk
-					cycleMSDScale()
-					return true
-				end
+				if isOverChunk(getChunkY(1)) then cycleGradeStyle() return true end
+				if isOverChunk(getChunkY(2)) then cycleMSDScale() return true end
+				if isOverChunk(getChunkY(3)) then cycleJudgeStyle() return true end
+				if isOverChunk(getChunkY(4)) then cycleDiffStyle() return true end
+				if isOverChunk(getChunkY(5)) then cycleCTStyle() return true end
 			end
 		end)
 	end,
@@ -252,21 +272,22 @@ local t = Def.ActorFrame {
 			-- Chunk hovers
 			local function isOverChunk(yOff)
 				local cx = previewStartX
-				local cy = previewStartY + yOff
+				local cy = yOff
 				return mx >= cx - chunkW/2 and mx <= cx + chunkW/2
 				   and my >= cy - chunkH/2 and my <= cy + chunkH/2
 			end
 			
-			local overGrade = isOverChunk(248)
-			local overMSD = isOverChunk(310)
-			if overGrade ~= self.HoveringGrade then
-				self.HoveringGrade = overGrade
-				MESSAGEMAN:Broadcast("GradeHoverChanged", { Hovering = overGrade })
-			end
-			if overMSD ~= self.HoveringMSD then
-				self.HoveringMSD = overMSD
-				MESSAGEMAN:Broadcast("MSDHoverChanged", { Hovering = overMSD })
-			end
+			local overG = isOverChunk(getChunkY(1))
+			local overM = isOverChunk(getChunkY(2))
+			local overJ = isOverChunk(getChunkY(3))
+			local overD = isOverChunk(getChunkY(4))
+			local overC = isOverChunk(getChunkY(5))
+			
+			if overG ~= self.HG then self.HG = overG MESSAGEMAN:Broadcast("GradeHoverChanged", { Hovering = overG }) end
+			if overM ~= self.HM then self.HM = overM MESSAGEMAN:Broadcast("MSDHoverChanged", { Hovering = overM }) end
+			if overJ ~= self.HJ then self.HJ = overJ MESSAGEMAN:Broadcast("JudgeHoverChanged", { Hovering = overJ }) end
+			if overD ~= self.HD then self.HD = overD MESSAGEMAN:Broadcast("DiffHoverChanged", { Hovering = overD }) end
+			if overC ~= self.HC then self.HC = overC MESSAGEMAN:Broadcast("CTHoverChanged", { Hovering = overC }) end
 		end)
 	end
 }
@@ -391,101 +412,19 @@ end
 -- FEATURE PREVIEW CHUNKS (Right Side)
 -- ============================================================
 
--- Helper to create a preview chunk
-local function createChunk(name, yOffset, iconChar, titleText, descText, showProgress)
-	return Def.ActorFrame {
-		Name = "Chunk_" .. name,
-		InitCommand = function(self) self:xy(previewStartX, previewStartY + yOffset) end,
-		
-		-- Chunk background
-		Def.Quad {
-			InitCommand = function(self)
-				self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9"))
-			end
-		},
-		
-		-- Left accent bar
-		Def.Quad {
-			Name = "ChunkAccentBar",
-			InitCommand = function(self)
-				self:halign(0):x(-chunkW/2):zoomto(3, chunkH)
-					:diffuse(color(getActiveHex())):diffusealpha(0.8)
-			end,
-			ColorThemeChangedMessageCommand = function(self)
-				self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8)
-			end
-		},
-		
-		-- Icon
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(-chunkW/2 + 18, 0):zoom(0.4)
-					:diffuse(color(getActiveHex()))
-				self:settext(iconChar)
-			end,
-			ColorThemeChangedMessageCommand = function(self)
-				self:stoptweening():linear(0.15):diffuse(previewColor)
-			end
-		},
-		
-		-- Title
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(-chunkW/2 + 38, -8):halign(0):zoom(0.32)
-					:diffuse(color("1,1,1,1"))
-				self:settext(titleText)
-			end
-		},
-		
-		-- Description
-		LoadFont("Common Normal") .. {
-			InitCommand = function(self)
-				self:xy(-chunkW/2 + 38, 8):halign(0):zoom(0.24)
-					:diffuse(color("0.65,0.65,0.65,1"))
-				self:settext(descText)
-			end
-		},
-		
-		-- Optional progress bar
-		showProgress and Def.ActorFrame {
-			InitCommand = function(self) self:y(16) end,
-			Def.Quad {
-				InitCommand = function(self)
-					self:halign(0):x(-chunkW/2 + 38):zoomto(80, 4)
-						:diffuse(color("0.18,0.18,0.18,1"))
-				end
-			},
-			Def.Quad {
-				Name = "ProgressBar",
-				InitCommand = function(self)
-					self:halign(0):x(-chunkW/2 + 38):zoomto(55, 4)
-						:diffuse(color(getActiveHex())):diffusealpha(0.7)
-				end,
-				ColorThemeChangedMessageCommand = function(self)
-					self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.7)
-				end
-			}
-		} or nil
-	}
-end
 
--- Add feature demonstration chunks
-t[#t + 1] = createChunk("Header", 0, "H", "Title Header", "Sample header text styling", false)
-t[#t + 1] = createChunk("Button", 62, "B", "Active Button", "Interactive button states", false)
-t[#t + 1] = createChunk("Progress", 124, "P", "Progress Bar", "Progress indicators", true)
-t[#t + 1] = createChunk("Accent", 186, "A", "Accent Elements", "Selection & highlights", false)
+
+
 
 -- ============================================================
 -- INTERACTIVE GRADE PREVIEW
 -- ============================================================
 t[#t+1] = Def.ActorFrame {
 	Name = "Chunk_Grade",
-	InitCommand = function(self) self:xy(previewStartX, previewStartY + 248) end,
+	InitCommand = function(self) self:xy(previewStartX, getChunkY(1)) end,
 	
 	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9"))
-		end,
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
 		GradeHoverChangedMessageCommand = function(self, params)
 			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.9") or color("0.06,0.06,0.06,0.9"))
 		end
@@ -494,63 +433,35 @@ t[#t+1] = Def.ActorFrame {
 	Def.Quad {
 		Name = "ChunkAccentBar",
 		InitCommand = function(self)
-			self:halign(0):x(-chunkW/2):zoomto(3, chunkH)
-				:diffuse(color(getActiveHex())):diffusealpha(0.8)
+			self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(color(getActiveHex())):diffusealpha(0.8)
 		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8)
-		end
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
 	},
 	
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex()))
-			self:settext("G")
-		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor)
-		end
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex())):settext("G") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
 	},
 	
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 38, -14):halign(0):zoom(0.32):diffuse(color("1,1,1,1"))
-		end,
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, -9):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
 		BeginCommand = function(self) self:playcommand("Set") end,
 		GradeStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
-		SetCommand = function(self)
-			self:settext("Grade Colors: " .. getGradeStyle())
-		end
-	},
-
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 38, -2):halign(0):zoom(0.18):diffuse(color("0.4,0.4,0.4,1"))
-			self:settext("Click to cycle style (Holographic/Classic)")
-		end,
-		GradeHoverChangedMessageCommand = function(self, params)
-			self:stoptweening():linear(0.1):diffusealpha(params.Hovering and 1 or 0.4)
-		end
+		SetCommand = function(self) self:settext("Grade Style: " .. getGradeStyle()) end
 	},
 	
 	-- Grade Examples
 	Def.ActorFrame {
-		InitCommand = function(self) self:xy(-chunkW/2 + 38, 14) end,
-		
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 9) end,
 		(function()
 			local grades = {"AAAAA", "AAAA", "AAA", "AA", "A", "B", "C", "D", "F"}
 			local am = Def.ActorFrame {}
 			for i, g in ipairs(grades) do
 				am[#am+1] = LoadFont("Common Normal") .. {
-					InitCommand = function(self)
-						self:x((i-1)*25):zoom(0.24):halign(0)
-					end,
+					InitCommand = function(self) self:x((i-1)*26):zoom(0.24):halign(0) end,
 					BeginCommand = function(self) self:playcommand("Set") end,
 					GradeStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
-					SetCommand = function(self)
-						self:settext(g)
-						self:diffuse(HVColor.GetGradeColor(g))
-					end
+					SetCommand = function(self) self:settext(g):diffuse(HVColor.GetGradeColor(g)) end
 				}
 			end
 			return am
@@ -563,87 +474,197 @@ t[#t+1] = Def.ActorFrame {
 -- ============================================================
 t[#t+1] = Def.ActorFrame {
 	Name = "Chunk_MSD",
-	InitCommand = function(self) self:xy(previewStartX, previewStartY + 310) end,
+	InitCommand = function(self) self:xy(previewStartX, getChunkY(2)) end,
 	
 	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9"))
-		end,
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
 		MSDHoverChangedMessageCommand = function(self, params)
 			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.9") or color("0.06,0.06,0.06,0.9"))
 		end
 	},
 	
 	Def.Quad {
-		InitCommand = function(self)
-			self:halign(0):x(-chunkW/2):zoomto(3, chunkH)
-				:diffuse(color(getActiveHex())):diffusealpha(0.8)
-		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8)
-		end
+		InitCommand = function(self) self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(color(getActiveHex())):diffusealpha(0.8) end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
 	},
 	
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex()))
-			self:settext("M")
-		end,
-		ColorThemeChangedMessageCommand = function(self)
-			self:stoptweening():linear(0.15):diffuse(previewColor)
-		end
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex())):settext("M") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
 	},
 	
 	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 38, -14):halign(0):zoom(0.32):diffuse(color("1,1,1,1"))
-		end,
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, -9):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
 		BeginCommand = function(self) self:playcommand("Set") end,
 		MSDScaleChangedMessageCommand = function(self) self:playcommand("Set") end,
-		SetCommand = function(self)
-			self:settext("MSD Scale: " .. getMSDScale())
-		end
+		SetCommand = function(self) self:settext("MSD Scale: " .. getMSDScale()) end
 	},
-
-	LoadFont("Common Normal") .. {
-		InitCommand = function(self)
-			self:xy(-chunkW/2 + 38, -2):halign(0):zoom(0.18):diffuse(color("0.4,0.4,0.4,1"))
-			self:settext("Click to cycle scale (Holographic/Classic/None/Mono)")
-		end,
-		MSDHoverChangedMessageCommand = function(self, params)
-			self:stoptweening():linear(0.1):diffusealpha(params.Hovering and 1 or 0.4)
-		end
-	},
-
+	
 	-- MSD Scale Bar (0-40)
 	Def.ActorFrame {
-		InitCommand = function(self) self:xy(-chunkW/2 + 38, 12) end,
-		
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 9) end,
 		(function()
 			local am = Def.ActorFrame {}
 			local segments = 40
 			local segW = 200 / segments
 			for i = 0, segments do
 				am[#am+1] = Def.Quad {
-					InitCommand = function(self)
-						self:x(i * segW):halign(0):zoomto(segW, 6)
-					end,
+					InitCommand = function(self) self:x(i * segW):halign(0):zoomto(segW, 4) end,
 					BeginCommand = function(self) self:playcommand("Set") end,
 					MSDScaleChangedMessageCommand = function(self) self:playcommand("Set") end,
-					SetCommand = function(self)
-						self:diffuse(HVColor.GetMSDRatingColor(i))
-					end
+					SetCommand = function(self) self:diffuse(HVColor.GetMSDRatingColor(i)) end
 				}
 			end
-			
-			-- Labels for 0 and 40
-			am[#am+1] = LoadFont("Common Normal") .. {
-				InitCommand = function(self) self:y(11):zoom(0.18):halign(0):diffuse(color("0.5,0.5,0.5,1")):settext("0") end
-			}
-			am[#am+1] = LoadFont("Common Normal") .. {
-				InitCommand = function(self) self:x(200):y(11):zoom(0.18):halign(1):diffuse(color("0.5,0.5,0.5,1")):settext("40+") end
-			}
-			
+			return am
+		end)()
+	}
+}
+
+-- ============================================================
+-- INTERACTIVE JUDGMENT PREVIEW
+-- ============================================================
+t[#t+1] = Def.ActorFrame {
+	Name = "Chunk_Judge",
+	InitCommand = function(self) self:xy(previewStartX, getChunkY(3)) end,
+	
+	Def.Quad {
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
+		JudgeHoverChangedMessageCommand = function(self, params)
+			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.9") or color("0.06,0.06,0.06,0.9"))
+		end
+	},
+	
+	Def.Quad {
+		InitCommand = function(self) self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(color(getActiveHex())):diffusealpha(0.8) end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex())):settext("J") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, -9):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
+		BeginCommand = function(self) self:playcommand("Set") end,
+		JudgeStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+		SetCommand = function(self) self:settext("Judgment Style: " .. getJudgeStyle()) end
+	},
+	
+	Def.ActorFrame {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 9) end,
+		(function()
+			local judges = {"W1", "W2", "W3", "W4", "W5", "Miss", "Held", "LetGo"}
+			local labels = {"MARV", "PERF", "GREAT", "GOOD", "BAD", "MISS", "OK", "NG"}
+			local am = Def.ActorFrame {}
+			for i, j in ipairs(judges) do
+				am[#am+1] = LoadFont("Common Normal") .. {
+					InitCommand = function(self) self:x((i-1)*32):zoom(0.24):halign(0) end,
+					BeginCommand = function(self) self:playcommand("Set") end,
+					JudgeStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+					SetCommand = function(self) self:settext(labels[i]):diffuse(HVColor.GetJudgmentColor(j)) end
+				}
+			end
+			return am
+		end)()
+	}
+}
+
+-- ============================================================
+-- INTERACTIVE DIFFICULTY PREVIEW
+-- ============================================================
+t[#t+1] = Def.ActorFrame {
+	Name = "Chunk_Diff",
+	InitCommand = function(self) self:xy(previewStartX, getChunkY(4)) end,
+	
+	Def.Quad {
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
+		DiffHoverChangedMessageCommand = function(self, params)
+			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.9") or color("0.06,0.06,0.06,0.9"))
+		end
+	},
+	
+	Def.Quad {
+		InitCommand = function(self) self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(color(getActiveHex())):diffusealpha(0.8) end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex())):settext("D") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, -9):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
+		BeginCommand = function(self) self:playcommand("Set") end,
+		DiffStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+		SetCommand = function(self) self:settext("Difficulty Style: " .. getDiffStyle()) end
+	},
+	
+	Def.ActorFrame {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 9) end,
+		(function()
+			local diffs = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
+			local labels = {"BEG", "EASY", "MED", "HARD", "CHAL", "EDIT"}
+			local am = Def.ActorFrame {}
+			for i, d in ipairs(diffs) do
+				am[#am+1] = LoadFont("Common Normal") .. {
+					InitCommand = function(self) self:x((i-1)*40):zoom(0.24):halign(0) end,
+					BeginCommand = function(self) self:playcommand("Set") end,
+					DiffStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+					SetCommand = function(self) self:settext(labels[i]):diffuse(HVColor.GetDifficultyColor(d)) end
+				}
+			end
+			return am
+		end)()
+	}
+}
+
+-- ============================================================
+-- INTERACTIVE CLEAR TYPE PREVIEW
+-- ============================================================
+t[#t+1] = Def.ActorFrame {
+	Name = "Chunk_CT",
+	InitCommand = function(self) self:xy(previewStartX, getChunkY(5)) end,
+	
+	Def.Quad {
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
+		CTHoverChangedMessageCommand = function(self, params)
+			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.9") or color("0.06,0.06,0.06,0.9"))
+		end
+	},
+	
+	Def.Quad {
+		InitCommand = function(self) self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(color(getActiveHex())):diffusealpha(0.8) end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(color(getActiveHex())):settext("C") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, -9):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
+		BeginCommand = function(self) self:playcommand("Set") end,
+		CTStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+		SetCommand = function(self) self:settext("Clear Type Style: " .. getCTStyle()) end
+	},
+	
+	Def.ActorFrame {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 9) end,
+		(function()
+			local cts = {"MFC", "WF", "SDP", "PFC", "BF", "SDG", "FC", "MF", "SDCB", "Clear", "Failed", "NoPlay"}
+			local labels = {"MFC", "WF", "SDP", "PFC", "BF", "SDG", "FC", "MF", "SDCB", "CLR", "FAIL", "NOP"}
+			local am = Def.ActorFrame {}
+			for i, ct in ipairs(cts) do
+				am[#am+1] = LoadFont("Common Normal") .. {
+					InitCommand = function(self) self:x((i-1)*19):zoom(0.18):halign(0) end,
+					BeginCommand = function(self) self:playcommand("Set") end,
+					CTStyleChangedMessageCommand = function(self) self:playcommand("Set") end,
+					SetCommand = function(self) self:settext(labels[i]):diffuse(HVColor.GetClearTypeColor(ct)) end
+				}
+			end
 			return am
 		end)()
 	}

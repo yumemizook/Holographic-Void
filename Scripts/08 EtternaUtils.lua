@@ -826,21 +826,21 @@ end
 -- OFFSET TO JUDGE COLOR
 ------------------------------------------------------------
 function offsetToJudgeColor(offset, scale)
-	if not offset then return color("#E0A0A0") end
+	if not offset then return HVColor.GetJudgmentColor("Miss") end
 	scale = scale or 1
 	local absOff = math.abs(offset)
 	if absOff <= 22.5 * scale then
-		return color("#FFFFFF")  -- Marvelous
+		return HVColor.GetJudgmentColor("W1")
 	elseif absOff <= 45 * scale then
-		return color("#E0E0A0")  -- Perfect
+		return HVColor.GetJudgmentColor("W2")
 	elseif absOff <= 90 * scale then
-		return color("#A0E0A0")  -- Great
+		return HVColor.GetJudgmentColor("W3")
 	elseif absOff <= 135 * scale then
-		return color("#A0C8E0")  -- Good
+		return HVColor.GetJudgmentColor("W4")
 	elseif absOff <= 180 * scale then
-		return color("#C8A0E0")  -- Bad
+		return HVColor.GetJudgmentColor("W5")
 	else
-		return color("#E0A0A0")  -- Miss
+		return HVColor.GetJudgmentColor("Miss")
 	end
 end
 
@@ -851,7 +851,7 @@ function getJudgeStrings(tns)
 	return THEME:GetString("TapNoteScore", ToEnumShortString(tns))
 end
 
--- Song length color (from sc-wh)
+-- Song length color (from sc-wh) -- unused for now?
 function getSongLengthColor(len)
 	if len > 600 then return color("#ff3333")
 	elseif len > 300 then return color("#ffaa33")

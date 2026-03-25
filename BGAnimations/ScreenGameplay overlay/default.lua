@@ -32,8 +32,12 @@ local mainText = color("0.85,0.85,0.85,1")
 local brightText = color("1,1,1,1")
 
 local judgmentColors = {
-	color("#FFFFFF"), color("#E0E0A0"), color("#A0E0A0"),
-	color("#A0C8E0"), color("#C8A0E0"), color("#E0A0A0")
+	HVColor.GetJudgmentColor("W1"),
+	HVColor.GetJudgmentColor("W2"),
+	HVColor.GetJudgmentColor("W3"),
+	HVColor.GetJudgmentColor("W4"),
+	HVColor.GetJudgmentColor("W5"),
+	HVColor.GetJudgmentColor("Miss")
 }
 local judgmentLabels = {
 	THEME:GetString("TapNoteScore", "W1"),
@@ -839,7 +843,7 @@ t[#t + 1] = Def.ActorFrame {
 
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self)
-					self:halign(0):valign(0):zoom(0.34):diffuse(color("#A0E0A0")):diffusealpha(0.8)
+					self:halign(0):valign(0):zoom(0.34):diffuse(HVColor.GetJudgmentColor("Held")):diffusealpha(0.8)
 					self:settext(THEME:GetString("HoldNoteScore", "OK"))
 				end
 			},
@@ -865,7 +869,7 @@ t[#t + 1] = Def.ActorFrame {
 
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self)
-					self:halign(0):valign(0):y(16):zoom(0.34):diffuse(color("#E0A0A0")):diffusealpha(0.8)
+					self:halign(0):valign(0):y(16):zoom(0.34):diffuse(HVColor.GetJudgmentColor("LetGo")):diffusealpha(0.8)
 					self:settext(THEME:GetString("HoldNoteScore", "NG"))
 				end
 			},

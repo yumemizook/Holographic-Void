@@ -42,8 +42,8 @@ function HVColor.RefreshAccent()
 	end
 end
 
--- Difficulty colors (monochromatic-friendly with subtle hue shifts)
-HVColor.Difficulty = {
+-- Difficulty colors
+HVColor.DifficultyHolographic = {
 	Beginner    = color("#98B8CF"),   -- Light gray
 	Easy        = color("#A0CFAB"),   -- Muted green-gray
 	Medium      = color("#CFD198"),   -- Muted gold-gray
@@ -52,30 +52,91 @@ HVColor.Difficulty = {
 	Edit        = color("#8C8C8C"),   -- Muted purple-gray
 }
 
--- Override GameColor.Difficulty with our monochromatic versions
-if GameColor and GameColor.Difficulty then
-	for k, v in pairs(HVColor.Difficulty) do
-		GameColor.Difficulty[k] = v
-		GameColor.Difficulty["Difficulty_" .. k] = v
+HVColor.DifficultyClassic = {
+	Beginner    = color("#66CCFF"),
+	Easy        = color("#099948"),
+	Medium      = color("#DDAA00"),
+	Hard        = color("#FF6666"),
+	Challenge   = color("#C97BFF"),
+	Edit        = color("#666666"),
+}
+
+HVColor.Difficulty = HVColor.DifficultyHolographic
+
+--- Refresh global difficulty color overrides based on style.
+function HVColor.RefreshDifficultyColors()
+	local style = ThemePrefs.Get("HV_DifficultyColorStyle") or "Holographic"
+	local palette = (tostring(style):lower() == "classic") and HVColor.DifficultyClassic or HVColor.DifficultyHolographic
+	HVColor.Difficulty = palette
+	
+	if GameColor and GameColor.Difficulty then
+		for k, v in pairs(palette) do
+			GameColor.Difficulty[k] = v
+			GameColor.Difficulty["Difficulty_" .. k] = v
+		end
 	end
 end
 
 --- Get a color for a difficulty short name (e.g. "Hard", "Challenge", "Edit").
 function HVColor.GetDifficultyColor(diff)
+	HVColor.RefreshDifficultyColors() -- Ensure we are using correct palette
 	if not diff then return HVColor.Difficulty.Edit end
 	local s = diff:gsub("Difficulty_", "")
 	return HVColor.Difficulty[s] or HVColor.Difficulty.Edit
 end
 
 -- Judgment colors (kept distinct but desaturated to fit the theme)
-HVColor.Judgment = {
+HVColor.JudgmentHolographic = {
 	W1   = color("#FFFFFF"),    -- Marvelous: pure white
 	W2   = color("#E0E0A0"),    -- Perfect: warm off-white
 	W3   = color("#A0E0A0"),    -- Great: pale green
 	W4   = color("#A0C8E0"),    -- Good: pale blue
 	W5   = color("#C8A0E0"),    -- Bad: pale purple
 	Miss = color("#E0A0A0"),    -- Miss: pale red
+	Held = color("#8fbb84ff"),    -- OK (Held): matches Perfect
+	LetGo = color("#E0A0A0"),   -- NG (LetGo): matches Miss
 }
+
+HVColor.JudgmentClassic = {
+	W1   = color("#99CCFF"),
+	W2   = color("#F2CB30"),
+	W3   = color("#14CC8F"),
+	W4   = color("#1AB2FF"),
+	W5   = color("#FF1AB3"),
+	Miss = color("#CC2929"),
+	Held = color("#F2CB30"),    -- Til Death Held (OK)
+	LetGo = color("#CC2929"),   -- Til Death LetGo (NG)
+}
+
+--- Refresh global judgment colors based on style.
+function HVColor.RefreshJudgmentColors()
+	local style = ThemePrefs.Get("HV_JudgmentColorStyle") or "Holographic"
+	-- Case-insensitive check for maximum robustness
+	if tostring(style):lower() == "classic" then
+		HVColor.Judgment = HVColor.JudgmentClassic
+	else
+		HVColor.Judgment = HVColor.JudgmentHolographic
+	end
+end
+
+--- Get a color for a Judgment type based on style.
+function HVColor.GetJudgmentColor(judge)
+	HVColor.RefreshJudgmentColors() -- Ensure we are using correct palette
+	local palette = HVColor.Judgment
+	
+	if not judge then return palette.Miss end
+	local s = tostring(judge):gsub("TapNoteScore_", ""):gsub("HoldNoteScore_", "")
+	
+	-- Map internal scores to the palette
+	if s == "W1" then return palette.W1 end
+	if s == "W2" or s == "Held" then return palette.Held or palette.W2 end
+	if s == "W3" then return palette.W3 end
+	if s == "W4" then return palette.W4 end
+	if s == "W5" then return palette.W5 end
+	if s == "Miss" or s == "LetGo" then return palette.LetGo or palette.Miss end
+	
+	return palette[s] or palette.Miss
+end
 
 -- MSD rating color scale (smooth gradient)
 local msdTable = {
@@ -100,7 +161,7 @@ function HVColor.GetMSDRatingColor(msd)
 		local prefValue = ThemePrefs.Get("HV_MSDColorScaleV3")
 		-- Robust fallback: if preference is empty, nil, or explicitly "None" (which was causing issues), 
 		-- default to our premium "Holographic" scale.
-		if prefValue and prefValue ~= "" and prefValue ~= "None" then
+		if prefValue and prefValue ~= "" then
 			scale = prefValue
 		end
 	end
@@ -133,8 +194,8 @@ function HVColor.GetMSDRatingColor(msd)
 	return msdTable[1][2]
 end
 
--- Clear Type colors (muted variants of classic schemes)
-HVColor.ClearType = {
+-- Clear Type colors
+HVColor.ClearTypeHolographic = {
 	MFC     = color("#E0F8FF"), -- Slightly cyan white (Marvelous Full Combo)
 	WF      = color("#E0E0E0"), -- Muted White (White Flag - 1xW2 FC)
 	SDP     = color("#CFD198"), -- Muted Yellow (Single Digit Perfects)
@@ -151,19 +212,46 @@ HVColor.ClearType = {
 	None    = color("#252525"), -- Darkest Gray
 }
 
+HVColor.ClearTypeClassic = {
+	MFC     = color("#66CCFF"),
+	WF      = color("#DDDDDD"),
+	SDP     = color("#CC8800"),
+	PFC     = color("#EEAA00"),
+	BF      = color("#999999"),
+	SDG     = color("#448844"),
+	FC      = color("#66CC66"),
+	MF      = color("#CC6666"),
+	SDCB    = color("#33BBFF"),
+	Clear   = color("#33AAFF"),
+	Failed  = color("#E61E25"),
+	Invalid = color("#E61E25"),
+	NoPlay  = color("#666666"),
+	None    = color("#666666"),
+}
+
+--- Refresh global clear type colors based on style.
+function HVColor.RefreshClearTypeColors()
+	local style = ThemePrefs.Get("HV_ClearTypeColorStyle") or "Holographic"
+	local palette = (tostring(style):lower() == "classic") and HVColor.ClearTypeClassic or HVColor.ClearTypeHolographic
+	HVColor.ClearType = palette
+end
+
 --- Get a color for a Clear Type string.
 function HVColor.GetClearTypeColor(ct)
-	if not ct then return HVColor.ClearType.Clear end
+	HVColor.RefreshClearTypeColors() -- Ensure we are using correct palette
+	local palette = HVColor.ClearType
+
+	if not ct then return palette.Clear end
 	local s = ct:upper():gsub(" ", ""):gsub("CLEARTYPE_", "")
 	
-	if HVColor.ClearType[s] then return HVColor.ClearType[s] end
+	if palette[s] then return palette[s] end
 	
 	-- Fallback patterns
-	if s:find("MARVELOUS") then return HVColor.ClearType.MFC end
-	if s:find("PERFECT")   then return HVColor.ClearType.PFC end
-	if s:find("COMBO")     then return HVColor.ClearType.FC end
-	if s:find("FAILED")    then return HVColor.ClearType.Failed end
-	return HVColor.ClearType.Clear
+	if s:find("MARVELOUS") then return palette.MFC end
+	if s:find("PERFECT")   then return palette.PFC end
+	if s:find("COMBO")     then return palette.FC end
+	if s:find("FAILED")    then return palette.Failed end
+	return palette.Clear
 end
 
 -- Song Length colors
@@ -209,10 +297,17 @@ HVColor.GradeClassic = {
 	None  = color("#666666"),    -- Dark Gray
 }
 
+--- Refresh global grade colors based on style.
+function HVColor.RefreshGradeColors()
+	local style = ThemePrefs.Get("HV_GradeColorStyle") or "Holographic"
+	local palette = (tostring(style):lower() == "classic") and HVColor.GradeClassic or HVColor.Grade
+	HVColor.GradePalette = palette
+end
+
 --- Get a color for a Grade string or enum.
 function HVColor.GetGradeColor(grade)
-	local style = ThemePrefs.Get("HV_GradeColorStyle") or "Holographic"
-	local palette = style == "Classic" and HVColor.GradeClassic or HVColor.Grade
+	HVColor.RefreshGradeColors() -- Ensure we are using correct palette
+	local palette = HVColor.GradePalette or HVColor.Grade
 
 	if not grade then return palette.None end
 	local s = tostring(grade):upper():gsub("GRADE_", "")
@@ -260,6 +355,15 @@ function getMainColor(type)
 	if type == "negative" then return color("#CF9898") end
 	-- Fallback for any other requested type
 	return HVColor.Accent
+end
+
+-- Initial refresh
+if ThemePrefs and ThemePrefs.Get then
+	HVColor.RefreshAccent()
+	HVColor.RefreshDifficultyColors()
+	HVColor.RefreshJudgmentColors()
+	HVColor.RefreshClearTypeColors()
+	HVColor.RefreshGradeColors()
 end
 
 Trace("Holographic Void: 02 Colors.lua loaded.")

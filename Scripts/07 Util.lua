@@ -57,9 +57,16 @@ end
 function DeviceBtnToChar(btn, shifted)
 	if not btn then return nil end
 	local b = btn:lower()
+	
+	-- Standard Letters (devicebutton_a to devicebutton_z)
 	local letter = b:match("^devicebutton_([a-z])$")
 	if letter then return shifted and letter:upper() or letter end
+	
+	-- Standard Digits (devicebutton_0 to devicebutton_9)
 	local digit = b:match("^devicebutton_([0-9])$")
+	-- Numpad Digits (devicebutton_kp 0 to devicebutton_kp 9)
+	if not digit then digit = b:match("^devicebutton_kp ([0-9])$") end
+	
 	if digit then
 		if shifted then
 			local shiftMap = { ["1"] = "!", ["2"] = "@", ["3"] = "#", ["4"] = "$", ["5"] = "%",
@@ -69,6 +76,7 @@ function DeviceBtnToChar(btn, shifted)
 		return digit
 	end
 	
+	-- Symbols and Special Keys
 	local symMap = {
 		["devicebutton_period"] = shifted and ">" or ".",
 		["devicebutton_comma"] = shifted and "<" or ",",
@@ -82,6 +90,12 @@ function DeviceBtnToChar(btn, shifted)
 		["devicebutton_right bracket"] = shifted and "}" or "]",
 		["devicebutton_grave"] = shifted and "~" or "`",
 		["devicebutton_space"] = " ",
+		-- Numpad Operators
+		["devicebutton_kp /"] = "/",
+		["devicebutton_kp *"] = "*",
+		["devicebutton_kp -"] = "-",
+		["devicebutton_kp +"] = "+",
+		["devicebutton_kp ."] = ".",
 	}
 	return symMap[b]
 end

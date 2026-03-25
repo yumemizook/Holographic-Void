@@ -68,7 +68,7 @@ end
 
 local function HighlightUpdaterThing(self)
 	if self:IsVisible() then
-		self:GetChild("Background"):queuecommand("Highlight")
+		self:GetChild("Background"):playcommand("Highlight")
 	end
 end
 

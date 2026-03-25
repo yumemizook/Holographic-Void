@@ -207,8 +207,8 @@ local dividerColor = color("0.2,0.2,0.2,1")
 
 -- Judgment colors (HV palette)
 local judgmentColors = {
-	color("#FFFFFF"), color("#E0E0A0"), color("#A0E0A0"),
-	color("#A0C8E0"), color("#C8A0E0"), color("#E0A0A0")
+	HVColor.GetJudgmentColor("W1"), HVColor.GetJudgmentColor("W2"), HVColor.GetJudgmentColor("W3"),
+	HVColor.GetJudgmentColor("W4"), HVColor.GetJudgmentColor("W5"), HVColor.GetJudgmentColor("Miss")
 }
 
 -- [NEW] Combo Graph Configuration
@@ -333,7 +333,8 @@ local t = Def.ActorFrame {
 			local screen = SCREENMAN:GetTopScreen()
 			if not screen then 
 				-- Retry next frame if screen is not yet available
-				self:sleep(0.01):queuecommand("On")
+				-- Use sleep with a slightly longer duration to be safe
+				self:sleep(0.05):queuecommand("On")
 				return 
 			end
 
@@ -380,12 +381,10 @@ local function scoreBoard(pn)
 	local frameH = SCREEN_HEIGHT - 20
 	local pad = 12
 
-	local function highlight(self) self:queuecommand("Highlight") end
 
 	local board = Def.ActorFrame {
 		InitCommand = function(self)
 			self:xy(frameX, frameY)
-			self:SetUpdateFunction(highlight)
 		end,
 		OffsetPlotModificationMessageCommand = function(self, params)
 			if params.Name == "Coin" then
@@ -512,7 +511,7 @@ local function scoreBoard(pn)
 
 			Def.Sprite {
 				Name = "Banner",
-				InitCommand = function(self) self:halign(0):valign(0):xy(pad, 0):diffusealpha(0) end,
+				InitCommand = function(self) self:halign(0):valign(0):xy(pad + 10, 0):diffusealpha(0) end,
 				OnCommand = function(self)
 					if song then
 						local bpath = song:GetBannerPath()
@@ -520,7 +519,7 @@ local function scoreBoard(pn)
 						self:LoadBackground(bpath)
 						self:scaletofit(0, 0, (frameW - pad * 3) * 0.5, 60)
 					end
-					self:sleep(0.05):linear(0.25):diffusealpha(1)
+					self:stoptweening():sleep(0.05):linear(0.25):diffusealpha(1)
 				end
 			},
 
@@ -829,7 +828,7 @@ local function scoreBoard(pn)
 				local grade = pss:GetWifeGrade()
 				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
 				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
-				self:sleep(0.3):linear(0.2):zoom(0.7):diffusealpha(1)
+				self:stoptweening():sleep(0.3):linear(0.2):zoom(0.7):diffusealpha(1)
 			end,
 			SetJudgeCommand = function(self)
 				if usingCustomWindows then return end
@@ -886,7 +885,8 @@ local function scoreBoard(pn)
 				label:sleep(0.35):linear(0.15):diffusealpha(1)
 				
 				-- Incremental counting
-				local duration = 0.8
+				local val = math.max(0, wife)
+				local duration = 0.8 -- Return to fast fixed duration, well under 2s limit
 				local curTime = 0
 				local targetWife = wife
 				self:SetUpdateFunction(function(self, delta)
@@ -1000,7 +1000,7 @@ local function scoreBoard(pn)
 					local duration = 0.8
 					local curTime = 0
 
-					self:visible(true):diffusealpha(0):sleep(0.4):linear(0.2):diffusealpha(1)
+					self:visible(true):stoptweening():diffusealpha(0):sleep(0.4):linear(0.2):diffusealpha(1)
 					
 					local label = self:GetChild("ProgressLabel")
 					self:SetUpdateFunction(function(self, delta)
@@ -1031,10 +1031,11 @@ local function scoreBoard(pn)
 				local decimalPart = self:GetChild("DecimalDP")
 				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (pss:GetWifeScore() * songMaxPoints)
 				local targetDP = dp
+				
 				local duration = 0.8
 				local curTime = 0
 
-				self:sleep(0.4):linear(0.15):diffusealpha(1)
+				self:stoptweening():sleep(0.4):linear(0.15):diffusealpha(1)
 				
 				self:SetUpdateFunction(function(self, delta)
 					curTime = curTime + delta
@@ -1117,7 +1118,7 @@ local function scoreBoard(pn)
 				else
 					self:settext("PB: New!"):diffuse(accentColor)
 				end
-				self:sleep(0.5):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.5):linear(0.2):diffusealpha(1)
 			end
 		},
 
@@ -1130,7 +1131,7 @@ local function scoreBoard(pn)
 		Def.ActorFrame {
 			InitCommand = function(self) self:xy(280, 45):diffusealpha(0) end,
 			OnCommand = function(self)
-				self:sleep(0.55):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.55):linear(0.2):diffusealpha(1)
 			end,
 
 			-- Current Clear Type
@@ -1185,20 +1186,25 @@ local function scoreBoard(pn)
 	-- Judgment Tally Frame (Column 1)
 	local tallyFrame = Def.ActorFrame {
 		Name = "JudgmentTally",
-		InitCommand = function(self) self:SetUpdateFunction(highlight):diffusealpha(0) end,
+		InitCommand = function(self) self:diffusealpha(0) end,
 		OnCommand = function(self)
-			self:sleep(0.6):linear(0.3):diffusealpha(1)
-		end,
-		HighlightCommand = function(self)
-			if usingCustomWindows then
-				if showRATally then showRATally = false self:playcommand("RATallyChanged") end
-				return
-			end
-			local over = isOver(self:GetChild("HoverArea"))
-			if over ~= showRATally then
-				showRATally = over
-				self:playcommand("RATallyChanged")
-			end
+			self:stoptweening():sleep(0.6):linear(0.3):diffusealpha(1)
+			
+			-- Handle hover logic via direct update function to avoid command overhead
+			self:SetUpdateFunction(function(self)
+				if usingCustomWindows then
+					if showRATally then 
+						showRATally = false 
+						self:playcommand("RATallyChanged") 
+					end
+					return
+				end
+				local over = isOver(self:GetChild("HoverArea"))
+				if over ~= showRATally then
+					showRATally = over
+					self:playcommand("RATallyChanged")
+				end
+			end)
 		end,
 
 		Def.Quad {
@@ -1217,7 +1223,10 @@ local function scoreBoard(pn)
 	board[#board + 1] = tallyFrame
 
 	local raLabels = {"Ludicrous", "Ridiculous", "Marvelous", "Perfect", "Great", "Miss"}
-	local raColors = {color("#FF69B4"), color("#FFD700"), color("#FFFFFF"), color("#E0E0A0"), color("#A0E0A0"), color("#E0A0A0")}
+	local raColors = {
+		color("#FF69B4"), color("#FFD700"), 
+		HVColor.GetJudgmentColor("W1"), HVColor.GetJudgmentColor("W2"), HVColor.GetJudgmentColor("W3"), HVColor.GetJudgmentColor("Miss")
+	}
 	
 	for k, v in ipairs(judges) do
 		local jy = statsStartY + 28 + (k - 1) * rowH
@@ -1357,7 +1366,7 @@ local function scoreBoard(pn)
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(col == 1 and 1 or 0):xy(col == 1 and rx + 30 or rx, ry):zoom(0.48):diffuse(ratioColors[ri]):settext(rlabel .. ":"):diffusealpha(0) end,
 			OnCommand = function(self)
-				self:sleep(0.65 + ri * 0.05):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.65 + ri * 0.05):linear(0.2):diffusealpha(1)
 			end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
@@ -1384,6 +1393,7 @@ local function scoreBoard(pn)
 				self:sleep(0.7 + ri * 0.05):linear(0.2):diffusealpha(1)
 			end,
 			SetJudgeCommand = function(self)
+				self:stoptweening()
 				if ri == 3 or ri == 4 then
 					local w1 = getRescoredJudge(dvt, judge, 1)
 					local w2 = getRescoredJudge(dvt, judge, 2)
@@ -1407,7 +1417,7 @@ local function scoreBoard(pn)
 	board[#board + 1] = LoadFont("Common Normal") .. {
 		InitCommand = function(self) self:halign(0):valign(0):xy(col2X, statsStartY + 8):zoom(0.45):diffuse(subText):settext("Holds & Stats"):diffusealpha(0) end,
 		OnCommand = function(self)
-			self:sleep(0.6):linear(0.2):diffusealpha(1)
+			self:stoptweening():sleep(0.6):linear(0.2):diffusealpha(1)
 		end
 	}
 	local holdLabels = {"Hold OK", "Hold NG", "Mines Hit"}
@@ -1416,7 +1426,7 @@ local function scoreBoard(pn)
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):xy(col2X, hy):zoom(0.42):diffuse(subText):settext(label .. ":"):diffusealpha(0) end,
 			OnCommand = function(self)
-				self:sleep(0.65 + i * 0.05):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.65 + i * 0.05):linear(0.2):diffusealpha(1)
 			end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
@@ -1425,7 +1435,7 @@ local function scoreBoard(pn)
 				if i == 1 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_Held"))
 				elseif i == 2 then self:settext(pss:GetHoldNoteScores("HoldNoteScore_LetGo"))
 				elseif i == 3 then self:settext(pss:GetTapNoteScores("TapNoteScore_HitMine")) end
-				self:sleep(0.65 + i * 0.05):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.65 + i * 0.05):linear(0.2):diffusealpha(1)
 			end
 		}
 	end
@@ -1438,7 +1448,7 @@ local function scoreBoard(pn)
 		board[#board + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(0):xy(col2X, ty):zoom(0.42):diffuse(subText):settext(label .. ":"):diffusealpha(0) end,
 			OnCommand = function(self)
-				self:sleep(0.75 + i * 0.05):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.75 + i * 0.05):linear(0.2):diffusealpha(1)
 			end
 		}
 		board[#board + 1] = LoadFont("Common Normal") .. {
@@ -1447,9 +1457,14 @@ local function scoreBoard(pn)
 				if i == 1 then self:settextf("%.2fms", wifeMean(dvt))
 				elseif i == 2 then self:settextf("%.2fms", wifeSd(dvt))
 				elseif i == 3 then self:settextf("%.2fms", wifeMax(dvt)) end
-				self:sleep(0.75 + i * 0.05):linear(0.2):diffusealpha(1)
+				self:stoptweening():sleep(0.75 + i * 0.05):linear(0.2):diffusealpha(1)
 			end,
-			SetJudgeCommand = function(self) self:playcommand("On") end
+			SetJudgeCommand = function(self) self:playcommand("UpdateText") end,
+			UpdateTextCommand = function(self)
+				if i == 1 then self:settextf("%.2fms", wifeMean(dvt))
+				elseif i == 2 then self:settextf("%.2fms", wifeSd(dvt))
+				elseif i == 3 then self:settextf("%.2fms", wifeMax(dvt)) end
+			end
 		}
 	end
 
@@ -1735,7 +1750,25 @@ t[#t + 1] = Def.ActorFrame {
 					})
 				end)
 			end,
-			SetJudgeMessageCommand = function(self) self:playcommand("On") end,
+			SetJudgeMessageCommand = function(self, params)
+				self:RunCommandsOnChildren(function(child)
+					child:playcommand("Update", {
+						width = rightW - 20,
+						height = 100,
+						song = song,
+						steps = steps,
+						nrv = nrv,
+						dvt = dvt,
+						ctt = ctt,
+						ntt = ntt,
+						columns = steps and steps:GetNumColumns() or 4,
+						cbl = cbl,
+						cbr = cbr,
+						cbm = cbm,
+						showMiddle = showMiddle
+					})
+				end)
+			end,
 		},
 		-- Offset Plot Label
 		LoadFont("Common Normal") .. {

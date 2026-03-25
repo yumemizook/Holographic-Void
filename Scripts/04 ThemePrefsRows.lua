@@ -58,12 +58,7 @@ local HVPrefRows = {
 	},
 
 
-	-- MSD Color Scale
-	HV_MSDColorScaleV3 = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "None", "Monochrome"},
-		Values  = {"Holographic", "Classic", "None", "Monochrome"},
-	},
+
 
 	-- Show Measure Lines
 	HV_ShowMeasureLines = {
@@ -212,12 +207,7 @@ local HVPrefRows = {
 		Values = {false, true},
 	},
 
-	-- Grade Color Style
-	HV_GradeColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic"},
-		Values  = {"Holographic", "Classic"},
-	},
+
 	
 	-- Background Effect Style
 	HV_BackgroundEffect = {
@@ -365,7 +355,7 @@ function HVThemeOptionsLines()
 		
 		-- Music Select
 		-- Music Select
-		"HV_ShowMSD", "HV_MSDColorScaleV3", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
+		"HV_ShowMSD", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
 		
 		-- Gameplay HUD
 		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_ShowCombo", "HV_ShowCurrentWife",
@@ -381,7 +371,7 @@ function HVThemeOptionsLines()
 		"HV_ShowGoalTracker",
 		
 		-- Grades
-		"HV_UseCustomGrades", "HV_GradeColorStyle"
+		"HV_UseCustomGrades"
 	}, ",")
 	return l
 end

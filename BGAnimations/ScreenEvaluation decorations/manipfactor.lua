@@ -104,8 +104,8 @@ local function byMF(x)
         x = 0.4
     end
     local p = x / 0.4
-    -- Lerp between W3 (Muted Green) and Miss (Muted Red)
-    return HV.LerpColor(p, HVColor.Judgment.W3, HVColor.Judgment.Miss)
+    -- Lerp between W3 and Miss
+    return HV.LerpColor(p, HVColor.GetJudgmentColor("W3"), HVColor.GetJudgmentColor("Miss"))
 end
 
 -- Generate key data
