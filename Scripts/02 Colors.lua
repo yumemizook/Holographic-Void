@@ -198,15 +198,15 @@ HVColor.Grade = {
 -- Classic Til Death grade colors
 HVColor.GradeClassic = {
 	AAAAA = color("#FFFFFF"),    -- White
-	AAAA  = color("#00FFFF"),    -- Cyan
-	AAA   = color("#FFFF00"),    -- Yellow
-	AA    = color("#00FF00"),    -- Green
-	A     = color("#FF0000"),    -- Red
-	B     = color("#3333FF"),    -- Blue
-	C     = color("#FF00FF"),    -- Purple
-	D     = color("#FF33CC"),    -- Pink
-	F     = color("#888888"),    -- Gray
-	None  = color("#444444"),    -- Dark Gray
+	AAAA  = color("#66CCFF"),    -- Cyan
+	AAA   = color("#EEBB00"),    -- Yellow
+	AA    = color("#66cc66"),    -- Green
+	A     = color("#DA5757"),    -- Red
+	B     = color("#5B78BB"),    -- Blue
+	C     = color("#C97BFF"),    -- Purple
+	D     = color("#8C6239"),    -- Pink
+	F     = color("#CDCDCD"),    -- Gray
+	None  = color("#666666"),    -- Dark Gray
 }
 
 --- Get a color for a Grade string or enum.

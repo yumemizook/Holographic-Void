@@ -1,9 +1,110 @@
 --- Holographic Void: ScreenPlayerOptions Overlay
--- Shows effective scroll speed display and noteskin preview.
+-- Shows tab bar (Player Options / Quick Theme Options / Effect Options),
+-- effective scroll speed display, and noteskin preview.
 -- Uses SpeedChoiceChangedMessage to update in real-time like Til Death.
 
 local t = Def.ActorFrame {
 	Name = "PlayerOptionsOverlay",
+}
+
+-- ============================================================
+-- MOD ICONS (top-left)
+-- Shows shorthand for currently active mods.
+-- ============================================================
+local modShorthands = {
+	-- Turn
+	["Mirror"] = "MIR", ["Back"] = "BAK", ["Left"] = "LFT", ["Right"] = "RGT",
+	["Shuffle"] = "SHU", ["SoftShuffle"] = "SSH", ["SuperShuffle"] = "XSH",
+	-- Appearance
+	["Hidden"] = "HID", ["Sudden"] = "SUD", ["Stealth"] = "STL", ["Blink"] = "BLK", ["RandomVanish"] = "RVN",
+	-- Hide
+	["Dark"] = "DRK", ["Blind"] = "BLN", ["Cover"] = "COV",
+	-- Remove
+	["NoMines"] = "NOM", ["NoHolds"] = "NOH", ["NoRolls"] = "NOR", ["NoLifts"] = "NOL", ["NoFakes"] = "NOF",
+	-- Other
+	["Reverse"] = "REV", ["Mines"] = "MNS",
+}
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "ModIcons",
+	InitCommand = function(self)
+		self:xy(SCREEN_LEFT + 18, 18)
+		self._lastModStr = ""
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(self)
+			self:playcommand("Update")
+		end)
+	end,
+
+	UpdateCommand = function(self)
+		local modStr = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptionsString("ModsLevel_Current")
+		if modStr == self._lastModStr then return end
+		self._lastModStr = modStr
+
+		local active = {}
+		
+		-- Check each shorthand
+		for mod, short in pairs(modShorthands) do
+			if string.find(modStr, mod) then
+				table.insert(active, short)
+			end
+		end
+
+		-- Special case for Mini
+		local mini = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptions("ModsLevel_Current"):Mini()
+		if mini ~= 0 then
+			table.insert(active, "MN" .. math.round(mini*100))
+		end
+
+		-- Update text
+		self:GetChild("Icons"):settext(table.concat(active, "  "))
+	end,
+
+	LoadFont("Common Normal") .. {
+		Name = "Icons",
+		InitCommand = function(self)
+			self:zoom(0.4):halign(0):valign(0.5)
+				:diffuse(HVColor and HVColor.Accent or color("#5ABAFF"))
+				:shadowlength(0)
+		end,
+	}
+}
+
+-- ============================================================
+-- SCREEN NAME DISPLAY (top-right)
+-- Shows only the current screen's name (tab label).
+-- ============================================================
+t[#t + 1] = LoadFont("Common Normal") .. {
+	Name = "ScreenNameDisplay",
+	InitCommand = function(self)
+		self:xy(SCREEN_RIGHT - 18, 18):zoom(0.5):halign(1):valign(0.5)
+			:shadowlength(0)
+			:diffuse(HVColor and HVColor.Accent or color("#5ABAFF"))
+	end,
+	OnCommand = function(self)
+		local key = HV and HV.GetCurrentPlayerOptionsTabKey() or "Main"
+		local label = "Player Options"
+		if HV and HV.PlayerOptionsTabs then
+			for _, tab in ipairs(HV.PlayerOptionsTabs) do
+				if tab.key == key then
+					label = tab.label
+					break
+				end
+			end
+		end
+		self:settext(label:upper())
+	end,
+}
+
+-- Separator line under header area
+t[#t + 1] = Def.Quad {
+	InitCommand = function(self)
+		self:xy(0, 30):halign(0):valign(0)
+			:zoomto(SCREEN_WIDTH, 1)
+			:diffuse(HVColor and HVColor.TextDim or color("#444466"))
+			:diffusealpha(0.3)
+	end,
 }
 
 -- Cache song BPMs at screen load time

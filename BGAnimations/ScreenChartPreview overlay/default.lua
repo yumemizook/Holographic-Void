@@ -122,25 +122,29 @@ local function updateSync(self)
 			noteFieldRef:SetSeconds(pausedPos)
 		end
 		-- Still update tooltip while paused
+		return
 	end
-	if not isPaused and not ssm then return end
+	if not ssm then return end
 	
-	if not isPaused and ssm then
-		local pos = ssm:GetSampleMusicPosition()
-		if pos > musicLength then pos = musicLength end
-		
-		-- Sync Progress Bar / Seek
-		if progressRef then
+	local pos = ssm:GetSampleMusicPosition()
+	if pos > musicLength then pos = musicLength end
+	
+	-- Keep NoteField locked to the actual audio clock every frame
+	if noteFieldRef and noteFieldRef.SetSeconds then
+		noteFieldRef:SetSeconds(pos)
+	end
+	
+	-- Sync Progress Bar / Seek
+	if progressRef then
+		local p = math.min(pos / math.max(1, musicLength), 1)
+		progressRef:stoptweening():zoomto(p * (SCREEN_WIDTH - 40), 2)
+	end
+	
+	if cdgFrameRef then
+		local seek = cdgFrameRef:GetChild("ProgressMarker")
+		if seek then
 			local p = math.min(pos / math.max(1, musicLength), 1)
-			progressRef:stoptweening():zoomto(p * (SCREEN_WIDTH - 40), 2)
-		end
-		
-		if cdgFrameRef then
-			local seek = cdgFrameRef:GetChild("ProgressMarker")
-			if seek then
-				local p = math.min(pos / math.max(1, musicLength), 1)
-				seek:x(p * (SCREEN_WIDTH - 120) - (SCREEN_WIDTH - 120)/2)
-			end
+			seek:x(p * (SCREEN_WIDTH - 120) - (SCREEN_WIDTH - 120)/2)
 		end
 	end
 	
@@ -833,11 +837,9 @@ local t = Def.ActorFrame {
 			ssm:AddInputCallback(inputCallback)
 		end
 		
-		-- Ensure any stale pause state is cleared
-		if isPaused and ssm and ssm.IsSampleMusicPaused and ssm:IsSampleMusicPaused() then
-			ssm:PauseSampleMusic()
-		end
+		-- Always enter with a clean, unpaused state
 		isPaused = false
+		pausedPos = 0
 		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
 		if pText then pText:diffusealpha(0) end
 		
@@ -854,9 +856,16 @@ local t = Def.ActorFrame {
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		-- Don't stop music — let the screen handle it naturally
 		fullSongMode = false
+		-- Always clear pause state so re-entry does not inherit a stale flag
+		isPaused = false
+		pausedPos = 0
 		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
 		if pText then pText:diffusealpha(0) end
 		if ssm and inputCallback then 
+			-- If the music was left paused, resume it before exiting
+			if ssm.IsSampleMusicPaused and ssm:IsSampleMusicPaused() then
+				ssm:PauseSampleMusic()
+			end
 			pcall(function() ssm:RemoveInputCallback(inputCallback) end)
 			inputCallback = nil 
 		end
