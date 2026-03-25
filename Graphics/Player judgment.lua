@@ -6,6 +6,7 @@ local t = Def.ActorFrame {
 	JudgmentMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
 		if not params.TapNoteScore then return end
+		if params.HoldNoteScore then return end -- Skip hold/roll end events
 		
 		local tns = ToEnumShortString(params.TapNoteScore)
 		local sprite = self:GetChild("JudgmentSprite")
