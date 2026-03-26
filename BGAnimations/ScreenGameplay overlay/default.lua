@@ -1,8 +1,15 @@
 local pn = GAMESTATE:GetEnabledPlayers()[1] or PLAYER_1
+local lScreen = Var "LoadingScreen" or ""
+local isSync = lScreen:find("Sync") ~= nil
 
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
-	InitCommand = function(self)
+	BeginCommand = function(self)
+		-- Re-check sync mode via SCREENMAN now that it's safer
+		local curScreen = SCREENMAN:GetTopScreen()
+		if curScreen and curScreen:GetName():find("Sync") then
+			isSync = true
+		end
 		-- Apply Mini mod (Receptor Size)
 		local miniValue = tonumber(ThemePrefs.Get("HV_Mini")) or 100
 		local miniPct = 100 - miniValue
@@ -11,18 +18,54 @@ local t = Def.ActorFrame {
 		-- Apply Measure Lines (Beat Bars) mod
 		local beatBarMod = HV.ShowMeasureLines() and "beatbars" or "nobeatbars"
 		
+		-- Apply mods to all enabled players
 		for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
 			local ps = GAMESTATE:GetPlayerState(pn)
 			local po = ps:GetPlayerOptions("ModsLevel_Preferred")
 			po:FromString(modStr)
 			po:FromString(beatBarMod)
+
+			-- Sync Mode overrides
+			if isSync then
+				po:CMod(400)
+				po:Reverse(0) -- Upscroll
+				-- Apply to Current level as well
+				local co = ps:GetPlayerOptions("ModsLevel_Current")
+				co:CMod(400)
+				co:Reverse(0)
+			end
 		end
 		
 		HV.LastGameplayTime = os.time()
 		HV.GameplaySessionValid = true
 	end,
+	OnCommand = function(self)
+		-- Double check mods on OnCommand just in case
+		if isSync then
+			for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
+				local ps = GAMESTATE:GetPlayerState(pn)
+				ps:GetPlayerOptions("ModsLevel_Current"):CMod(400)
+				ps:GetPlayerOptions("ModsLevel_Current"):Reverse(0)
+			end
+		end
+	end,
 	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end,
-	PracticeModeReloadMessageCommand = function(self) self:playcommand("Init") end
+	PracticeModeReloadMessageCommand = function(self) self:playcommand("Init") end,
+	
+	CurrentSongChangedMessageCommand = function(self)
+		-- Re-apply sync mods on every loop start to prevent engine resets
+		if isSync then
+			for _, pn_loop in ipairs(GAMESTATE:GetEnabledPlayers()) do
+				local ps = GAMESTATE:GetPlayerState(pn_loop)
+				local po = ps:GetPlayerOptions("ModsLevel_Preferred")
+				po:CMod(400)
+				po:Reverse(0)
+				local co = ps:GetPlayerOptions("ModsLevel_Current")
+				co:CMod(400)
+				co:Reverse(0)
+			end
+		end
+	end
 }
 
 local accentColor = HVColor.Accent
@@ -62,7 +105,23 @@ t[#t + 1] = Def.ActorFrame {
 			-- Lifebar still uses this for now
 			MESSAGEMAN:Broadcast("PlayingUpdate")
 		end)
-	end
+	end,
+
+	-- NoteMask for Sync Mode (placed here to be below judgments/combo)
+	Def.Quad {
+		Name = "SyncNoteMask",
+		InitCommand = function(self)
+			self:Center():zoomto(SCREEN_WIDTH * 0.4, SCREEN_HEIGHT)
+				:diffuse(color("0,0,0,1")):diffusealpha(0)
+				:visible(isSync)
+		end,
+		SyncTriggeredMessageCommand = function(self)
+			self:linear(2):diffusealpha(1)
+		end,
+		CurrentSongChangedMessageCommand = function(self)
+			self:stoptweening():diffusealpha(0)
+		end
+	}
 }
 
 -- ============================================================
@@ -73,7 +132,7 @@ local barW = SCREEN_WIDTH * 0.4
 local barH = 6
 local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bottom" and SCREEN_BOTTOM - 12 or 12)
 
-local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode()
+local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode() and not isSync
 
 if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
@@ -156,7 +215,7 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "PracticeIndicator",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, barY + 15):zoom(0.35):diffuse(accentColor):diffusealpha(0.8)
-		self:settext("** Practice Mode **"):visible(GAMESTATE:IsPracticeMode())
+		self:settext("** Practice Mode **"):visible(GAMESTATE:IsPracticeMode() and not isSync)
 	end
 }
 
@@ -168,7 +227,7 @@ local lifeBarH = SCREEN_HEIGHT * 0.5
 local lifeBarX = SCREEN_CENTER_X + 220
 local lifeBarY = SCREEN_CENTER_Y
 
-if not HV.MinimalisticMode() then
+if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "VerticalLifeBar",
 	InitCommand = function(self)
@@ -271,7 +330,7 @@ end -- End Vertical Life Bar
 -- ============================================================
 -- SCORE % (REAL-TIME)
 -- ============================================================
-local showCurrentWife = HV.ShowCurrentWife() and not HV.MinimalisticMode()
+local showCurrentWife = HV.ShowCurrentWife() and not HV.MinimalisticMode() and not isSync
 
 if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
@@ -332,7 +391,7 @@ end
 -- ============================================================
 -- GOAL TRACKER
 -- ============================================================
-local showGoalTrackerText = HV.ShowGoalTrackerText() and not HV.MinimalisticMode()
+local showGoalTrackerText = HV.ShowGoalTrackerText() and not HV.MinimalisticMode() and not isSync
 if showGoalTrackerText then
 	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType")
 	if not pacemakerMode or pacemakerMode == "" then pacemakerMode = "Target" end
@@ -393,7 +452,7 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
 		-- Check if hit mean should be shown
-		local showMean = HV.ShowHitMean() and not HV.MinimalisticMode()
+		local showMean = HV.ShowHitMean() and not HV.MinimalisticMode() and not isSync
 		self:visible(showMean)
 	end,
 	OnCommand = function(self)
@@ -546,7 +605,7 @@ end -- End combo visibility check
 -- ============================================================
 -- COMBO BREAK LANE HIGHLIGHT
 -- ============================================================
-local showComboBreakHighlight = HV.ComboBreakHighlight() and not HV.MinimalisticMode()
+local showComboBreakHighlight = HV.ComboBreakHighlight() and not HV.MinimalisticMode() and not isSync
 
 if showComboBreakHighlight then
 
@@ -638,7 +697,7 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "PracticeCDGraphContainer",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 80)
-		self:visible(GAMESTATE:IsPracticeMode())
+		self:visible(GAMESTATE:IsPracticeMode() and not isSync)
 	end,
 	LoadActor("../_chorddensitygraph.lua") .. {
 		InitCommand = function(self)
@@ -668,7 +727,7 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		Name = "ErrorBar",
 		InitCommand = function(self)
 			local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
-			self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off")
+			self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off" and not isSync)
 		end,
 
 	-- Background line
@@ -784,7 +843,7 @@ local showJudgeCounter = HV.ShowJudgeCounter()
 local tallyX = SCREEN_CENTER_X + 160
 local tallyY = SCREEN_HEIGHT - 176
 
-if showJudgeCounter and not HV.MinimalisticMode() then
+if showJudgeCounter and not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
@@ -1123,7 +1182,7 @@ end
 -- ============================================================
 -- SONG TITLE (BOTTOM of screen)
 -- ============================================================
-if not HV.MinimalisticMode() then
+if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "SongInfoHUD",
 	InitCommand = function(self)
@@ -1161,6 +1220,7 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	}
 }
+end
 
 -- ============================================================
 -- TOASTY (fires at combo 250, 500, 750, 1000, ...)
@@ -1187,6 +1247,7 @@ end
 local toastyImgPath = safeGetThemePath("G", "Graphics", "toasty") or safeGetThemePath("G", "Graphics", "Common toasty")
 local toastySndPath = safeGetThemePath("S", "Sounds", "toasty") or safeGetThemePath("S", "Sounds", "Common toasty")
 
+if not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "Toasty",
 	InitCommand = function(self)
@@ -1270,7 +1331,10 @@ if suddenHeight > 0 or hiddenHeight > 0 then
 
 	local t_cover = Def.ActorFrame {
 		Name = "LaneCoverLayer",
-		InitCommand = function(self) self:Center() end,
+		InitCommand = function(self)
+			self:Center()
+			self:visible(not isSync)
+		end,
 	}
 
 	-- Sudden: spawn side (Top for Standard, Bottom for Reverse)
@@ -1286,18 +1350,20 @@ if suddenHeight > 0 or hiddenHeight > 0 then
 	t[#t + 1] = t_cover
 end
 
-t[#t + 1] = LoadActor("scoretracking")
-t[#t + 1] = LoadActor("pacemaker")
-t[#t + 1] = LoadActor("npscalc")
-t[#t + 1] = LoadActor("multiplayer")
-t[#t + 1] = LoadActor("leaderboard")
-t[#t + 1] = LoadActor("avatar")
+if not isSync then
+	t[#t + 1] = LoadActor("scoretracking")
+	t[#t + 1] = LoadActor("pacemaker")
+	t[#t + 1] = LoadActor("npscalc")
+	t[#t + 1] = LoadActor("multiplayer")
+	t[#t + 1] = LoadActor("leaderboard")
+	t[#t + 1] = LoadActor("avatar")
+end
 t[#t + 1] = LoadActor("intro")
 
 -- ============================================================
 -- NG INDICATOR (POPUP)
 -- ============================================================
-if HV.ShowNGIndicator() and not HV.MinimalisticMode() then
+if HV.ShowNGIndicator() and not HV.MinimalisticMode() and not isSync then
 	local isReverse = GAMESTATE:GetPlayerState(PLAYER_1):GetCurrentPlayerOptions():UsingReverse()
 	local ngY = isReverse and (SCREEN_CENTER_Y + 164 - 40) or (SCREEN_CENTER_Y - 164 + 40)
 	local colOffsets = {-96, -32, 32, 96}
@@ -1327,5 +1393,49 @@ if HV.ShowNGIndicator() and not HV.MinimalisticMode() then
 	end
 	t[#t + 1] = ngFrame
 end
+
+
+-- ============================================================
+-- SYNC MODE CHALLENGE (Note Fading)
+-- ============================================================
+t[#t + 1] = Def.ActorFrame {
+	Name = "SyncChallengeOverlay",
+	InitCommand = function(self) self:visible(isSync) end,
+	(function()
+		local noteCounter = 0
+		local threshold = 10
+		local triggered = false
+		
+		return Def.ActorFrame {
+			LoadFont("Common Normal") .. {
+				Name = "Message",
+				InitCommand = function(self)
+					self:Center():zoom(0.8):diffusealpha(0):settext("Keep tapping to the beat")
+				end,
+				PulseCommand = function(self)
+					self:stoptweening():linear(0.5):zoom(0.85):linear(0.5):zoom(0.8):queuecommand("Pulse")
+				end
+			},
+			JudgmentMessageCommand = function(self, params)
+				if not isSync or triggered then return end
+				if params.TapNoteScore then
+					noteCounter = noteCounter + 1
+					if noteCounter >= threshold then
+						triggered = true
+						MESSAGEMAN:Broadcast("SyncTriggered")
+						local msg = self:GetChild("Message")
+						msg:linear(1):diffusealpha(1):queuecommand("Pulse")
+					end
+				end
+			end,
+			CurrentSongChangedMessageCommand = function(self)
+				noteCounter = 0
+				triggered = false
+				local msg = self:GetChild("Message")
+				if msg then msg:stoptweening():diffusealpha(0) end
+			end
+		}
+	end)()
+}
 
 return t

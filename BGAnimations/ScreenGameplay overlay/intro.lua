@@ -1,4 +1,15 @@
--- this is purely sc-wh. will be changed later.
+local lScreen = Var "LoadingScreen" or ""
+local isSync = lScreen:find("Sync") ~= nil
+
+if not isSync then
+	local curScreen = SCREENMAN:GetTopScreen()
+	if curScreen and curScreen:GetName():find("Sync") then
+		isSync = true
+	end
+end
+
+if isSync then return Def.Actor{} end
+
 local bannerWidth = 256
 local bannerHeight = 80
 local borderWidth = 2
