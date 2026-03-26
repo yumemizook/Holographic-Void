@@ -194,6 +194,13 @@ local HVPrefs = {
 		Values = {false, true}
 	},
 
+	-- Gameplay: Song Preview Mode (1: SM, 2: osu! New, 3: osu! Old)
+	HV_SongPreview = {
+		Default = 1,
+		Choices = {"SM Style", "osu! Style (New)", "osu! Style (Old)"},
+		Values = {1, 2, 3}
+	},
+
 	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
 	HV_MSDColorScaleV3 = {
 		Default = "Holographic",
@@ -322,6 +329,20 @@ local HVPrefs = {
 		}
 	},
 
+	-- Gameplay: Toggle Mini Text Goal Tracker (formerly Pacemaker)
+	HV_ShowGoalTracker = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Gameplay: Goal Tracker Text
+	HV_GoalTrackerText = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
 	-- Gameplay: Toggle target tracker comparison
 	HV_ShowTargetTracker = { Default = false },
 
@@ -361,6 +382,13 @@ local HVPrefs = {
 		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
+	},
+
+	-- Visual: Grade Coloring Style
+	HV_GradeColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic"},
+		Values = {"Holographic", "Classic"}
 	},
 	
 	-- Judgment Color Style
@@ -454,6 +482,13 @@ local HVPrefs = {
 		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
+	},
+
+	-- Gameplay: Assist Mode (Off, Clap, Metronome, Both)
+	HV_AssistMode = {
+		Default = "Off",
+		Choices = {"Off", "Clap", "Metronome", "Both"},
+		Values = {"Off", "Clap", "Metronome", "Both"}
 	},
 	-- Gameplay: Minimalistic Mode
 	HV_MinimalisticMode = {
