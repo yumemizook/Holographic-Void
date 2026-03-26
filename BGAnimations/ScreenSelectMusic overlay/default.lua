@@ -71,6 +71,9 @@ local main_af = Def.ActorFrame {
 		HV.ActiveTab = ""
 		HV.GameplaySessionValid = false
 		HV.LastPlayedSecond = HV.LastPlayedSecond or 0
+		
+		-- Always default Practice Mode to Off when entering song select
+		GAMESTATE:SetPracticeMode(false)
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)

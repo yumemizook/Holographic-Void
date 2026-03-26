@@ -249,6 +249,19 @@ local function scoreItem(i)
 			end
 		},
 
+		-- CC Indicator
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:xy(150, 35):zoom(0.24):halign(0):diffuse(color("#FF0000")):settext("CC ON"):visible(false) end,
+			SetScoreCommand = function(self, params)
+				local s = hsTable[params.index]
+				if s and s:GetChordCohesion() then
+					self:visible(true)
+				else
+					self:visible(false)
+				end
+			end
+		},
+
 		-- Replay dot
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)

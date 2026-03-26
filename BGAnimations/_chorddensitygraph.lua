@@ -1,7 +1,3 @@
---- Holographic Void: Chord Density Graph
--- Adapted from Til Death / spawncamping-wallhack
--- Uses GetCDGraphVectors() + ActorMultiVertex for proper chord density visualization
-
 local cdg
 
 local optionalParam = Var("width")
@@ -10,42 +6,79 @@ if optionalParam ~= nil then
 	wodth = optionalParam
 end
 local hidth = 40
-local txtoff = 10
+local accentColor = HVColor.Accent or color("#00CFFF")
 
-local textonleft = true
-local function textmover(self)
-	if not self:GetChild("npstext") then return end
-	local npsActor = self:GetChild("npstext")
-	if npsActor:GetVisible() == false then return end
-	local overNps = false
-	local mx = INPUTFILTER:GetMouseX()
-	local my = INPUTFILTER:GetMouseY()
-	-- simple bounding check
-	local ax, ay = npsActor:GetTrueX(), npsActor:GetTrueY()
-	if math.abs(mx - ax) < 40 and math.abs(my - ay) < 12 then
-		overNps = true
-	end
-	if overNps and textonleft then
-		npsActor:x(wodth - txtoff):halign(1)
-		textonleft = false
-	elseif overNps and not textonleft then
-		npsActor:x(txtoff):halign(0)
-		textonleft = true
-	end
+-- Helper: format seconds as m:ss.x
+local function formatTime(s)
+	if not s or s < 0 then return "-:--" end
+	local m = math.floor(s / 60)
+	local sec = s - m * 60
+	return string.format("%d:%02d", m, math.floor(sec))
 end
 
-local function makeABar(vertices, x, y, barWidth, barHeight, prettycolor)
-	vertices[#vertices + 1] = {{x, y - barHeight, 0}, prettycolor}
-	vertices[#vertices + 1] = {{x - barWidth, y - barHeight, 0}, prettycolor}
-	vertices[#vertices + 1] = {{x - barWidth, y, 0}, prettycolor}
-	vertices[#vertices + 1] = {{x, y, 0}, prettycolor}
-end
-
-local function getColorForDensity(density, nColumns)
-	-- Grayscale gradient: single notes lighter, bigger chords darker
-	local interval = 1 / nColumns
-	local value = 1 - density * interval
-	return color(tostring(value) .. "," .. tostring(value) .. "," .. tostring(value))
+local function updateInteraction(self)
+	local mouseX = INPUTFILTER:GetMouseX()
+	local mouseY = INPUTFILTER:GetMouseY()
+	
+	local bg = self:GetChild("cdbg")
+	local marker = self:GetChild("SeekMarker")
+	local info = self:GetChild("InfoBar")
+	local curMarker = self:GetChild("CurrentPosMarker")
+	
+	local steps = GAMESTATE:GetCurrentSteps()
+	local song = GAMESTATE:GetCurrentSong()
+	if not steps or not song then return end
+	
+	local musicLength = song:MusicLengthSeconds()
+	local rate = getCurRateValue()
+	
+	-- Update Current Position Marker
+	if curMarker then
+		local curPos = GAMESTATE:GetSongPosition():GetMusicSeconds()
+		local p = math.max(0, math.min(curPos / musicLength, 1))
+		curMarker:x(p * wodth)
+	end
+	
+	if isOver(bg) then
+		local gx = bg:GetTrueX()
+		local p = math.max(0, math.min((mouseX - gx) / wodth, 1))
+		
+		if marker then marker:visible(true):x(p * wodth) end
+		
+		if info then
+			local time = p * musicLength
+			local beat = song:GetTimingData():GetBeatFromElapsedTime(time)
+			local bpm = song:GetTimingData():GetBPMAtBeat(beat) * rate
+			
+			local nps = 0
+			if self.npsVector then
+				local idx = math.floor(p * #self.npsVector) + 1
+				idx = math.max(1, math.min(#self.npsVector, idx))
+				nps = self.npsVector[idx]
+			end
+			
+			info:settext(string.format("%s | %.0f BPM | %.1f NPS", formatTime(time), bpm, nps))
+				:diffuse(accentColor)
+		end
+	else
+		if marker then marker:visible(false) end
+		if info then
+			local curPos = GAMESTATE:GetSongPosition():GetMusicSeconds()
+			local beat = song:GetTimingData():GetBeatFromElapsedTime(curPos)
+			local bpm = song:GetTimingData():GetBPMAtBeat(beat) * rate
+			
+			local p = math.max(0, math.min(curPos / musicLength, 1))
+			local nps = 0
+			if self.npsVector then
+				local idx = math.floor(p * #self.npsVector) + 1
+				idx = math.max(1, math.min(#self.npsVector, idx))
+				nps = self.npsVector[idx]
+			end
+			
+			info:settext(string.format("%s | %.0f BPM | %.1f NPS", formatTime(curPos), bpm, nps))
+				:diffuse(color("1,1,1,0.6"))
+		end
+	end
 end
 
 local function updateGraphMultiVertex(parent, realgraph)
@@ -64,7 +97,7 @@ local function updateGraphMultiVertex(parent, realgraph)
 		parent.npsVector = npsVector
 		local numberOfColumns = #npsVector
 		local columnWidth = wodth / numberOfColumns
-		-- set height scale of graph relative to the max nps
+		
 		local hodth = 0
 		for i = 1, #npsVector do
 			if npsVector[i] * 2 > hodth then
@@ -73,24 +106,26 @@ local function updateGraphMultiVertex(parent, realgraph)
 		end
 
 		parent:GetChild("npsline"):y(-hidth * 0.7)
-		parent:GetChild("npstext"):settext(string.format(THEME:GetString("ScreenEvaluation", "NPSFormatted"), hodth / 2 * 0.7)):y(-hidth * 0.9)
+		parent:GetChild("npstext"):settext(string.format("%.1f NPS Peak", hodth / 2)):y(-hidth - 10):x(wodth):halign(1)
+		
 		hodth = hidth / hodth
 		local verts = {}
-		local yOffset = 0
-		local lastIndex = 1
 		for density = 1, ncol do
 			for column = 1, numberOfColumns do
 				if graphVectors[density][column] > 0 then
-					local barColor = getColorForDensity(density, ncol)
-					makeABar(verts, math.min(column * columnWidth, wodth), yOffset, columnWidth, graphVectors[density][column] * 2 * hodth, barColor)
-					if column > lastIndex then
-						lastIndex = column
-					end
+					local interval = 1 / ncol
+					local val = 1 - density * interval
+					local barColor = color(tostring(val) .. "," .. tostring(val) .. "," .. tostring(val))
+					
+					local x, y = column * columnWidth, 0
+					local bw, bh = columnWidth, graphVectors[density][column] * 2 * hodth
+					verts[#verts + 1] = {{x, y - bh, 0}, barColor}
+					verts[#verts + 1] = {{x - bw, y - bh, 0}, barColor}
+					verts[#verts + 1] = {{x - bw, y, 0}, barColor}
+					verts[#verts + 1] = {{x, y, 0}, barColor}
 				end
 			end
 		end
-
-		parent.finalNPSVectorIndex = lastIndex
 
 		realgraph:SetVertices(verts)
 		realgraph:SetDrawState({Mode = "DrawMode_Quads", First = 1, Num = #verts})
@@ -102,60 +137,82 @@ local t = Def.ActorFrame {
 	InitCommand = function(self)
 		cdg = self
 	end,
-	CurrentSongChangedMessageCommand = function(self)
-		self:diffusealpha(0)
-	end,
-	DelayedChartUpdateMessageCommand = function(self)
+	OnCommand = function(self)
+		self:SetUpdateFunction(updateInteraction)
 		self:playcommand("GraphUpdate")
 	end,
-	ChartPreviewOnMessageCommand = function(self)
-		self:queuecommand("GraphUpdate")
+	GraphUpdateCommand = function(self)
+		self:diffusealpha(0):linear(0.2):diffusealpha(1)
+		updateGraphMultiVertex(self, self:GetChild("CDGraphDrawer"))
 	end,
-	OnCommand = function(self)
-		self:queuecommand("GraphUpdate")
-	end,
-	PracticeModeReloadMessageCommand = function(self)
-		self:queuecommand("GraphUpdate")
-	end,
-	PracticeModeResetMessageCommand = function(self)
-		self:queuecommand("GraphUpdate")
-	end,
+	PracticeModeReloadMessageCommand = function(self) self:queuecommand("GraphUpdate") end,
+	PracticeModeResetMessageCommand = function(self) self:queuecommand("GraphUpdate") end,
+	DelayedChartUpdateMessageCommand = function(self) self:queuecommand("GraphUpdate") end,
+
+	-- Background
 	Def.Quad {
 		Name = "cdbg",
 		InitCommand = function(self)
-			self:zoomto(wodth, hidth + 2):valign(1):diffuse(color("1,1,1,1")):halign(0)
+			self:zoomto(wodth, hidth):valign(1):diffuse(color("0,0,0,0.5")):halign(0)
+		end,
+		MouseDownCommand = function(self, params)
+			if isOver(self) and params.button == "DeviceButton_left mouse button" then
+				local song = GAMESTATE:GetCurrentSong()
+				if song then
+					local mx = INPUTFILTER:GetMouseX()
+					local gx = self:GetTrueX()
+					local p = math.max(0, math.min((mx - gx) / wodth, 1))
+					local time = p * song:MusicLengthSeconds()
+					SCREENMAN:GetTopScreen():SetSongPosition(time)
+				end
+			end
+		end
+	},
+
+	-- Graph Drawer
+	Def.ActorMultiVertex {
+		Name = "CDGraphDrawer"
+	},
+
+	-- NPS Peak reference line
+	Def.Quad {
+		Name = "npsline",
+		InitCommand = function(self)
+			self:zoomto(wodth, 1):valign(1):diffuse(accentColor):diffusealpha(0.4):halign(0)
+		end
+	},
+
+	-- NPS text label
+	LoadFont("Common Normal") .. {
+		Name = "npstext",
+		InitCommand = function(self)
+			self:zoom(0.45):diffuse(accentColor)
+		end
+	},
+	
+	-- Info Bar (Time | BPM | NPS)
+	LoadFont("Common Normal") .. {
+		Name = "InfoBar",
+		InitCommand = function(self)
+			self:y(18):halign(0):zoom(0.45)
+		end
+	},
+	
+	-- Current Position Marker
+	Def.Quad {
+		Name = "CurrentPosMarker",
+		InitCommand = function(self)
+			self:zoomto(1.5, hidth):valign(1):diffuse(accentColor):halign(0.5)
+		end
+	},
+	
+	-- Seek Marker (Hover)
+	Def.Quad {
+		Name = "SeekMarker",
+		InitCommand = function(self)
+			self:zoomto(1, hidth):valign(1):diffuse(color("1,1,1,0.5")):visible(false):halign(0.5)
 		end
 	}
-}
-
-t[#t + 1] = Def.ActorMultiVertex {
-	Name = "CDGraphDrawer",
-	GraphUpdateCommand = function(self)
-		if self:IsVisible() then
-			self:GetParent():SetUpdateFunction(textmover)
-			updateGraphMultiVertex(cdg, self)
-			self:GetParent():linear(0.3)
-			self:GetParent():diffusealpha(1)
-		else
-			self:GetParent():SetUpdateFunction(nil)
-		end
-	end
-}
-
--- NPS reference line
-t[#t + 1] = Def.Quad {
-	Name = "npsline",
-	InitCommand = function(self)
-		self:zoomto(wodth, 2):diffusealpha(1):valign(1):diffuse(color(".75,0,0,0.75")):halign(0)
-	end
-}
-
--- NPS text label
-t[#t + 1] = LoadFont("Common Normal") .. {
-	Name = "npstext",
-	InitCommand = function(self)
-		self:halign(0):zoom(0.35):settext(""):diffuse(color("1,0.3,0.3"))
-	end
 }
 
 return t

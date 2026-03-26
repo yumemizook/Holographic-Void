@@ -370,6 +370,7 @@ for i = 1, pageSize do
 		LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:halign(0):valign(0.5):x(415):y(rowH/2):zoom(0.38):diffuse(mainText) end },
 		LoadFont("Common Normal") .. { Name = "Clear", InitCommand = function(self) self:halign(0):valign(0.5):x(485):y(rowH/2):zoom(0.35) end },
 		LoadFont("Common Normal") .. { Name = "Date", InitCommand = function(self) self:halign(1):valign(0.5):x(overlayW - 90):y(rowH/2):zoom(0.32):diffuse(subText) end },
+		LoadFont("Common Normal") .. { Name = "CC", InitCommand = function(self) self:halign(0):valign(0.5):x(30):y(rowH/2 + 8):zoom(0.28):diffuse(color("#FF0000")):settext("Chord Cohesion ON") end },
 		
 		-- Replay Button
 		Def.ActorFrame {
@@ -458,6 +459,12 @@ for i = 1, pageSize do
 					local ct = getDetailedClearType(s)
 					self:GetChild("Clear"):settext(ct):diffuse(HVColor.GetClearTypeColor(ct))
 					self:GetChild("Date"):settext(s:GetDate())
+
+					-- Chord Cohesion indicator
+					local cc = self:GetChild("CC")
+					if cc then
+						cc:visible(s:GetChordCohesion())
+					end
 				else
 					-- Online leaderboard score
 					local s = scores[idx]
@@ -497,6 +504,16 @@ for i = 1, pageSize do
 						local ct = getDetailedClearType(s)
 						self:GetChild("Clear"):settext(ct):diffuse(HVColor.GetClearTypeColor(ct))
 						self:GetChild("Date"):settext(s:GetDate())
+
+						-- Chord Cohesion indicator (online scores might not always have this)
+						local cc = self:GetChild("CC")
+						if cc then
+							if s.GetChordCohesion then
+								cc:visible(s:GetChordCohesion())
+							else
+								cc:visible(false)
+							end
+						end
 					end)
 				end
 			else

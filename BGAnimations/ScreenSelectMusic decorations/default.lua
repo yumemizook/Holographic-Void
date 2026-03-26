@@ -1271,6 +1271,21 @@ t[#t + 1] = Def.ActorFrame {
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	},
 
+	-- CC Indicator for Personal Best
+	LoadFont("Common Normal") .. {
+		Name = "PBCC",
+		InitCommand = function(self) self:halign(0):valign(0):x(60):y(52):zoom(0.30):diffuse(color("#FF0000")):settext("Chord Cohesion ON"):visible(false) end,
+		SetCommand = function(self)
+			local score = HV.CurrentSongData.pbScore
+			if score and score:GetChordCohesion() then
+				self:visible(true)
+			else
+				self:visible(false)
+			end
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+	},
+
 	Def.ActorFrame {
 		Name = "PBJudgesFrame",
 		InitCommand = function(self)

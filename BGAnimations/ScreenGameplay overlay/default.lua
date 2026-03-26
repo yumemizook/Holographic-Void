@@ -694,17 +694,46 @@ t[#t + 1] = Def.ActorFrame {
 end -- End combo break highlight
 
 t[#t + 1] = Def.ActorFrame {
-	Name = "PracticeCDGraphContainer",
+	Name = "ChordDensityGraphContainer",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 80)
-		self:visible(GAMESTATE:IsPracticeMode() and not isSync)
+		self:xy(SCREEN_LEFT + 20, SCREEN_CENTER_Y)
+		-- Only show CDG if it's not a Sync screen AND Practice Mode is ON
+		self:visible(not isSync and GAMESTATE:IsPracticeMode())
 	end,
 	LoadActor("../_chorddensitygraph.lua") .. {
 		InitCommand = function(self)
-			self:zoom(0.7)
+			self:zoom(0.8) -- Slightly larger
 		end
 	}
 }
+
+-- Software Mouse Cursor
+t[#t + 1] = Def.ActorFrame {
+	Name = "SoftwareCursor",
+	InitCommand = function(self)
+		self:z(1000):visible(GAMESTATE:IsPracticeMode())
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(self)
+			if self:GetVisible() then
+				self:xy(INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY())
+			end
+		end)
+	end,
+	-- Cursor Background (Stroke)
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(8, 8):rotationz(45):diffuse(color("0,0,0,1"))
+		end
+	},
+	-- Cursor Foreground
+	Def.Quad {
+		InitCommand = function(self)
+			self:zoomto(6, 6):rotationz(45):diffuse(accentColor)
+		end
+	}
+}
+
 t[#t + 1] = LoadActor("replayscrolling.lua")
 
 -- ============================================================

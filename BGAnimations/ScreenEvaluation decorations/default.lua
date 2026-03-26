@@ -820,6 +820,19 @@ local function scoreBoard(pn)
 		Name = "GradeScore",
 		InitCommand = function(self) self:xy(pad, pad + 145) end,
 
+		-- Menacing CC Indicator
+		LoadFont("Common Normal") .. {
+			Name = "ChordCohesionIndicator",
+			InitCommand = function(self) self:xy(0, -25):halign(0):zoom(0.6):diffuse(color("#FF0000")):visible(false) end,
+			OnCommand = function(self)
+				if curScore and curScore:GetChordCohesion() then
+					self:visible(true):pulse():effectmagnitude(1, 1.1, 1):effecttiming(0.25, 0.25, 0.25, 0.25)
+					self:settext("Chord Cohesion ON")
+				end
+			end,
+			ScoreChangedMessageCommand = function(self) self:playcommand("On") end
+		},
+
 		-- Grade
 		LoadFont("Common Large") .. {
 			Name = "GradeScoreLabel",
@@ -980,6 +993,20 @@ local function scoreBoard(pn)
 					end
 				end,
 			},
+
+			-- CC indicator below Wife%
+			LoadFont("Common Normal") .. {
+				Name = "CCBelowWife",
+				InitCommand = function(self) self:halign(0):valign(0):xy(0, 24):zoom(0.35):diffuse(color("#FF0000")):settext("Chord Cohesion ON"):visible(false) end,
+				OnCommand = function(self)
+					if curScore and curScore:GetChordCohesion() then
+						self:visible(true)
+					else
+						self:visible(false)
+					end
+				end,
+				ScoreChangedMessageCommand = function(self) self:playcommand("On") end
+			},
 		},
 
 		-- Chart Progress (Percentage completion on fail)
@@ -1119,6 +1146,18 @@ local function scoreBoard(pn)
 					self:settext("PB: New!"):diffuse(accentColor)
 				end
 				self:stoptweening():sleep(0.5):linear(0.2):diffusealpha(1)
+			end
+		},
+
+		-- CC Indicator for Best Score
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:halign(0):valign(0):xy(110, 84):zoom(0.35):diffuse(color("#FF0000")):settext("Beat with Chord Cohesion ON"):visible(false) end,
+			OnCommand = function(self)
+				if recScore and recScore:GetChordCohesion() then
+					self:visible(true)
+				else
+					self:visible(false)
+				end
 			end
 		},
 

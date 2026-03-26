@@ -642,6 +642,33 @@ function OptionRowShowNGIndicator()
 	return HVThemePrefRow("HV_ShowNGIndicator", "Show NG Indicator")
 end
 
+-- Practice Mode toggle (used in ScreenPlayerOptions)
+function PracticeMode()
+	return {
+		Name = "PracticeMode",
+		LayoutType = "ShowAllInRow",
+		SelectType = "SelectOne",
+		OneChoiceForAllPlayers = true,
+		ExportOnChange = true,
+		Choices = {"Off", "On"},
+		LoadSelections = function(self, list, pn)
+			if GAMESTATE:IsPracticeMode() then
+				list[2] = true
+			else
+				list[1] = true
+			end
+		end,
+		SaveSelections = function(self, list, pn)
+			if list[2] then
+				GAMESTATE:SetPracticeMode(true)
+			else
+				GAMESTATE:SetPracticeMode(false)
+			end
+		end
+	}
+end
+_G["PracticeMode"] = PracticeMode
+
 -- Listen for pref changes and refresh accent color
 local function OnThemePrefChanged(params)
 	if params and params.Name == "HV_AccentColor" then
