@@ -19,6 +19,9 @@ local noteFieldRef = nil
 local progressRef = nil
 local cdgFrameRef = nil
 local rootRef = nil
+local cdgInfoTimeRef = nil
+local cdgInfoBPMRef  = nil
+local cdgInfoNPSRef  = nil
 
 local musicStartTime = 0
 local musicStartOffset = 0
@@ -43,6 +46,14 @@ local function playFrom(pos)
 	if screen.SetSampleMusicPosition then
 		screen:SetSampleMusicPosition(pos)
 	end
+end
+
+-- Helper: format seconds as m:ss.x
+local function formatTime(s)
+	if not s or s < 0 then return "-:--" end
+	local m = math.floor(s / 60)
+	local sec = s - m * 60
+	return string.format("%d:%04.1f", m, sec)
 end
 
 -- HV Aesthetics constants
@@ -147,24 +158,21 @@ local function updateSync(self)
 			seek:x(p * (SCREEN_WIDTH - 120) - (SCREEN_WIDTH - 120)/2)
 		end
 	end
-	
-	-- Update NPS tooltip position and value
+
+	-- CDG hover + info bar update
+	local cdgX = SCREEN_CENTER_X - (SCREEN_WIDTH - 120)/2
+	local cdgY = SCREEN_HEIGHT - 60 - 40  -- frame center minus half height
+	local cdgW = SCREEN_WIDTH - 120
+	local cdgH = 80
+	local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+	local inGraph = mx >= cdgX and mx <= cdgX + cdgW and my >= cdgY and my <= cdgY + cdgH
+
+	-- Update NPS tooltip (floating)
 	if npsTooltipActor and rootRef and rootRef:GetVisible() and steps then
-		local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-		-- Get CDG frame true position for accurate bounds checking
-		local cdgX = SCREEN_CENTER_X - (SCREEN_WIDTH - 120)/2
-		local cdgY = SCREEN_HEIGHT - 60 - 40  -- frame center minus half height
-		local cdgW = SCREEN_WIDTH - 120
-		local cdgH = 80
-		
-		-- Simple bounds check (reference: _chorddensitygraph.lua lines 20-27)
-		local inGraph = mx >= cdgX and mx <= cdgX + cdgW and my >= cdgY and my <= cdgY + cdgH
-		
 		if inGraph then
 			npsTooltipActor:visible(true)
 			npsTooltipActor:xy(mx + 15, my - 35)
 			
-			-- Calculate NPS at this position
 			local relX = mx - cdgX
 			local p = math.max(0, math.min(1, relX / cdgW))
 			
@@ -175,25 +183,63 @@ local function updateSync(self)
 				local npsV = vectors[1]
 				local idx = math.floor(p * #npsV) + 1
 				idx = math.max(1, math.min(#npsV, idx))
-				-- NPS values are already correct, don't multiply by 2
 				local nps = npsV[idx]
-				
 				local textActor = npsTooltipActor:GetChild("NPSText")
-				if textActor then
-					textActor:settextf("%.1f NPS", nps)
-				end
+				if textActor then textActor:settextf("%.1f NPS", nps) end
 			else
-				-- Debug: show when vectors fail
 				local textActor = npsTooltipActor:GetChild("NPSText")
-				if textActor then
-					textActor:settext("no data")
-				end
+				if textActor then textActor:settext("no data") end
 			end
 		else
 			npsTooltipActor:visible(false)
 		end
 	elseif npsTooltipActor then
 		npsTooltipActor:visible(false)
+	end
+
+	-- Helper: BPM at a given elapsed-time position (rate-adjusted)
+	local function getBPMAt(t)
+		local td = song and song:GetTimingData()
+		if not td then return 0 end
+		local beat = td:GetBeatFromElapsedTime(t)
+		local bpm  = td:GetBPMAtBeat(beat)
+		return bpm * math.max(MIN_MUSIC_RATE, getCurRateValue())
+	end
+
+	-- Helper: NPS at a proportion p (0–1)
+	local function getNPSAt(p)
+		local rate = math.max(MIN_MUSIC_RATE, getCurRateValue())
+		local vectors = steps:GetCDGraphVectors(rate)
+		if not (vectors and vectors[1] and #vectors[1] > 0) then return 0 end
+		local npsV = vectors[1]
+		local idx = math.floor(p * #npsV) + 1
+		idx = math.max(1, math.min(#npsV, idx))
+		return npsV[idx]
+	end
+
+	-- Update info bar below CDG
+	if cdgInfoTimeRef and cdgInfoBPMRef and cdgInfoNPSRef and steps then
+		if inGraph then
+			-- Hover mode: show hovered timestamp, BPM, and NPS in accent color
+			local relX    = mx - cdgX
+			local p       = math.max(0, math.min(1, relX / cdgW))
+			local hoverT  = p * musicLength
+			local hoverBPM = getBPMAt(hoverT)
+			local hoverNPS = getNPSAt(p)
+
+			cdgInfoTimeRef:settextf("%s",         formatTime(hoverT)):diffuse(accentColor)
+			cdgInfoBPMRef :settextf("%.0f BPM",   hoverBPM):diffuse(accentColor)
+			cdgInfoNPSRef :settextf("%.1f NPS",   hoverNPS):diffuse(accentColor)
+		else
+			-- Normal mode: show current playback values in dim colors
+			local p      = math.max(0, math.min(1, pos / math.max(1, musicLength)))
+			local curBPM = getBPMAt(pos)
+			local curNPS = getNPSAt(p)
+
+			cdgInfoTimeRef:settextf("%s",         formatTime(pos)):diffuse(textDim)
+			cdgInfoBPMRef :settextf("%.0f BPM",   curBPM):diffuse(textSub)
+			cdgInfoNPSRef :settextf("%.1f NPS",   curNPS):diffuse(textSub)
+		end
 	end
 	
 	-- MSD Tooltip hover check
@@ -220,8 +266,8 @@ local function updateSync(self)
 		end
 		
 		if hoveredSteps and HV.ShowMSD() then
-			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-			msdTooltipActor:visible(true):xy(mx + 5, my - 15)
+			local mx2, my2 = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+			msdTooltipActor:visible(true):xy(mx2 + 5, my2 - 15)
 			msdTooltipActor:playcommand("SetHover", {steps = hoveredSteps})
 		else
 			msdTooltipActor:visible(false)
@@ -233,6 +279,10 @@ end
 -- INPUT HANDLING
 ------------------------------------------------------------
 local function input(event)
+	-- Guard: if the overlay isn't visible the callback is stale — drop silently.
+	-- This also protects against the callback firing after RemoveInputCallback races.
+	if not rootRef or not rootRef:GetVisible() then return false end
+
 	if event.type ~= "InputEventType_FirstPress" then return false end
 	local btn = event.DeviceInput.button
 
@@ -571,11 +621,9 @@ local function densityGraphComp()
 		-- BG
 		Def.Quad { InitCommand = function(self) self:zoomto(SCREEN_WIDTH - 120, 80):diffuse(bgCard):diffusealpha(0.9) end },
 		
-		-- Markers
-		Def.Quad { Name = "ProgressMarker", InitCommand = function(self) self:x(-(SCREEN_WIDTH-120)/2):zoomto(2, 80):diffuse(accentColor) end },
 		Def.Quad { Name = "ClickArea", InitCommand = function(self) self:zoomto(SCREEN_WIDTH - 120, 80):diffusealpha(0) end },
 
-		-- Graph (AMV) - drawn first so line appears on top
+		-- Graph (AMV)
 		Def.ActorMultiVertex {
 			Name = "GraphAMV",
 			ReloadCommand = function(self)
@@ -614,7 +662,7 @@ local function densityGraphComp()
 			end
 		},
 
-		-- 70% Peak NPS Reference Line (drawn on top of everything)
+		-- 70% Peak NPS Reference Line (drawn on top of graph)
 		Def.ActorFrame {
 			Name = "Peak70Container",
 			InitCommand = function(self)
@@ -682,6 +730,9 @@ local function densityGraphComp()
 			}
 		},
 
+		-- ProgressMarker drawn AFTER the graph so it renders on top
+		Def.Quad { Name = "ProgressMarker", InitCommand = function(self) self:x(-(SCREEN_WIDTH-120)/2):zoomto(2, 80):diffuse(accentColor) end },
+
 		-- Hover Tooltip Area (invisible but captures mouse)
 		Def.Quad {
 			Name = "TooltipArea",
@@ -694,7 +745,7 @@ local function densityGraphComp()
 			end
 		},
 
-		-- Tooltip Display (positioned in updateSync)
+		-- Tooltip Display (positioned in updateSync) -- kept for compatibility but hidden in favor of info bar
 		Def.ActorFrame {
 			Name = "NPSTooltip",
 			InitCommand = function(self)
@@ -733,6 +784,43 @@ local function densityGraphComp()
 					self:settext("-- NPS")
 				end
 			}
+		},
+
+		-- Info bar below CDG: centered TIME · BPM · NPS; accent color on hover
+		Def.ActorFrame {
+			Name = "CDGInfoBar",
+			-- CDGFrame center is at SCREEN_HEIGHT-60; place bar 48px below that
+			InitCommand = function(self) self:y(48) end,
+
+			-- Time (left of center trio)
+			LoadFont("Common Normal") .. {
+				Name = "CDGInfoTime",
+				InitCommand = function(self)
+					self:halign(1):x(-90)
+					self:zoom(0.3):diffuse(textDim):settext("-:--")
+					cdgInfoTimeRef = self
+				end
+			},
+
+			-- BPM (center)
+			LoadFont("Common Normal") .. {
+				Name = "CDGInfoBPM",
+				InitCommand = function(self)
+					self:halign(0.5):x(0)
+					self:zoom(0.3):diffuse(textSub):settext("-- BPM")
+					cdgInfoBPMRef = self
+				end
+			},
+
+			-- NPS (right of center trio)
+			LoadFont("Common Normal") .. {
+				Name = "CDGInfoNPS",
+				InitCommand = function(self)
+					self:halign(0):x(90)
+					self:zoom(0.3):diffuse(textSub):settext("-- NPS")
+					cdgInfoNPSRef = self
+				end
+			},
 		}
 	}
 end
@@ -861,14 +949,30 @@ local t = Def.ActorFrame {
 		pausedPos = 0
 		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
 		if pText then pText:diffusealpha(0) end
-		if ssm and inputCallback then 
+		if ssm and inputCallback then
 			-- If the music was left paused, resume it before exiting
 			if ssm.IsSampleMusicPaused and ssm:IsSampleMusicPaused() then
 				ssm:PauseSampleMusic()
 			end
-			pcall(function() ssm:RemoveInputCallback(inputCallback) end)
-			inputCallback = nil 
+			-- Defer removal to the next frame: RemoveInputCallback called from *within*
+			-- the callback itself (via Broadcast) is unreliable — the engine may ignore
+			-- it because the callback is currently on the call stack.  The visibility
+			-- guard at the top of input() keeps stale firings harmless in the meantime.
+			local cbToRemove = inputCallback
+			local ssmRef     = ssm
+			inputCallback = nil  -- clear immediately so the guard triggers on next press
+			self:queuecommand("RemoveOldCallback")
+			self.pendingRemove     = cbToRemove
+			self.pendingRemoveSsm  = ssmRef
 		end
+	end,
+
+	RemoveOldCallbackCommand = function(self)
+		if self.pendingRemoveSsm and self.pendingRemove then
+			pcall(function() self.pendingRemoveSsm:RemoveInputCallback(self.pendingRemove) end)
+		end
+		self.pendingRemove    = nil
+		self.pendingRemoveSsm = nil
 	end,
 
 	ReloadChartPreviewMessageCommand = function(self) 

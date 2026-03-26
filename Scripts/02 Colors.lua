@@ -87,14 +87,14 @@ end
 
 -- Judgment colors (kept distinct but desaturated to fit the theme)
 HVColor.JudgmentHolographic = {
-	W1   = color("#FFFFFF"),    -- Marvelous: pure white
-	W2   = color("#E0E0A0"),    -- Perfect: warm off-white
+	W1   = color("#f1ffff"),    -- Marvelous: pure white
+	W2   = color("#FFFFB7"),    -- Perfect: warm off-white
 	W3   = color("#A0E0A0"),    -- Great: pale green
 	W4   = color("#A0C8E0"),    -- Good: pale blue
 	W5   = color("#C8A0E0"),    -- Bad: pale purple
 	Miss = color("#E0A0A0"),    -- Miss: pale red
-	Held = color("#8fbb84ff"),    -- OK (Held): matches Perfect
-	LetGo = color("#E0A0A0"),   -- NG (LetGo): matches Miss
+	Held = color("#8fbb84ff"),    -- OK (Held)
+	LetGo = color("#E0A0A0"),   -- NG (LetGo)
 }
 
 HVColor.JudgmentClassic = {
@@ -129,11 +129,15 @@ function HVColor.GetJudgmentColor(judge)
 	
 	-- Map internal scores to the palette
 	if s == "W1" then return palette.W1 end
-	if s == "W2" or s == "Held" then return palette.Held or palette.W2 end
+	if s == "W2" then return palette.W2 end
 	if s == "W3" then return palette.W3 end
 	if s == "W4" then return palette.W4 end
 	if s == "W5" then return palette.W5 end
-	if s == "Miss" or s == "LetGo" then return palette.LetGo or palette.Miss end
+	if s == "Miss" then return palette.Miss end
+	
+	-- Hold score mappings
+	if s == "Held" then return palette.Held or palette.W1 end
+	if s == "LetGo" then return palette.LetGo or palette.Miss end
 	
 	return palette[s] or palette.Miss
 end

@@ -549,61 +549,61 @@ end -- End combo visibility check
 local showComboBreakHighlight = HV.ComboBreakHighlight() and not HV.MinimalisticMode()
 
 if showComboBreakHighlight then
+
+-- Helper: build a gradient AMV lane quad.
+-- xOffset: lane center X (relative to parent ActorFrame at SCREEN_CENTER)
+-- laneW: lane pixel width
+-- The quad spans from y=0 (screen center, top of highlight, transparent)
+--   to y=SCREEN_HEIGHT/2 (receptor area, bottom, opaque at flash time).
+-- Vertices are ordered: TL, TR, BR, BL (quad strip).
+local function makeCBLane(name, xOffset, laneW)
+	local halfW   = laneW / 2
+	-- The parent frame sits at SCREEN_CENTER_Y.
+	-- Receptors are near SCREEN_BOTTOM, so the opaque end of the gradient
+	-- is SCREEN_HEIGHT/2 pixels below the frame origin (positive Y = down).
+	-- 80% height means topY = (bottomY) - (0.8 * SCREEN_HEIGHT) = -0.3 * SCREEN_HEIGHT
+	local topY    = -SCREEN_HEIGHT * 0.3 -- 80% height highlight
+	local bottomY = SCREEN_HEIGHT / 2    -- receptor area       → opaque at flash peak
+
+	return Def.ActorMultiVertex {
+		Name = name,
+		InitCommand = function(self)
+			self:x(xOffset)
+			-- Pre-set vertices with the desired gradient (peak alpha handled in FlashCommand)
+			self:SetVertices({
+				{{-halfW, topY,    0}, {1, 1, 1, 0}}, -- TL
+				{{ halfW, topY,    0}, {1, 1, 1, 0}}, -- TR
+				{{ halfW, bottomY, 0}, {1, 1, 1, 1}}, -- BR
+				{{-halfW, bottomY, 0}, {1, 1, 1, 1}}, -- BL
+			})
+			self:SetDrawState({Mode="DrawMode_Quads", First=1, Num=4})
+			self:diffusealpha(0)
+		end,
+		FlashCommand = function(self, params)
+			local c = params and params.color or color("#FF5050")
+			self:stoptweening()
+			self:diffuse(c)
+			
+			-- Instant snap to a clearer peak (0.35) and a single linear fade-out.
+			-- This avoids the "snapping to dim" feeling of the dual-ramp approach.
+			self:diffusealpha(0.35)
+			self:linear(0.70)
+			self:diffusealpha(0)
+		end
+	}
+end
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboBreakHighlight",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y)
 	end,
 
-	-- Lane highlight quads (4 lanes for standard 4K)
-	Def.Quad {
-		Name = "Lane1",
-		InitCommand = function(self)
-			self:zoomto(64, 480):x(-96):diffuse(color("1,0,0,0")):diffusealpha(0)
-		end,
-		FlashCommand = function(self, params)
-			local c = params and params.color or color("#FF5050")
-			self:diffuse(c):diffusealpha(0.3)
-			self:linear(0.1):diffusealpha(0.5)
-			self:linear(0.2):diffusealpha(0)
-		end
-	},
-	Def.Quad {
-		Name = "Lane2",
-		InitCommand = function(self)
-			self:zoomto(64, 480):x(-32):diffuse(color("1,0,0,0")):diffusealpha(0)
-		end,
-		FlashCommand = function(self, params)
-			local c = params and params.color or color("#FF5050")
-			self:diffuse(c):diffusealpha(0.3)
-			self:linear(0.1):diffusealpha(0.5)
-			self:linear(0.2):diffusealpha(0)
-		end
-	},
-	Def.Quad {
-		Name = "Lane3",
-		InitCommand = function(self)
-			self:zoomto(64, 480):x(32):diffuse(color("1,0,0,0")):diffusealpha(0)
-		end,
-		FlashCommand = function(self, params)
-			local c = params and params.color or color("#FF5050")
-			self:diffuse(c):diffusealpha(0.3)
-			self:linear(0.1):diffusealpha(0.5)
-			self:linear(0.2):diffusealpha(0)
-		end
-	},
-	Def.Quad {
-		Name = "Lane4",
-		InitCommand = function(self)
-			self:zoomto(64, 480):x(96):diffuse(color("1,0,0,0")):diffusealpha(0)
-		end,
-		FlashCommand = function(self, params)
-			local c = params and params.color or color("#FF5050")
-			self:diffuse(c):diffusealpha(0.3)
-			self:linear(0.1):diffusealpha(0.5)
-			self:linear(0.2):diffusealpha(0)
-		end
-	},
+	-- 4 gradient lane highlights for standard 4K (64px wide, spaced 64px apart)
+	makeCBLane("Lane1", -96, 64),
+	makeCBLane("Lane2", -32, 64),
+	makeCBLane("Lane3",  32, 64),
+	makeCBLane("Lane4",  96, 64),
 
 	JudgmentMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
@@ -625,7 +625,7 @@ t[#t + 1] = Def.ActorFrame {
 				if params.Notes[i] ~= nil then
 					local lane = self:GetChild("Lane" .. i)
 					if lane then
-						lane:stoptweening():playcommand("Flash", {color=jColor})
+						lane:playcommand("Flash", {color=jColor})
 					end
 				end
 			end
