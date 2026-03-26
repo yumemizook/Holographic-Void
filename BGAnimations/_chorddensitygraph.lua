@@ -111,7 +111,13 @@ local t = Def.ActorFrame {
 	ChartPreviewOnMessageCommand = function(self)
 		self:queuecommand("GraphUpdate")
 	end,
+	OnCommand = function(self)
+		self:queuecommand("GraphUpdate")
+	end,
 	PracticeModeReloadMessageCommand = function(self)
+		self:queuecommand("GraphUpdate")
+	end,
+	PracticeModeResetMessageCommand = function(self)
 		self:queuecommand("GraphUpdate")
 	end,
 	Def.Quad {

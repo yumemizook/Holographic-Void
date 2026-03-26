@@ -30,6 +30,7 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_LEFT + 18, 18)
 		self._lastModStr = ""
+		self._lastExtra = ""
 	end,
 	OnCommand = function(self)
 		self:SetUpdateFunction(function(self)
@@ -38,36 +39,122 @@ t[#t + 1] = Def.ActorFrame {
 	end,
 
 	UpdateCommand = function(self)
-		local modStr = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptionsString("ModsLevel_Current")
-		if modStr == self._lastModStr then return end
-		self._lastModStr = modStr
+		local screen = SCREENMAN:GetTopScreen()
+		local ps = GAMESTATE:GetPlayerState(PLAYER_1)
+		local po = ps:GetPlayerOptions("ModsLevel_Current")
+		local modStr = ps:GetPlayerOptionsString("ModsLevel_Current")
 
-		local active = {}
-		
-		-- Check each shorthand
-		for mod, short in pairs(modShorthands) do
-			if string.find(modStr, mod) then
-				table.insert(active, short)
+		local accent = (HVColor and HVColor.Accent or color("#5ABAFF"))
+		local dim = color("0.4,0.4,0.4,1")
+		local warn = color("#CF9898")
+
+		-- Tentative values (from screen rows if available)
+		local tLife = GetLifeDifficulty()
+		local tJudge = GetTimingDifficulty()
+		local tFail = po:FailSetting()
+		local tAssist = (string.find(modStr, "AssistClap") or string.find(modStr, "AssistTick") or string.find(modStr, "AutoPlay"))
+		local tTurn = nil -- For Mirror/etc
+
+		if screen and screen.GetNumRows then
+			for i = 0, screen:GetNumRows() - 1 do
+				local row = screen:GetOptionRow(i)
+				if row and row.GetName and row.GetChoice then
+					local rName = row:GetName():lower()
+					local choice = row:GetChoice(PLAYER_1)
+					
+					-- Map rows by name
+					if choice then
+						if rName == "life" then
+							tLife = choice + 1
+						elseif rName == "judge" then
+							tJudge = choice + 4
+						elseif rName == "fail" then
+							if choice == 0 then tFail = "FailType_Immediate"
+							elseif choice == 1 then tFail = "FailType_EndOfSong"
+							elseif choice == 2 then tFail = "FailType_Off" end
+						elseif rName == "assist" then
+							tAssist = (choice > 0)
+						elseif rName == "mirror" or rName == rName:match("turn") then
+							if choice > 0 then tTurn = "MIR" end -- Simplify for icon
+						end
+					end
+				end
 			end
 		end
 
-		-- Special case for Mini
-		local mini = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptions("ModsLevel_Current"):Mini()
-		if mini ~= 0 then
-			table.insert(active, "MN" .. math.round(mini*100))
-		end
+		-- Life Difficulty
+		local lifeColor = color("#FFFFFF")
+		if tLife <= 2 then lifeColor = color("#A0CFAB")
+		elseif tLife <= 4 then lifeColor = color("#5ABAFF")
+		elseif tLife == 5 then lifeColor = color("#CFD198")
+		elseif tLife == 6 then lifeColor = color("#E0B080")
+		else lifeColor = color("#CF9898") end
+		
+		local lifeActor = self:GetChild("Life")
+		lifeActor:settext(string.format("L%d", tLife))
+		lifeActor:diffuse(lifeColor)
 
-		-- Update text
-		self:GetChild("Icons"):settext(table.concat(active, "  "))
+		-- Judge Difficulty
+		local judgeActor = self:GetChild("Judge")
+		judgeActor:settext(string.format("J%d", tJudge))
+		judgeActor:diffuse(accent)
+
+		-- Fail Setting (Always display)
+		local failText = "F:IMM"
+		if tFail == "FailType_Off" then failText = "F:OFF"
+		elseif tFail == "FailType_EndOfSong" then failText = "F:END"
+		end
+		local failActor = self:GetChild("Fail")
+		failActor:settext(failText)
+		failActor:diffuse(tFail == "FailType_Immediate" and accent or warn)
+
+		-- Assist (Always display AST, colored if active)
+		local assistActor = self:GetChild("Assist")
+		assistActor:settext("AST")
+		assistActor:diffuse(tAssist and accent or dim)
+
+		-- Existing mod shorthands
+		local active = {}
+		if tTurn then table.insert(active, tTurn) end
+		
+		for mod, short in pairs(modShorthands) do
+			if mod ~= "Mirror" and string.find(modStr, mod) then
+				table.insert(active, short)
+			end
+		end
+		local mini = po:Mini()
+		if mini ~= 0 then table.insert(active, "MN" .. math.round(mini * 100)) end
+
+		local modsText = table.concat(active, "  ")
+		self:GetChild("Separator"):visible(#active > 0)
+		
+		local modsActor = self:GetChild("Mods")
+		modsActor:settext(modsText)
+		modsActor:diffuse(accent)
 	end,
 
-	LoadFont("Common Normal") .. {
-		Name = "Icons",
-		InitCommand = function(self)
-			self:zoom(0.4):halign(0):valign(0.5)
-				:diffuse(HVColor and HVColor.Accent or color("#5ABAFF"))
-				:shadowlength(0)
-		end,
+	MenuLeftMessageCommand = function(self) self:playcommand("Update") end,
+	MenuRightMessageCommand = function(self) self:playcommand("Update") end,
+	MenuUpMessageCommand = function(self) self:playcommand("Update") end,
+	MenuDownMessageCommand = function(self) self:playcommand("Update") end,
+	ChoiceChangedMessageCommand = function(self) self:playcommand("Update") end,
+
+	-- Prefix Icons (L, J, F, AST)
+	LoadFont("Common Normal") .. { Name = "Life", InitCommand = function(self) self:zoom(0.4):halign(0) end },
+	LoadFont("Common Normal") .. { Name = "Judge", InitCommand = function(self) self:x(28):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
+	LoadFont("Common Normal") .. { Name = "Fail", InitCommand = function(self) self:x(56):zoom(0.4):halign(0):diffuse(color("#CF9898")) end },
+	LoadFont("Common Normal") .. { Name = "Assist", InitCommand = function(self) self:x(100):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
+	
+	-- Separator
+	LoadFont("Common Normal") .. { 
+		Name = "Separator", 
+		InitCommand = function(self) self:x(135):zoom(0.4):halign(0):settext("|"):diffuse(color("0.4,0.4,0.4,1")) end 
+	},
+
+	-- Main Mods
+	LoadFont("Common Normal") .. { 
+		Name = "Mods", 
+		InitCommand = function(self) self:x(150):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end 
 	}
 }
 

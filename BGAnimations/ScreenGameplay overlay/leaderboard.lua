@@ -4,7 +4,7 @@
 -- THe judgement display is not shown here.
 
 local leaderboardMode = HV.ShowInGameLeaderboard() or "Off"
-if leaderboardMode == "Off" or HV.MinimalisticMode() then
+if leaderboardMode == "Off" or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
 	return Def.ActorFrame {}
 end
 

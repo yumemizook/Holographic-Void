@@ -10,20 +10,35 @@ end
 
 if isSync then return Def.Actor{} end
 
-local bannerWidth = 256
-local bannerHeight = 80
-local borderWidth = 2
-local accentColor = HVColor.Accent or color("#00FF00")
+-- Layout constants (banner ratio matches music select: w/h = 3.2)
+local bannerW = 160
+local bannerH = 50
+local metaW = 170
+local totalW = bannerW + metaW + 12  -- banner + gap + metadata
+local totalH = bannerH + 10
+local gradientPad = 60  -- extra fade on each side
+local accentColor = HVColor.Accent or color("#5ABAFF")
+
+-- Invalidating mods (fetched at BeginCommand)
+local invalidMods = {}
 
 local t = Def.ActorFrame{
+	Name = "IntroBanner",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 50)
 		self:diffusealpha(0)
 	end,
+	BeginCommand = function(self)
+		-- Fetch invalidating mods
+		local po = GAMESTATE:GetPlayerState():GetCurrentPlayerOptions()
+		if po and po.GetInvalidatingMods then
+			invalidMods = po:GetInvalidatingMods()
+		end
+	end,
 	CurrentSongChangedMessageCommand = function(self)
-		self:decelerate(1)
-		self:diffusealpha(0.8)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 60)
+		self:stoptweening()
+		self:decelerate(0.8)
+		self:diffusealpha(1)
 	end,
 	SongStartingMessageCommand = function(self)
 		self:stoptweening()
@@ -32,30 +47,68 @@ local t = Def.ActorFrame{
 	end
 }
 
-t[#t+1] = Def.Quad{
-	InitCommand = function(self)
-		self:y(15)
-		self:zoomto(bannerWidth + borderWidth * 4, bannerHeight + borderWidth * 4 + 30)
-		self:diffuse(color("#000000"))
-		self:diffusealpha(0)
-	end,
-	CurrentSongChangedMessageCommand = function(self)
-		if GAMESTATE:GetCurrentSteps() ~= nil then
-			self:diffuse(HVColor.GetDifficultyColor(GAMESTATE:GetHardestStepsDifficulty()))
+-- ============================================================
+-- OUTWARDS-GRADIENT BACKGROUND (ActorMultiVertex)
+-- Opaque center fading to transparent at left/right edges
+-- ============================================================
+t[#t+1] = Def.ActorFrame{
+
+	Def.ActorMultiVertex{
+		Name = "GradientBG",
+		CurrentSongChangedMessageCommand = function(self)
+			local diffColor = color("#000000")
+			if GAMESTATE:GetCurrentSteps() then
+				diffColor = HVColor.GetDifficultyColor(GAMESTATE:GetHardestStepsDifficulty())
+			end
+			-- Build gradient: transparent -> colored center -> transparent
+			local halfW = (totalW + gradientPad * 2) / 2
+			local halfH = (totalH + 6) / 2
+			local cR, cG, cB = diffColor[1], diffColor[2], diffColor[3]
+			local centerA = 0.7
+			local edgeA = 0
+
+			self:SetVertices({
+				-- Left edge (transparent)
+				{{-halfW, -halfH, 0}, {cR, cG, cB, edgeA}},
+				{{-halfW,  halfH, 0}, {cR, cG, cB, edgeA}},
+				-- Left-center (start of opaque)
+				{{-totalW/2, -halfH, 0}, {cR, cG, cB, centerA * 0.6}},
+				{{-totalW/2,  halfH, 0}, {cR, cG, cB, centerA * 0.6}},
+				-- Center-left
+				{{-totalW/4, -halfH, 0}, {cR, cG, cB, centerA}},
+				{{-totalW/4,  halfH, 0}, {cR, cG, cB, centerA}},
+				-- Center-right
+				{{ totalW/4, -halfH, 0}, {cR, cG, cB, centerA}},
+				{{ totalW/4,  halfH, 0}, {cR, cG, cB, centerA}},
+				-- Right-center (start fading)
+				{{ totalW/2, -halfH, 0}, {cR, cG, cB, centerA * 0.6}},
+				{{ totalW/2,  halfH, 0}, {cR, cG, cB, centerA * 0.6}},
+				-- Right edge (transparent)
+				{{ halfW, -halfH, 0}, {cR, cG, cB, edgeA}},
+				{{ halfW,  halfH, 0}, {cR, cG, cB, edgeA}},
+			})
+			self:SetDrawState({Mode = "DrawMode_QuadStrip", First = 1, Num = 12})
 		end
-	end
+	},
+
+	-- Dark underlay for readability
+	Def.Quad{
+		InitCommand = function(self)
+			self:zoomto(totalW + 4, totalH + 4)
+			self:diffuse(color("#000000"))
+			self:diffusealpha(0.6)
+		end
+	}
 }
 
-t[#t+1] = Def.Quad{
+-- ============================================================
+-- SONG BANNER (left side)
+-- ============================================================
+t[#t+1] = Def.Sprite{
+	Name = "SongBanner",
 	InitCommand = function(self)
-		self:y(15)
-		self:zoomto(bannerWidth + borderWidth * 2, bannerHeight + borderWidth * 2 + 30)
-		self:diffuse(color("#000000"))
-		self:diffusealpha(0.8)
-	end
-}
-
-t[#t+1] = Def.Sprite {
+		self:x(-totalW / 2 + bannerW / 2 + 4)
+	end,
 	CurrentSongChangedMessageCommand = function(self)
 		local song = GAMESTATE:GetCurrentSong()
 		if song then
@@ -65,34 +118,111 @@ t[#t+1] = Def.Sprite {
 			end
 			self:LoadBackground(bnpath)
 		end
-		self:scaletoclipped(bannerWidth, bannerHeight)
+		self:scaletoclipped(bannerW, bannerH)
 	end
 }
 
+-- ============================================================
+-- CHART METADATA (right side)
+-- ============================================================
+local metaX = -totalW / 2 + bannerW + 12  -- right of banner + gap
+
+-- Song Title
 t[#t+1] = LoadFont("Zpix Normal") .. {
 	InitCommand = function(self)
-		self:y(50)
-		self:zoom(0.6)
-		self:diffusealpha(1)
-		self:maxwidth(bannerWidth / 0.6)
+		self:x(metaX):y(-16):halign(0):zoom(0.5)
+		self:maxwidth(metaW / 0.5)
 	end,
 	CurrentSongChangedMessageCommand = function(self)
-		if GAMESTATE:GetCurrentSong() ~= nil then
-			self:settext(GAMESTATE:GetCurrentSong():GetDisplayMainTitle())
+		local song = GAMESTATE:GetCurrentSong()
+		if song then self:settext(song:GetDisplayMainTitle()) end
+	end
+}
+
+-- Artist
+t[#t+1] = LoadFont("Common Normal") .. {
+	InitCommand = function(self)
+		self:x(metaX):y(-2):halign(0):zoom(0.35)
+		self:diffuse(color("0.7,0.7,0.7,1"))
+		self:maxwidth(metaW / 0.35)
+	end,
+	CurrentSongChangedMessageCommand = function(self)
+		local song = GAMESTATE:GetCurrentSong()
+		if song then self:settext(song:GetDisplayArtist()) end
+	end
+}
+
+-- Difficulty + MSD
+t[#t+1] = LoadFont("Common Normal") .. {
+	InitCommand = function(self)
+		self:x(metaX):y(10):halign(0):zoom(0.35)
+		self:maxwidth(metaW / 0.35)
+	end,
+	CurrentSongChangedMessageCommand = function(self)
+		local steps = GAMESTATE:GetCurrentSteps()
+		if steps then
+			local diff = ToEnumShortString(steps:GetDifficulty())
+			local diffName = getDifficulty(steps:GetDifficulty())
+			local meter = steps:GetMSD(getCurRateValue(), 1)
+			local msdStr = meter > 0 and string.format(" [%.2f]", meter) or ""
+			self:settext(diffName .. msdStr)
+			self:diffuse(HVColor.GetDifficultyColor(diff))
 		end
 	end
 }
 
-t[#t+1] = LoadFont("Zpix Normal") .. {
+-- Rate + Chart Author
+t[#t+1] = LoadFont("Common Normal") .. {
 	InitCommand = function(self)
-		self:y(65)
-		self:zoom(0.4)
-		self:diffusealpha(1)
-		self:maxwidth(bannerWidth / 0.4)
+		self:x(metaX):y(20):halign(0):zoom(0.3)
+		self:diffuse(color("0.55,0.55,0.55,1"))
+		self:maxwidth(metaW / 0.3)
 	end,
 	CurrentSongChangedMessageCommand = function(self)
-		if GAMESTATE:GetCurrentSong() ~= nil then
-			self:settext(GAMESTATE:GetCurrentSong():GetDisplayArtist())
+		local song = GAMESTATE:GetCurrentSong()
+		local rate = getCurRateString()
+		local author = ""
+		if song and song.GetOrTryAtLeastToGetSimfileAuthor then
+			author = song:GetOrTryAtLeastToGetSimfileAuthor()
+		end
+		local parts = {}
+		if rate ~= "1.0x" then table.insert(parts, rate .. " Rate") end
+		if author ~= "" then table.insert(parts, "By: " .. author) end
+		self:settext(table.concat(parts, "  ·  "))
+	end
+}
+
+-- ============================================================
+-- INVALIDATING MODS WARNING
+-- ============================================================
+t[#t+1] = LoadFont("Common Normal") .. {
+	Name = "InvalidModsText",
+	InitCommand = function(self)
+		self:y(totalH / 2 + 14):zoom(0.35):valign(0)
+		self:diffuse(color("#CF9898")):diffusealpha(0)
+	end,
+	BeginCommand = function(self)
+		if #invalidMods > 0 then
+			local translated = {}
+			for _, mod in ipairs(invalidMods) do
+				table.insert(translated, THEME:HasString("OptionNames", mod) and THEME:GetString("OptionNames", mod) or mod)
+			end
+			local header = THEME:HasString("ScreenGameplay", "InvalidMods")
+				and THEME:GetString("ScreenGameplay", "InvalidMods")
+				or "SCORE INVALIDATED BY:"
+			self:settext(header .. "\n" .. table.concat(translated, ", "))
+		end
+	end,
+	CurrentSongChangedMessageCommand = function(self)
+		if #invalidMods > 0 then
+			self:stoptweening()
+			self:decelerate(0.8):diffusealpha(1)
+		end
+	end,
+	SongStartingMessageCommand = function(self)
+		if #invalidMods > 0 then
+			self:stoptweening()
+			self:sleep(1):smooth(0.8):diffusealpha(0)
 		end
 	end
 }
