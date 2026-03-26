@@ -22,4 +22,3 @@ TODO: Sort these images
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/f57d1fec-8374-4fa3-b60c-12df8fcaff5b" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/d162fbd3-af08-436d-8b9c-da716632eb90" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/3807025d-cf79-47b8-9ca2-35ea3cca18e4" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/bd1252fe-5f2f-4104-8e89-e90b5bc6fbdf" />
