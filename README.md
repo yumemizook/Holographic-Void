@@ -29,13 +29,14 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 | :---: | :---: |
 | <img width="400" alt="Title" src="https://github.com/user-attachments/assets/dc650ff8-c05d-4eeb-92b4-20fa51b631b0" /> | <img width="400" alt="SongSelect" src="https://github.com/user-attachments/assets/4e01b345-e267-485d-b64c-8ba5810c4d08" /> |
 
-| Gameplay (Minimalist) | Evaluation Screen |
+| Gameplay | Evaluation Screen |
 | :---: | :---: |
-| <img width="400" alt="Gameplay" src="https://github.com/user-attachments/assets/cbb407f1-8652-4083-96e0-d555e421815b" /> | <img width="400" alt="Eval" src="https://github.com/user-attachments/assets/abd0845c-d528-439a-91bf-46223e738efd" /> |
+|  <img width="400" alt="Gameplay" src="https://github.com/user-attachments/assets/5696b3ab-3c99-4f81-a133-1dd6888fcd47" />| <img width="400" alt="Eval" src="https://github.com/user-attachments/assets/f57d1fec-8374-4fa3-b60c-12df8fcaff5b" /> |
 
 <details>
 <summary>View All Screenshots</summary>
-
+<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/cbb407f1-8652-4083-96e0-d555e421815b" />
+<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/abd0845c-d528-439a-91bf-46223e738efd" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/16703a8d-8996-44f2-b19b-2e399d650527" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/639ddab9-ae63-44ab-98ad-0aa1d6faf9cf" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/3fb77040-62c8-4ae9-b5be-8a8cc1a5668d" />
@@ -48,9 +49,7 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/be692f13-5af0-4396-9c89-96d174e44bbf" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/a6d11077-4dee-4f00-82f7-60f1525d9ba3" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/510d4458-c54a-4cf5-b2ff-efc3d23ea540" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/5696b3ab-3c99-4f81-a133-1dd6888fcd47" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/826d80ad-9354-46c2-85b6-5fe7658afd68" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/f57d1fec-8374-4fa3-b60c-12df8fcaff5b" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/d162fbd3-af08-436d-8b9c-da716632eb90" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/3807025d-cf79-47b8-9ca2-35ea3cca18e4" />
 
