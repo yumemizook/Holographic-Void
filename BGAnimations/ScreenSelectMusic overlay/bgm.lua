@@ -9,10 +9,13 @@ local sampleStart = 0
 local musicLength = 0
 local loops = 0
 local musicNotPaused = 1
-local goNow = false
-local nah = false
-
 local sampleEvent = false
+
+-- Use a more robust check for chart preview mode
+local function isChartPreviewActive()
+	return (SCREENMAN:GetTopScreen() and SCREENMAN:GetTopScreen():GetName() == "ScreenChartPreview")
+		or (HV and HV.ChartPreviewActive)
+end
 
 HV.LastPlayedSecond = 0
 
@@ -32,20 +35,23 @@ local function playMusic(self, delta)
 	end
 
 	-- dont override sample music with this if in chart preview mode
-	nah = tscr:GetName() == "ScreenChartPreview"
-	if nah then return end
+	if isChartPreviewActive() then 
+		SOUND:StopMusic() -- Ensure we fall back if we were playing something
+		return 
+	end
 
 	-- Fallback: arm sampleEvent if PlayingSampleMusic never fired.
 	-- In normal wheel navigation PlayingSampleMusic arrives within ~1-2 frames.
 	-- When returning from the evaluation screen the wheel is already settled so
 	-- Etterna never re-fires PlayingSampleMusic — catch that with a 0.4s timeout.
+	-- Sanity: only fire if curSong and curPath are actually valid.
 	if not sampleEvent and loops == 0 and curSong and curPath and curPath ~= ""
 		and deltaSum > 0.4 then
 		sampleEvent = true
 	end
 
 	-- Initial start or transition trigger
-	if (deltaSum > delay and sampleEvent and loops == 0) or goNow then
+	if (deltaSum > delay and sampleEvent and loops == 0) or (goNow and not isChartPreviewActive()) then
 		goNow = false
 		if tscr:GetMusicWheel():IsSettled() and loops <= 1 then
 			if curSong and curPath then
@@ -80,6 +86,8 @@ local t = Def.ActorFrame{
 	InitCommand = function(self)
 		if ThemePrefs.Get("HV_SongPreview") ~= 1 then
 			self:SetUpdateFunction(playMusic)
+			-- Initial arming if a song is already selected (e.g. returning to screen)
+			self:playcommand("CurrentSongChanged")
 		end
 	end,
 	CurrentSongChangedMessageCommand = function(self)
@@ -110,8 +118,7 @@ local t = Def.ActorFrame{
 		end
 	end,
 	PlayingSampleMusicMessageCommand = function(self)
-		local tscr = SCREENMAN:GetTopScreen()
-		nah = tscr ~= nil and tscr:GetName() == "ScreenChartPreview"
+		local nah = isChartPreviewActive()
 
 		musicNotPaused = 1
 		goNow = false

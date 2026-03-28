@@ -70,7 +70,11 @@ local main_af = Def.ActorFrame {
 		HV.SSM = SCREENMAN:GetTopScreen()
 		HV.ActiveTab = ""
 		HV.GameplaySessionValid = false
-		HV.LastPlayedSecond = HV.LastPlayedSecond or 0
+		HV.ChartPreviewActive = false
+		
+		-- If returning from a gameplay session, reset the preview position to 0
+		-- to avoid trying to "resume" from the end of the song.
+		HV.LastPlayedSecond = 0
 		
 		-- Always default Practice Mode to Off when entering song select
 		GAMESTATE:SetPracticeMode(false)
@@ -1729,8 +1733,14 @@ main_af[#main_af + 1] = LoadActor("input_debugger.lua")
 
 -- Sync previewActive state from outside
 main_af[#main_af + 1] = Def.Actor {
-	ChartPreviewOnMessageCommand = function(self) previewActive = true end,
-	ChartPreviewOffMessageCommand = function(self) previewActive = false end,
+	ChartPreviewOnMessageCommand = function(self) 
+		previewActive = true 
+		HV.ChartPreviewActive = true
+	end,
+	ChartPreviewOffMessageCommand = function(self) 
+		previewActive = false 
+		HV.ChartPreviewActive = false
+	end,
 }
 
 -- Load Decoration Overlays (Initially hidden, using standard Toggle[NAME]Overlay messages)

@@ -1,10 +1,41 @@
-Built mostly from scratch, based on spawncamping-wallhack.
-TODO: Sort these images
+# Holographic Void
 
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/dc650ff8-c05d-4eeb-92b4-20fa51b631b0" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/4e01b345-e267-485d-b64c-8ba5810c4d08" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/cbb407f1-8652-4083-96e0-d555e421815b" />
-<img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/abd0845c-d528-439a-91bf-46223e738efd" />
+A futuristic, high-performance Etterna theme built for technical players who demand both aesthetics and precision. **Holographic Void** blends a minimalist "Void" backdrop with vibrant "Holographic" neon accents, creating a high-contrast environment optimized for focus and detailed metrics.
+
+---
+
+## Key Features
+
+### OLED-Optimized Visuals
+*   **True Black Backgrounds:** Designed specifically for OLED displays to provide infinite contrast and eliminate "IPS glow" distractions.
+*   **Desat Color Palette:** A sophisticated, muted neon color system for Difficulties, Judgments, and Clear Types that maintains high legibility without being garish. The classic color systems from Rebith/'Til Death are available.
+*   **25+ Dynamic Preset Accent Colors:** Instantly swap the entire UI's highlight color (Lavender, Cyan, Crimson, etc.) from the **Color Theme** menu. A proper Color Customization Screen will come at a later time.
+
+### Technical Stuff
+*   **MSD, but cleaner:** A revamped radar graph in the Song Select screen that visualizes MSD breakdowns (Stream, Jumpstream, Handstream, etc.) on hover, saving space for other important features.
+*   **Advanced Evaluation:** Built on and extended from what is available from other themes, the themes features **RA/LA judgement/ratio display**, **Stacked Combo Graph bars** for different judgements and judge windows, and **Online/Local leaderboards**, visible at a glance.
+*   **Real-time metrics:** More than just a jduge counter, it also includes a live Judge 4 rescoring display, as well as a live MA/PA ratio display, along with offset metrics.
+*   **Celebratory Display:** Visual indicators for specialized clears like MFC, WF (White Flag), SDP (Single Digit Perfects), and more at the end of a chart.
+
+### Performance & UX:
+*   **Optimized Music Wheel:** The wheel also displays the MSD of the selected difficulty of each and every song, at the cost of some performance bottleneck.
+*   **Custom Overlays:** Sophisticated modal windows for the Pack Download and Player Options that extends to the aesthestic of the theme.
+
+---
+
+## Screenshots
+
+| Title Screen | Song Selection |
+| :---: | :---: |
+| <img width="400" alt="Title" src="https://github.com/user-attachments/assets/dc650ff8-c05d-4eeb-92b4-20fa51b631b0" /> | <img width="400" alt="SongSelect" src="https://github.com/user-attachments/assets/4e01b345-e267-485d-b64c-8ba5810c4d08" /> |
+
+| Gameplay (Minimalist) | Evaluation Screen |
+| :---: | :---: |
+| <img width="400" alt="Gameplay" src="https://github.com/user-attachments/assets/cbb407f1-8652-4083-96e0-d555e421815b" /> | <img width="400" alt="Eval" src="https://github.com/user-attachments/assets/abd0845c-d528-439a-91bf-46223e738efd" /> |
+
+<details>
+<summary>View All Screenshots</summary>
+
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/16703a8d-8996-44f2-b19b-2e399d650527" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/639ddab9-ae63-44ab-98ad-0aa1d6faf9cf" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/3fb77040-62c8-4ae9-b5be-8a8cc1a5668d" />
@@ -22,3 +53,38 @@ TODO: Sort these images
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/f57d1fec-8374-4fa3-b60c-12df8fcaff5b" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/d162fbd3-af08-436d-8b9c-da716632eb90" />
 <img width="1599" height="896" alt="image" src="https://github.com/user-attachments/assets/3807025d-cf79-47b8-9ca2-35ea3cca18e4" />
+
+</details>
+
+---
+
+## Installation
+
+1.  Download the repository.
+2.  Extract the folder into your Etterna `Themes` directory.
+3.  In-game, navigate to **Options > Appearance Option > Theme** and select **Holographic Void**.
+
+---
+
+## Bugs
+1. There is an unfixed input callback error. I do not know how to fix this.
+2. The search bar can be a bit buggy, pressing Enter starts the highlighted song instead.
+3. The J4 scoring might or might not be accurate at times.
+4. The preview music might not play in a few circumstances.
+
+---
+
+## TODO
+1. Add the proper Customize Gameplay mechanic from other themes
+2. Also add the full-fledged color configuration screen
+3. Add the song background to other screens
+4. Clean up the very scuffed ThemePref saving
+
+---
+
+## Credits
+* Everyone in the EtternaOnline Discord
+* poco0317 for creating Etterna
+* martzi for putting this theme on the theme repo
+* ifwas (reimuboobs) for one of the feedbacks
+* Matthia for accing

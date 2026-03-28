@@ -30,20 +30,22 @@ local pausedPos = 0
 
 local fullSongMode = false
 
-local function playFrom(pos)
+local function playFrom(pos, forceRestart)
 	if not song then return end
 	isPaused = false
 	local screen = ssm or SCREENMAN:GetTopScreen()
 	if not screen then return end
 	
-	-- Switch to full-song mode on first seek so the song doesn't loop the preview segment
-	if not fullSongMode then
+	-- If forceRestart is true (e.g. after rate change), or if we haven't switched to full song mode yet
+	if forceRestart or not fullSongMode then
 		SOUND:StopMusic()
 		screen:PlayCurrentSongSampleMusic(true, true)
 		fullSongMode = true
 	end
 	
 	if screen.SetSampleMusicPosition then
+		-- Seek to the captured position. We use a short delay via queuecommand/sleep if needed,
+		-- but standard SetSampleMusicPosition usually works if called after PlayCurrentSongSampleMusic.
 		screen:SetSampleMusicPosition(pos)
 	end
 end
@@ -296,13 +298,13 @@ local function input(event)
 	if event.button == "EffectUp" then
 		local pos = ssm and ssm:GetSampleMusicPosition() or 0
 		changeMusicRate(0.05)
-		playFrom(pos)
+		playFrom(pos, true)
 		return true
 	end
 	if event.button == "EffectDown" then
 		local pos = ssm and ssm:GetSampleMusicPosition() or 0
 		changeMusicRate(-0.05)
-		playFrom(pos)
+		playFrom(pos, true)
 		return true
 	end
 
@@ -336,13 +338,13 @@ local function input(event)
 			if isOver(rateFrame:GetChild("Dec")) then 
 				local pos = ssm and ssm:GetSampleMusicPosition() or 0
 				changeMusicRate(-0.05)
-				playFrom(pos)
+				playFrom(pos, true)
 				return true 
 			end
 			if isOver(rateFrame:GetChild("Inc")) then 
 				local pos = ssm and ssm:GetSampleMusicPosition() or 0
 				changeMusicRate(0.05)
-				playFrom(pos)
+				playFrom(pos, true)
 				return true 
 			end
 		end
