@@ -136,7 +136,6 @@ local t = Def.ActorFrame {
 			end
 		end,
 		CurrentRateChangedMessageCommand = function(self) self:queuecommand("Set") end,
-		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Set") end,
 	},
 
 	-- Difficulty name

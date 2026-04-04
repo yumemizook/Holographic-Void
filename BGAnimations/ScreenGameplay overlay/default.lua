@@ -49,8 +49,8 @@ local t = Def.ActorFrame {
 			end
 		end
 	end,
-	PracticeModeResetMessageCommand = function(self) self:playcommand("Init") end,
-	PracticeModeReloadMessageCommand = function(self) self:playcommand("Init") end,
+	
+
 	
 	CurrentSongChangedMessageCommand = function(self)
 		-- Re-apply sync mods on every loop start to prevent engine resets
@@ -134,8 +134,11 @@ local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bot
 
 local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode() and not isSync
 
+t[#t + 1] = LoadActor("practice_input.lua")
+
 if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
+	Name = "ProgressBarContainer",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, barY)
 	end,
@@ -144,10 +147,36 @@ t[#t + 1] = Def.ActorFrame {
 			self:playcommand("UpdateBars")
 		end)
 	end,
+	-- Interactive Seek (Practice Mode Only)
+	Def.Quad {
+		Name = "MouseHitbox",
+		InitCommand = function(self)
+			self:zoomto(barW + 20, barH + 20):diffusealpha(0)
+		end,
+		UpdateBarsCommand = function(self)
+			if not GAMESTATE:IsPracticeMode() then return end
+			
+			-- Direct polling for smoother dragging and bypass input callback issues
+			if INPUTFILTER:IsBeingPressed("left mouse button") and isOver(self) then
+				local song = GAMESTATE:GetCurrentSong()
+				if song then
+					local mx = INPUTFILTER:GetMouseX()
+					-- Use IsOver's absolute coordinates or calculate manually
+					local rx = mx - self:GetTrueX()
+					local pct = (rx / barW) + 0.5
+					local top = SCREENMAN:GetTopScreen()
+					if top and top.SetSongPosition then
+						top:SetSongPosition(math.max(0, math.min(song:MusicLengthSeconds(), song:MusicLengthSeconds() * pct)))
+					end
+				end
+			end
+		end
+	},
 
 	Def.Quad {
+		Name = "ProgressBarBG",
 		InitCommand = function(self)
-			self:zoomto(barW, barH):diffuse(color("0.15,0.15,0.15,1"))
+			self:zoomto(barW, barH):diffuse(color("0,0,0,0.2"))
 		end
 	},
 
@@ -168,6 +197,40 @@ t[#t + 1] = Def.ActorFrame {
 				end
 			end
 		end
+	},
+
+	-- Loop Markers
+	Def.ActorFrame {
+		Name = "LoopMarkers",
+		InitCommand = function(self) self:visible(GAMESTATE:IsPracticeMode()) end,
+		PracticeLoopChangedMessageCommand = function(self) self:queuecommand("Update") end,
+		
+		Def.Quad {
+			Name = "StartMarker",
+			InitCommand = function(self) self:zoomto(2, barH + 6):diffuse(color("#00FF00")):visible(false) end,
+			UpdateCommand = function(self)
+				local song = GAMESTATE:GetCurrentSong()
+				if song and HV.PracticeLoopStart > 0 then
+					local pct = HV.PracticeLoopStart / song:MusicLengthSeconds()
+					self:visible(true):x(-barW/2 + (barW * pct))
+				else
+					self:visible(false)
+				end
+			end
+		},
+		Def.Quad {
+			Name = "EndMarker",
+			InitCommand = function(self) self:zoomto(2, barH + 6):diffuse(color("#FF0000")):visible(false) end,
+			UpdateCommand = function(self)
+				local song = GAMESTATE:GetCurrentSong()
+				if song and HV.PracticeLoopEnd > 0 then
+					local pct = HV.PracticeLoopEnd / song:MusicLengthSeconds()
+					self:visible(true):x(-barW/2 + (barW * pct))
+				else
+					self:visible(false)
+				end
+			end
+		}
 	},
 
 	-- Remaining Time (incorporating music rate and ms)
@@ -206,18 +269,10 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext(string.format("%d:%02d.%02d", mins, secs, ms))
 			end
 		end,
-		PracticeModeResetMessageCommand = function(self) self:queuecommand("UpdateBars") end,
-		PracticeModeReloadMessageCommand = function(self) self:queuecommand("UpdateBars") end
+
 	}
 }
 end -- End progress bar visibility check
-t[#t + 1] = LoadFont("Common Normal") .. {
-	Name = "PracticeIndicator",
-	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, barY + 15):zoom(0.35):diffuse(accentColor):diffusealpha(0.8)
-		self:settext("** Practice Mode **"):visible(GAMESTATE:IsPracticeMode() and not isSync)
-	end
-}
 
 -- ============================================================
 -- VERTICAL LIFE BAR (right edge) with % counter
@@ -321,8 +376,7 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext(string.format("%.1f%%", lifeVal * 100))
 			end
 		end,
-		PracticeModeResetMessageCommand = function(self) self:playcommand("RefreshLifePct") end,
-		PracticeModeReloadMessageCommand = function(self) self:playcommand("RefreshLifePct") end
+
 	}
 }
 end -- End Vertical Life Bar
@@ -382,8 +436,7 @@ t[#t + 1] = Def.ActorFrame {
 			end
 			self:diffuse(HVColor.GetGradeColor(gradeStr)):diffusealpha(0.7)
 		end,
-		PracticeModeResetMessageCommand = function(self) self:settext("0.00%") end,
-		PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
+
 	}
 }
 end
@@ -438,8 +491,7 @@ if showGoalTrackerText then
 				end
 				self:settextf("%+5.2f (%5.2f%%)", tDiff or 0, displayTarget)
 			end,
-			PracticeModeResetMessageCommand = function(self) self:settextf("%+5.2f (%5.2f%%)", 0, targetGoalPct) end,
-			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
+
 		}
 	}
 end
@@ -475,8 +527,7 @@ t[#t + 1] = Def.ActorFrame {
 					end
 				end
 			end,
-			PracticeModeResetMessageCommand = function(self) self:settext("0.00ms") end,
-			PracticeModeReloadMessageCommand = function(self) self:queuecommand("Judgment") end
+		
 		}
 	}
 
@@ -590,15 +641,7 @@ t[#t + 1] = Def.ActorFrame {
 			text:visible(false)
 		end
 	end,
-	PracticeModeResetMessageCommand = function(self)
-		missStreak = 0
-		local numActor = self:GetChild("ComboNumber")
-		local labelContainer = self:GetChild("ComboLabel")
-		numActor:settext("0"):diffuse(dimText)
-		labelContainer:GetChild("ComboGraphic"):visible(true):diffusealpha(0.5)
-		labelContainer:GetChild("MissesText"):visible(false)
-	end,
-	PracticeModeReloadMessageCommand = function(self) self:playcommand("PracticeModeReset") end
+
 }
 end -- End combo visibility check
 
@@ -693,6 +736,18 @@ t[#t + 1] = Def.ActorFrame {
 }
 end -- End combo break highlight
 
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "IndicatorFrame",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, barY + 15):visible(GAMESTATE:IsPracticeMode())
+	end,
+	LoadFont("Common Normal") .. {
+		Text = "** PRACTICE MODE **",
+		InitCommand = function(self) self:zoom(0.35):diffuse(accentColor):diffusealpha(0.8) end
+	}
+}
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ChordDensityGraphContainer",
 	InitCommand = function(self)
@@ -707,32 +762,6 @@ t[#t + 1] = Def.ActorFrame {
 	}
 }
 
--- Software Mouse Cursor
-t[#t + 1] = Def.ActorFrame {
-	Name = "SoftwareCursor",
-	InitCommand = function(self)
-		self:z(1000):visible(GAMESTATE:IsPracticeMode())
-	end,
-	OnCommand = function(self)
-		self:SetUpdateFunction(function(self)
-			if self:GetVisible() then
-				self:xy(INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY())
-			end
-		end)
-	end,
-	-- Cursor Background (Stroke)
-	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(8, 8):rotationz(45):diffuse(color("0,0,0,1"))
-		end
-	},
-	-- Cursor Foreground
-	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(6, 6):rotationz(45):diffuse(accentColor)
-		end
-	}
-}
 
 t[#t + 1] = LoadActor("replayscrolling.lua")
 
