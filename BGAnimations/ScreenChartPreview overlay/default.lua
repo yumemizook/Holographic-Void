@@ -14,6 +14,28 @@ local densityGraph = nil
 local musicLength = 0
 local inputCallback = nil
 
+-- Safe fallbacks for engine globals that may not exist in all contexts
+local function getCurRateValue()
+	local ok, rate = pcall(function()
+		return GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate()
+	end)
+	return (ok and type(rate) == "number") and rate or 1.0
+end
+
+local function changeMusicRate(delta)
+	local ok, curRate = pcall(function()
+		return GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate()
+	end)
+	if not ok then return end
+	local newRate = math.max(0.7, math.min(2.0, curRate + delta))
+	pcall(function()
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate(newRate)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Stage"):MusicRate(newRate)
+		GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate(newRate)
+	end)
+	MESSAGEMAN:Broadcast("CurrentRateChanged")
+end
+
 -- References for sync
 local noteFieldRef = nil
 local progressRef = nil
@@ -30,23 +52,27 @@ local pausedPos = 0
 
 local fullSongMode = false
 
-local function playFrom(pos, forceRestart)
+local function playFrom(pos, forceRestart, isInitialOpen)
 	if not song then return end
 	isPaused = false
 	local screen = ssm or SCREENMAN:GetTopScreen()
 	if not screen then return end
 	
-	-- If forceRestart is true (e.g. after rate change), or if we haven't switched to full song mode yet
-	if forceRestart or not fullSongMode then
+	if isInitialOpen or forceRestart or not fullSongMode then
+		-- Stop any bgm.lua-managed stream and hand ownership to the screen's
+		-- sample-music system (required for GetSampleMusicPosition / updateSync).
 		SOUND:StopMusic()
 		screen:PlayCurrentSongSampleMusic(true, true)
 		fullSongMode = true
-	end
-	
-	if screen.SetSampleMusicPosition then
-		-- Seek to the captured position. We use a short delay via queuecommand/sleep if needed,
-		-- but standard SetSampleMusicPosition usually works if called after PlayCurrentSongSampleMusic.
-		screen:SetSampleMusicPosition(pos)
+		-- isInitialOpen: seek is deferred to PlayingSampleMusicMessageCommand
+		-- so the stream is guaranteed to be ready before we seek.
+		if not isInitialOpen and screen.SetSampleMusicPosition then
+			screen:SetSampleMusicPosition(pos)
+		end
+	else
+		if screen.SetSampleMusicPosition then
+			screen:SetSampleMusicPosition(pos)
+		end
 	end
 end
 
@@ -288,9 +314,10 @@ local function input(event)
 	if event.type ~= "InputEventType_FirstPress" then return false end
 	local btn = event.DeviceInput.button
 
-	-- Close mechanisms
+	-- Close mechanisms — sink the event only.
+	-- MasterInputSink is the sole authority for broadcasting ChartPreviewOff
+	-- so that previewActive and HV.ChartPreviewActive stay in sync.
 	if btn == "DeviceButton_escape" or event.button == "Back" or event.button == "Start" then
-		MESSAGEMAN:Broadcast("ChartPreviewOff")
 		return true
 	end
 
@@ -922,10 +949,13 @@ local t = Def.ActorFrame {
 		
 		musicLength = song:GetLastSecond()
 		
-		if not inputCallback then
-			inputCallback = function(event) return input(event) end
-			ssm:AddInputCallback(inputCallback)
+		-- Always remove any stale callback first to prevent double-registration
+		-- across repeated open/close cycles (even if RemoveOldCallback hasn't fired yet).
+		if inputCallback and ssm then
+			pcall(function() ssm:RemoveInputCallback(inputCallback) end)
 		end
+		inputCallback = function(event) return input(event) end
+		ssm:AddInputCallback(inputCallback)
 		
 		-- Always enter with a clean, unpaused state
 		isPaused = false
@@ -933,18 +963,53 @@ local t = Def.ActorFrame {
 		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
 		if pText then pText:diffusealpha(0) end
 		
-		-- Start the sample music in full mode to ensure the exact audio track starts natively.
-		-- This guarantees smooth pausing, seeking, and NoteField synchronization.
-		local startPos = 0
-		if ssm and ssm.GetSampleMusicPosition then
-			startPos = ssm:GetSampleMusicPosition()
-			if startPos < 0 then startPos = 0 end
+		-- Capture current audio position from bgm.lua's wall-clock tracker.
+		-- HV.GetBgmCurrentPos() is set at every SOUND:PlayMusicPart call, so it
+		-- correctly reflects the live absolute-seconds position for ALL preview modes.
+		-- We store it as a pending seek rather than applying immediately, because
+		-- PlayCurrentSongSampleMusic initialises its stream asynchronously — any
+		-- SetSampleMusicPosition called before the stream is ready gets overwritten
+		-- by the engine's own reset to song:GetSampleStart().
+		-- PlayingSampleMusicMessageCommand (below) applies the seek once the stream is live.
+		local capturedPos = 0
+		if HV.GetBgmCurrentPos then
+			capturedPos = HV.GetBgmCurrentPos()
 		end
-		playFrom(startPos, true)
+		if capturedPos <= 0 and ssm and ssm.GetSampleMusicPosition then
+			local sp = ssm:GetSampleMusicPosition()
+			if sp and sp > 0 then capturedPos = sp end
+		end
+		if capturedPos < 0 then capturedPos = 0 end
+		self.pendingSeekPos = capturedPos
+		
+		-- Start the screen-managed audio (isInitialOpen=true skips the immediate seek)
+		playFrom(capturedPos, false, true)
 		
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
 		self:visible(true)
 		MESSAGEMAN:Broadcast("ReloadChartPreview")
+	end,
+
+	-- Apply the deferred seek once PlayCurrentSongSampleMusic signals the stream is live.
+	-- This fires after the audio thread has initialised the stream. We perform an
+	-- immediate seek, followed by a verification seek after a short delay (0.04s)
+	-- to ensure the engine's asynchronous audio start didn't overwrite the initial call.
+	PlayingSampleMusicMessageCommand = function(self)
+		if not HV.ChartPreviewActive then return end
+		if self.pendingSeekPos and self.pendingSeekPos > 0 and ssm and ssm.SetSampleMusicPosition then
+			-- First attempt: immediate
+			ssm:SetSampleMusicPosition(self.pendingSeekPos)
+			-- Second attempt: verification after a short delay to be certain
+			self:stoptweening():sleep(0.04):queuecommand("PerformSeek")
+		end
+	end,
+	
+	PerformSeekCommand = function(self)
+		if not HV.ChartPreviewActive then return end
+		if self.pendingSeekPos and self.pendingSeekPos > 0 and ssm and ssm.SetSampleMusicPosition then
+			ssm:SetSampleMusicPosition(self.pendingSeekPos)
+		end
+		self.pendingSeekPos = nil
 	end,
 	
 	ChartPreviewOffMessageCommand = function(self)
@@ -973,6 +1038,8 @@ local t = Def.ActorFrame {
 			self.pendingRemove     = cbToRemove
 			self.pendingRemoveSsm  = ssmRef
 		end
+		self.pendingSeekPos = nil
+		self:stoptweening()
 	end,
 
 	RemoveOldCallbackCommand = function(self)

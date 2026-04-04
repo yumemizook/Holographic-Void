@@ -1801,11 +1801,12 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				
 				if event.type ~= "InputEventType_FirstPress" then return true end
 				
-				-- Let rate preview shortcuts pass through
+				-- Let rate preview shortcuts pass through to the chart preview's own callback
 				if event.button == "EffectUp" or event.button == "EffectDown" then return false end
 				
 				if event.button == "Back" or event.button == "Start" or btn == "DeviceButton_escape" then
 					previewActive = false
+					HV.ChartPreviewActive = false
 					MESSAGEMAN:Broadcast("ChartPreviewOff")
 				end
 				return true

@@ -19,6 +19,21 @@ end
 
 HV.LastPlayedSecond = 0
 
+-- Wall-clock position tracking — updated every time a SOUND:PlayMusicPart stream starts.
+-- This gives chart preview a reliable position source for ALL preview modes:
+--   Mode 1 (SM native): HV.BgmTrackStartPos is set from PlayingSampleMusicMessageCommand.
+--   Modes 2/3 (custom):  set from the SOUND:PlayMusicPart call sites below.
+local bgmTrackStartPos  = 0   -- absolute song seconds at the moment playback began
+local bgmTrackStartTime = 0   -- GetTimeSinceStart() at that same moment
+
+HV.GetBgmCurrentPos = function()
+	if bgmTrackStartTime <= 0 then return 0 end
+	local elapsed = GetTimeSinceStart() - bgmTrackStartTime
+	-- Account for the current music rate: if at 1.5x, 1s wall time = 1.5s song time.
+	local rate = (getCurRateValue and getCurRateValue()) or 1.0
+	return bgmTrackStartPos + (elapsed * rate)
+end
+
 local deltaSum = 0
 local function playMusic(self, delta)
 	deltaSum = deltaSum + delta * musicNotPaused
@@ -57,6 +72,8 @@ local function playMusic(self, delta)
 				if startFromPreview then -- When starting from preview point
 					local duration = musicLength - sampleStart
 					SOUND:PlayMusicPart(curPath, sampleStart, duration, 2, 2, loop, true, true)
+					bgmTrackStartPos  = sampleStart
+					bgmTrackStartTime = GetTimeSinceStart()
 					if ThemePrefs.Get("HV_SongPreview") == 3 then
 						startFromPreview = false
 					end
@@ -65,6 +82,8 @@ local function playMusic(self, delta)
 					-- If this is the second part of Mode 3, let it loop
 					local shouldLoop = (ThemePrefs.Get("HV_SongPreview") == 3) or loop
 					SOUND:PlayMusicPart(curPath, start, duration, 2, 2, shouldLoop, true, not (loops == 1))
+					bgmTrackStartPos  = start
+					bgmTrackStartTime = GetTimeSinceStart()
 					start = 0
 					if ThemePrefs.Get("HV_SongPreview") == 2 then
 						startFromPreview = true
@@ -95,6 +114,7 @@ local t = Def.ActorFrame{
 		loops = 0
 		SOUND:StopMusic()
 		deltaSum = 0
+		bgmTrackStartTime = 0
 		curSong = GAMESTATE:GetCurrentSong()
 		if curSong ~= nil then
 			curPath = curSong:GetMusicPath()
@@ -128,6 +148,18 @@ local t = Def.ActorFrame{
 			self:SetUpdateFunctionInterval(0.002)
 			SOUND:StopMusic()
 		end
+		
+		if nah then
+			bgmTrackStartTime = 0 -- Reset if we are in chart preview
+		elseif ThemePrefs.Get("HV_SongPreview") == 1 then
+			-- Mode 1: native sample music just started. Record its start position
+			-- so HV.GetBgmCurrentPos() can serve chart preview correctly.
+			local ok, sp = pcall(function()
+				return SCREENMAN:GetTopScreen():GetSampleMusicPosition()
+			end)
+			bgmTrackStartPos  = (ok and sp and sp >= 0) and sp or sampleStart
+			bgmTrackStartTime = GetTimeSinceStart()
+		end
 	end,
 	CurrentRateChangedMessageCommand = function(self)
 		-- Removed StopMusic and restart to allow real-time rate update by the engine.
@@ -144,11 +176,20 @@ local t = Def.ActorFrame{
 		end
 	end,
 	ChartPreviewOnMessageCommand = function(self)
+		-- Chart preview manages its own audio via playFrom().
+		-- Do NOT call SOUND:StopMusic() here — it would race with
+		-- PlayCurrentSongSampleMusic() called by the preview overlay.
 		self.stoppedForPreview = true
-		SOUND:StopMusic()
 	end,
 	ChartPreviewOffMessageCommand = function(self)
 		self.stoppedForPreview = false
+		-- Reset playback state so playMusic() restarts sample music on the next tick.
+		loops = 0
+		sampleEvent = true
+		deltaSum = 0
+		if ThemePrefs.Get("HV_SongPreview") ~= 1 then
+			self:SetUpdateFunctionInterval(0.002)
+		end
 	end
 }
 
