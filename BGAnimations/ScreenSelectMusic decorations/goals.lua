@@ -81,6 +81,14 @@ local t = Def.ActorFrame {
 		end
 		self:playcommand("GoalTableRefresh")
 	end,
+	NextGoalPageMessageCommand = function(self)
+		ind = math.max(0, math.min(#goaltable - numGoals, ind + 1 * numGoals))
+		self:playcommand("GoalTableRefresh")
+	end,
+	PrevGoalPageMessageCommand = function(self)
+		ind = math.max(0, math.min(#goaltable - numGoals, ind - 1 * numGoals))
+		self:playcommand("GoalTableRefresh")
+	end,
 
 	-- Glassmorphism Background
 	Def.Quad { 
@@ -359,15 +367,7 @@ t[#t + 1] = Def.ActorFrame {
 				end
 			end
 
-			-- Scroll
-			local dir = 0
-			if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
-			if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
-			if dir ~= 0 then
-				ind = math.max(0, math.min(#goaltable - numGoals, ind + dir * numGoals))
-				goalsActor:playcommand("GoalTableRefresh")
-				return true
-			end
+			-- Scroll (Now routed via global TabNavigation in default.lua)
 
 			-- Row Clicks
 			if btn == "DeviceButton_left mouse button" or btn == "DeviceButton_right mouse button" then

@@ -933,8 +933,14 @@ local t = Def.ActorFrame {
 		local pText = self:GetChild("NoteFieldContainer") and self:GetChild("NoteFieldContainer"):GetChild("PausedText")
 		if pText then pText:diffusealpha(0) end
 		
-		-- Don't restart music — let the NoteField sync to whatever the screen is already playing.
-		-- The music wheel preview is already active, so the NoteField picks up the current position.
+		-- Start the sample music in full mode to ensure the exact audio track starts natively.
+		-- This guarantees smooth pausing, seeking, and NoteField synchronization.
+		local startPos = 0
+		if ssm and ssm.GetSampleMusicPosition then
+			startPos = ssm:GetSampleMusicPosition()
+			if startPos < 0 then startPos = 0 end
+		end
+		playFrom(startPos, true)
 		
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
 		self:visible(true)

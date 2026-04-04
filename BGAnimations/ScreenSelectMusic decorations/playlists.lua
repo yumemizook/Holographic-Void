@@ -29,6 +29,13 @@ local currentChartPage = 1
 local pl = nil
 local chartlist = {}
 
+-- Helper to persist changes to disk (local profile is Player 1)
+local function saveProfile()
+	if PROFILEMAN and PROFILEMAN.SaveProfile then
+		PROFILEMAN:SaveProfile(PLAYER_1 or 0)
+	end
+end
+
 local function RefreshPlaylistList()
 	allplaylists = {}
 	local ok, playlists = pcall(function() return SONGMAN:GetPlaylists() end)
@@ -140,7 +147,63 @@ local function ManualMoveChart(fromIdx, toIdx)
 			end
 		end
 	end
+	saveProfile()
+	return true
+end
 
+-- Manual playlist rename workaround
+-- SONGMAN:RenamePlaylist is not available in some older Etterna versions
+local function ManualRenamePlaylist(oldName, newName, oldPl)
+	if not oldPl or not oldName or not newName or oldName == newName then return false end
+
+	-- 1. Snapshot current state (keys + rates)
+	local snapshot = {}
+	local ok, steps = pcall(function() return oldPl:GetAllSteps() end)
+	local ok2, keys = pcall(function() return oldPl:GetChartkeys() end)
+	if not ok or not steps or not ok2 or not keys then return false end
+
+	for i = 1, #keys do
+		snapshot[i] = { key = keys[i], rate = steps[i]:GetRate() }
+	end
+
+	-- 2. Create NEW playlist
+	SONGMAN:NewPlaylistNoDialog(newName)
+	
+	-- 3. Find the newly created playlist object
+	local newPl = nil
+	local allPls = SONGMAN:GetPlaylists()
+	for _, p in pairs(allPls) do
+		if p:GetName() == newName then
+			newPl = p
+			break
+		end
+	end
+	
+	if not newPl then return false end
+
+	-- 4. Re-add all charts
+	for i = 1, #snapshot do
+		pcall(function() newPl:AddChart(snapshot[i].key) end)
+	end
+
+	-- 5. Restore rates in new playlist
+	local ok3, newSteps = pcall(function() return newPl:GetAllSteps() end)
+	if ok3 and newSteps then
+		for i = 1, #snapshot do
+			if newSteps[i] then
+				local targetRate = snapshot[i].rate
+				local currentRate = newSteps[i]:GetRate()
+				local delta = targetRate - currentRate
+				if math.abs(delta) > 0.001 then
+					pcall(function() newSteps[i]:ChangeRate(delta) end)
+				end
+			end
+		end
+	end
+
+	-- 6. Delete OLD playlist
+	SONGMAN:DeletePlaylist(oldName)
+	saveProfile()
 	return true
 end
 
@@ -152,27 +215,16 @@ local function SharedInputHandler(event)
 
 	-- Screen state awareness: Only handle input if we are the top screen
 	-- This prevents blocking overlays like ScreenTextEntry (naming/login)
-	local top = SCREENMAN:GetTopScreen()
-	if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
-	
-	if event.type ~= "InputEventType_FirstPress" then return true end
-	local btn = event.DeviceInput.button
-	local dir = 0
+	-- Safe extraction matching goals.lua
+	local btn = event.DeviceInput.button or ""
+	if type(btn) ~= "string" then btn = tostring(btn) end
+	local evType = event.type
 
+	-- Sink releases immediately
+	if evType == "InputEventType_Release" then return true end
 
-	if btn == "DeviceButton_mousewheel down" or btn == "DeviceButton_down" then dir = 1 end
-	if btn == "DeviceButton_mousewheel up" or btn == "DeviceButton_up" then dir = -1 end
-	if dir ~= 0 then
-		if singleplaylistactive then
-			local totalPages = math.max(1, math.ceil(#chartlist / chartsPerPage))
-			currentChartPage = math.max(1, math.min(totalPages, currentChartPage + dir))
-		else
-			local totalPages = math.max(1, math.ceil(#allplaylists / playlistsPerPage))
-			currentPlaylistPage = math.max(1, math.min(totalPages, currentPlaylistPage + dir))
-		end
-		playlistsActor:playcommand("RefreshUI")
-		return true
-	end
+	-- Only respond to first presses for clicks!
+	if evType ~= "InputEventType_FirstPress" then return true end
 
 	if btn == "DeviceButton_left mouse button" then
 		local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
@@ -214,6 +266,7 @@ local function SharedInputHandler(event)
 					if pl then
 						pl:AddChart(ck)
 						ms.ok(string.format(THEME:GetString("Playlists", "ChartAdded"), pl:GetName()))
+						saveProfile()
 						RefreshChartList()
 						playlistsActor:playcommand("RefreshUI")
 					end
@@ -238,6 +291,7 @@ local function SharedInputHandler(event)
 					if name and name ~= "" then
 						SONGMAN:NewPlaylistNoDialog(name)
 						ms.ok(string.format(THEME:GetString("Playlists", "PlaylistCreated"), name))
+						saveProfile()
 						RefreshPlaylistList()
 						playlistsActor:playcommand("RefreshUI")
 					end
@@ -296,6 +350,7 @@ local function SharedInputHandler(event)
 						-- 3. Delete button
 						elseif hx >= overlayW - 80 then
 							pcall(function() pl:DeleteChart(idx) end)
+							saveProfile()
 							RefreshChartList()
 							playlistsActor:playcommand("RefreshUI")
 							return true
@@ -325,6 +380,7 @@ local function SharedInputHandler(event)
 							if plEntry.playlist then
 								SONGMAN:DeletePlaylist(name)
 								ms.ok(string.format(THEME:GetString("Playlists", "PlaylistDeleted"), name))
+								saveProfile()
 								RefreshPlaylistList()
 								playlistsActor:playcommand("RefreshUI")
 							end
@@ -335,10 +391,13 @@ local function SharedInputHandler(event)
 							if plEntry.playlist then
 								easyInputStringOKCancel(THEME:GetString("Playlists", "PromptRename"), 32, false, function(newName)
 									if newName and newName ~= "" then
-										plEntry.playlist:SetName(newName)
-										ms.ok(string.format(THEME:GetString("Playlists", "PlaylistRenamed"), name, newName))
-										RefreshPlaylistList()
-										playlistsActor:playcommand("RefreshUI")
+										if ManualRenamePlaylist(name, newName, plEntry.playlist) then
+											ms.ok(string.format(THEME:GetString("Playlists", "PlaylistRenamed"), name, newName))
+											RefreshPlaylistList()
+											playlistsActor:playcommand("RefreshUI")
+										else
+											ms.ok(THEME:GetString("Common", "Error"))
+										end
 									end
 								end, nil, name)
 							end
@@ -404,6 +463,26 @@ local t = Def.ActorFrame {
 			self:visible(false)
 			if HV.ActiveTab == "PLAYLISTS" then HV.ActiveTab = "" end
 		end
+	end,
+	NextPlaylistPageMessageCommand = function(self)
+		if singleplaylistactive then
+			local totalPages = math.max(1, math.ceil(#chartlist / chartsPerPage))
+			currentChartPage = math.max(1, math.min(totalPages, currentChartPage + 1))
+		else
+			local totalPages = math.max(1, math.ceil(#allplaylists / playlistsPerPage))
+			currentPlaylistPage = math.max(1, math.min(totalPages, currentPlaylistPage + 1))
+		end
+		self:playcommand("RefreshUI")
+	end,
+	PrevPlaylistPageMessageCommand = function(self)
+		if singleplaylistactive then
+			local totalPages = math.max(1, math.ceil(#chartlist / chartsPerPage))
+			currentChartPage = math.max(1, math.min(totalPages, currentChartPage - 1))
+		else
+			local totalPages = math.max(1, math.ceil(#allplaylists / playlistsPerPage))
+			currentPlaylistPage = math.max(1, math.min(totalPages, currentPlaylistPage - 1))
+		end
+		self:playcommand("RefreshUI")
 	end,
 
 	-- Background

@@ -461,6 +461,12 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						if HV.ActiveTab == "PROFILE" then
 							if dir < 0 then MESSAGEMAN:Broadcast("PrevScorePage")
 							else MESSAGEMAN:Broadcast("NextScorePage") end
+						elseif HV.ActiveTab == "PLAYLISTS" then
+							if dir < 0 then MESSAGEMAN:Broadcast("PrevPlaylistPage")
+							else MESSAGEMAN:Broadcast("NextPlaylistPage") end
+						elseif HV.ActiveTab == "GOALS" then
+							if dir < 0 then MESSAGEMAN:Broadcast("PrevGoalPage")
+							else MESSAGEMAN:Broadcast("NextGoalPage") end
 						else
 							MESSAGEMAN:Broadcast("TabNavigation", {dir = dir})
 						end
@@ -1721,6 +1727,10 @@ end
 -- ============================================================
 -- (Relocated to bottom to ensure decoration callbacks are prioritized)
 
+-- 4. Song Preview Logic (Ported from spawncamping-wallhack)
+-- Loaded before other layers to ensure its message listeners clear state first.
+main_af[#main_af + 1] = LoadActor("bgm.lua")
+
 -- Load the Chart Preview layer (initially hidden)
 main_af[#main_af + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .. {
 	InitCommand = function(self)
@@ -1732,16 +1742,7 @@ main_af[#main_af + 1] = LoadActor("../ScreenChartPreview overlay/default.lua") .
 main_af[#main_af + 1] = LoadActor("input_debugger.lua")
 
 -- Sync previewActive state from outside
-main_af[#main_af + 1] = Def.Actor {
-	ChartPreviewOnMessageCommand = function(self) 
-		previewActive = true 
-		HV.ChartPreviewActive = true
-	end,
-	ChartPreviewOffMessageCommand = function(self) 
-		previewActive = false 
-		HV.ChartPreviewActive = false
-	end,
-}
+
 
 -- Load Decoration Overlays (Initially hidden, using standard Toggle[NAME]Overlay messages)
 local decorOverlays = {"scores", "filters", "playlists", "tags", "goals"}
@@ -1775,9 +1776,11 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				if event.type ~= "InputEventType_FirstPress" then return end
 				if previewActive then
 					previewActive = false
+					HV.ChartPreviewActive = false
 					MESSAGEMAN:Broadcast("ChartPreviewOff")
 				else
 					previewActive = true
+					HV.ChartPreviewActive = true
 					MESSAGEMAN:Broadcast("ChartPreviewOn")
 				end
 				return true
@@ -1812,9 +1815,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 		end)
 	end
 }
-
--- 4. Song Preview Logic (Ported from spawncamping-wallhack)
-main_af[#main_af + 1] = LoadActor("bgm.lua")
 
 return main_af
 

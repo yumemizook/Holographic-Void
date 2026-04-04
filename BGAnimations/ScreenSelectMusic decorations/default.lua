@@ -35,8 +35,16 @@ local loginState = HV.LoginState
 HV.CurrentSongData = {
 	song = nil,
 	steps = nil,
+	group = nil,
+	avgMSD = 0,
+	songCount = 0,
+	progress = 0,
 	rate = 1.0,
 	allSteps = {},
+	displayCharts = {},    -- List of {steps=steps, difficulty=string, isPlaceholder=bool}
+	hasSingle = false,
+	hasDouble = false,
+	chartOffset = 0,       -- For scrolling
 	diffAvailability = {}, -- {Beginner = true, ...}
 	diffMeters = {},       -- {Beginner = 10, ...}
 	diffMSDs = {},         -- {Beginner = 25.4, ...}
@@ -96,16 +104,83 @@ t[#t + 1] = Def.Actor {
 		data.song = GAMESTATE:GetCurrentSong()
 		data.steps = GAMESTATE:GetCurrentSteps()
 		data.rate = getCurRateValue() or 1.0
+		data.group = nil
+		if not data.song then
+			local screen = SCREENMAN:GetTopScreen()
+			if screen and screen.GetMusicWheel then
+				local wheel = screen:GetMusicWheel()
+				if wheel then
+					data.group = wheel:GetSelectedSection()
+					
+					-- Perform pack stats calculation on-demand for the selected group
+					if data.group and data.group ~= "" then
+						local songs = SONGMAN:GetSongsInGroup(data.group)
+						data.songCount = #songs
+						local totalMSD = 0
+						local countedSongs = 0
+						local clearedSongs = 0
+						local stype = GAMESTATE:GetCurrentStyle():GetStepsType()
+						for _, s in ipairs(songs) do
+							local charts = s:GetStepsByStepsType(stype)
+							local highest = 0
+							for _, chart in ipairs(charts) do
+								local msd = chart:GetMSD(1, 1) -- Overall MSD at 1.0x
+								if msd > highest then highest = msd end
+							end
+							if highest > 0 then
+								totalMSD = totalMSD + highest
+								countedSongs = countedSongs + 1
+							end
+							
+							-- Check clearing status
+							local grade = s:GetHighestGrade()
+							if grade and grade ~= "Grade_NoData" and grade ~= "Grade_Failed" then
+								clearedSongs = clearedSongs + 1
+							end
+						end
+						data.avgMSD = countedSongs > 0 and (totalMSD / countedSongs) or 0
+						data.progress = data.songCount > 0 and (clearedSongs / data.songCount) * 100 or 0
+					end
+				end
+			end
+		end
 	end,
 	
 	UpdateHeavyDataCommand = function(self)
 		local data = HV.CurrentSongData
 		if data.song then
+			-- Style check
+			data.hasSingle = data.song:HasStepsType("StepsType_Dance_Single")
+			data.hasDouble = data.song:HasStepsType("StepsType_Dance_Double")
+
 			data.allSteps = (data.song.GetChartsOfCurrentGameType and data.song:GetChartsOfCurrentGameType()) 
 				or (data.song.GetStepsByStepsType and data.song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType())) 
 				or {}
 			
-			-- Diff availability and meters (O(N) once per song)
+			-- Populate displayCharts
+			data.displayCharts = {}
+			local baseDiffs = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
+			
+			-- Group steps by difficulty
+			local grouped = {}
+			for _, st in ipairs(data.allSteps) do
+				local diff = ToEnumShortString(st:GetDifficulty())
+				if not grouped[diff] then grouped[diff] = {} end
+				table.insert(grouped[diff], st)
+			end
+			
+			-- 1. Standard Diffs (Placeholders if missing, includes Edits)
+			for _, diff in ipairs(baseDiffs) do
+				if grouped[diff] and #grouped[diff] > 0 then
+					for _, st in ipairs(grouped[diff]) do
+						table.insert(data.displayCharts, {steps = st, difficulty = diff, isPlaceholder = false})
+					end
+				else
+					table.insert(data.displayCharts, {steps = nil, difficulty = diff, isPlaceholder = true})
+				end
+			end
+			
+			-- Diff availability and meters (O(N) once per song, keeping for compatibility)
 			data.diffAvailability = {}
 			data.diffMeters = {}
 			data.diffMSDs = {}
@@ -135,16 +210,26 @@ t[#t + 1] = Def.Actor {
 			end
 		else
 			data.allSteps = {}
+			data.hasSingle = false
+			data.hasDouble = false
 			data.diffAvailability = {}
 			data.diffMeters = {}
 			data.diffMSDs = {}
 			data.skillsetMSDs = {}
 			data.pbScore = nil
 			data.pbSSR = 0
+
+			-- Populate placeholders for folders
+			data.displayCharts = {}
+			local baseDiffs = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
+			for _, diff in ipairs(baseDiffs) do
+				table.insert(data.displayCharts, {steps = nil, difficulty = diff, isPlaceholder = true})
+			end
 		end
 	end,
 	
 	CurrentSongChangedMessageCommand = function(self)
+		HV.CurrentSongData.chartOffset = 0
 		self:playcommand("UpdateData")
 		-- Throttle InstantChartUpdate to avoid CPU spikes during fast scrolling
 		-- 0.04s is roughly 1-2 frames at high refresh rates, enough to skip redundant zips
@@ -198,18 +283,21 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		SetCommand = function(self)
 			local song = HV.CurrentSongData.song
+			local group = HV.CurrentSongData.group
+			local bnpath = ""
 			if song then
-				local bnpath = song:GetBannerPath()
-				if bnpath and bnpath ~= "" then
-					if bnpath ~= self.lastPath then
-						self:Load(bnpath)
-						self.lastPath = bnpath
-					end
-					self:scaletoclipped(panelW - 24, (panelW - 24) / 3.2)
-					self:visible(true)
-				else
-					self:visible(false)
+				bnpath = song:GetBannerPath()
+			elseif group then
+				bnpath = SONGMAN:GetSongGroupBannerPath(group)
+			end
+
+			if bnpath and bnpath ~= "" then
+				if bnpath ~= self.lastPath then
+					self:Load(bnpath)
+					self.lastPath = bnpath
 				end
+				self:scaletoclipped(panelW - 24, (panelW - 24) / 3.2)
+				self:visible(true)
 			else
 				self:visible(false)
 			end
@@ -251,10 +339,34 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		SetCommand = function(self)
 			local song = HV.CurrentSongData.song
+			local group = HV.CurrentSongData.group
 			if song then
 				self:settext(song:GetDisplayMainTitle())
+			elseif group then
+				self:settext(group)
 			else
 				self:settext("")
+			end
+		end,
+		InstantChartUpdateMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	},
+
+	-- Pack Stats (Songs and Average MSD)
+	LoadFont("Common Normal") .. {
+		Name = "PackStats",
+		InitCommand = function(self)
+			self:halign(0):valign(0):y(22):zoom(0.4)
+				:diffuse(subText)
+		end,
+		SetCommand = function(self)
+			local data = HV.CurrentSongData
+			if not data.song and data.group and data.group ~= "" then
+				self:settextf("%d Songs\nProgress: %.1f%%", data.songCount, data.progress)
+				self:visible(true)
+			else
+				self:visible(false)
 			end
 		end,
 		InstantChartUpdateMessageCommand = function(self)
@@ -416,6 +528,10 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(panelX + 16, detailY)
 	end,
+	SetCommand = function(self)
+		self:visible(HV.CurrentSongData.song ~= nil)
+	end,
+	InstantChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 
 	-- BPM Label
 	LoadFont("Common Normal") .. {
@@ -558,16 +674,17 @@ t[#t + 1] = Def.ActorFrame {
 		CurrentRateChangedMessageCommand = function(self)
 			self:playcommand("Set")
 		end
-	},
-
-	-- Separator
-	Def.Quad {
-		InitCommand = function(self)
-			self:halign(0):valign(0):y(20)
-				:zoomto(panelW - 32, 1)
-				:diffuse(color("0.12,0.12,0.12,1"))
-		end
 	}
+}
+
+-- Separator between Details and MSD
+t[#t + 1] = Def.Quad {
+	Name = "DetailsMSDSeparator",
+	InitCommand = function(self)
+		self:halign(0):valign(0):xy(panelX + 16, detailY + 20)
+			:zoomto(panelW - 32, 1)
+			:diffuse(color("0.12,0.12,0.12,1"))
+	end
 }
 
 -- ============================================================
@@ -585,10 +702,18 @@ t[#t + 1] = Def.ActorFrame {
 	end,
 
 	LoadFont("Common Normal") .. {
+		Name = "MSDRatingsLabel",
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.35):diffuse(accentColor)
-			self:settext(THEME:GetString("ScreenSelectMusic", "MSDRatings"))
-		end
+		end,
+		SetCommand = function(self)
+			if not HV.CurrentSongData.song and HV.CurrentSongData.group then
+				self:settext("AVERAGE MSD")
+			else
+				self:settext(THEME:GetString("ScreenSelectMusic", "MSDRatings"))
+			end
+		end,
+		InstantChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 	}
 }
 
@@ -609,6 +734,11 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local data = HV.CurrentSongData
 			local msd = data.skillsetMSDs[1] -- Overall
+			
+			if not data.song and data.avgMSD > 0 then
+				msd = data.avgMSD
+			end
+			
 			if msd and msd > 0 then
 				self:settext(string.format("%.2f", msd))
 				self:diffuse(HVColor.GetMSDRatingColor(msd))
@@ -798,10 +928,10 @@ t[#t + 1] = Def.ActorFrame {
 -- DIFFICULTY SELECTOR TABS (Vertical, right of sidebar)
 -- ============================================================
 local diffSelectorY = msdY + 80
-local diffTabW = 70
-local diffTabH = 22
-local diffNames = {"Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit"}
-local diffShort = {"BG", "EZ", "MD", "HD", "CH", "ED"}
+local diffTabW = 64 -- Smaller
+local diffTabH = 26 -- Smaller
+local maxVisibleCharts = 6 -- Exactly 6
+local diffShort = {Beginner = "BG", Easy = "EZ", Medium = "MD", Hard = "HD", Challenge = "CH", Edit = "ED"}
 local diffSelectorX = panelX + panelW + 14
 local diffSelectorTopY = panelY + 8
 
@@ -811,19 +941,55 @@ t[#t + 1] = Def.ActorFrame {
 		self:xy(diffSelectorX, diffSelectorTopY)
 	end,
 
+	-- Header and Style Toggle
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):zoom(0.28):diffuse(accentColor)
 			self:settext(THEME:GetString("ScreenSelectMusic", "Chart"))
 		end
+	},
+
+	-- Style Toggle Buttons (S / D)
+	Def.ActorFrame {
+		Name = "StyleToggle",
+		InitCommand = function(self) self:xy(diffTabW - 25, 0) end,
+		SetCommand = function(self)
+			local data = HV.CurrentSongData
+			self:visible(data.hasSingle and data.hasDouble)
+		end,
+		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		
+		LoadFont("Common Normal") .. {
+			Name = "Single",
+			InitCommand = function(self) self:x(0):zoom(0.28):settext("S") end,
+			SetCommand = function(self)
+				local data = HV.CurrentSongData
+				local isS = GAMESTATE:GetCurrentStyle():GetName() == "single"
+				self:diffuse(isS and accentColor or dimText)
+				self:diffusealpha(data.hasSingle and 1 or 0.2)
+			end,
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Double",
+			InitCommand = function(self) self:x(12):zoom(0.28):settext("D") end,
+			SetCommand = function(self)
+				local data = HV.CurrentSongData
+				local isD = GAMESTATE:GetCurrentStyle():GetName() == "double"
+				self:diffuse(isD and accentColor or dimText)
+				self:diffusealpha(data.hasDouble and 1 or 0.2)
+			end,
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		}
 	}
 }
 
-for di, dname in ipairs(diffNames) do
+-- Dynamic Chart Slots
+for i = 1, maxVisibleCharts do
 	t[#t + 1] = Def.ActorFrame {
-		Name = "DiffTab_" .. dname,
+		Name = "DiffSlot_" .. i,
 		InitCommand = function(self)
-			self:xy(diffSelectorX, diffSelectorTopY + 16 + (di - 1) * (diffTabH + 3))
+			self:xy(diffSelectorX, diffSelectorTopY + 16 + (i - 1) * (diffTabH + 3))
 		end,
 
 		Def.Quad {
@@ -834,14 +1000,19 @@ for di, dname in ipairs(diffNames) do
 			end,
 			SetCommand = function(self)
 				local data = HV.CurrentSongData
-				if not data.song then self:diffusealpha(0.3) return end
+				local entry = data.displayCharts[i + data.chartOffset]
+				if not entry then
+					self:visible(false)
+					return
+				end
+				self:visible(true)
 				
-				local found = data.diffAvailability[dname]
-				if not found then
-					self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(0.15)
+				if entry.isPlaceholder then
+					self:diffuse(color("0.05,0.05,0.05,1")):diffusealpha(0.3)
 				else
 					local curSteps = data.steps
-					if curSteps and ToEnumShortString(curSteps:GetDifficulty()) == dname then
+					if curSteps == entry.steps then
+						local dname = entry.difficulty
 						self:diffuse(HVColor.Difficulty[dname] or accentColor):diffusealpha(0.4)
 					else
 						self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(1)
@@ -855,15 +1026,37 @@ for di, dname in ipairs(diffNames) do
 			Name = "Label",
 			InitCommand = function(self)
 				self:halign(0):valign(0.5)
-					:xy(6, diffTabH / 2)
-					:zoom(0.26):diffuse(mainText)
-				self:settext(diffShort[di])
+					:xy(5, 13)
+					:zoom(0.30):diffuse(mainText)
 			end,
 			SetCommand = function(self)
 				local data = HV.CurrentSongData
-				if not data.song then self:diffusealpha(0.3) return end
-				local found = data.diffAvailability[dname]
-				self:diffusealpha(found and 1 or 0.2)
+				local entry = data.displayCharts[i + data.chartOffset]
+				if not entry then return end
+				self:settext(diffShort[entry.difficulty] or "??")
+				self:diffusealpha(entry.isPlaceholder and 0.2 or 1)
+			end,
+			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		},
+
+		LoadFont("Common Normal") .. {
+			Name = "Author",
+			InitCommand = function(self)
+				self:halign(0):valign(0.5)
+					:xy(5, 20)
+					:zoom(0.25):diffuse(dimText)
+			end,
+			SetCommand = function(self)
+				local data = HV.CurrentSongData
+				local entry = data.displayCharts[i + data.chartOffset]
+				if not entry or entry.isPlaceholder then 
+					self:settext("") 
+					return 
+				end
+				local auth = entry.steps:GetAuthorCredit()
+				if auth == "" then auth = entry.steps:GetDescription() end
+				if #auth > 15 then auth = string.sub(auth, 1, 13) .. ".." end
+				self:settext(auth)
 			end,
 			DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		},
@@ -872,21 +1065,21 @@ for di, dname in ipairs(diffNames) do
 			Name = "MSDVal",
 			InitCommand = function(self)
 				self:halign(1):valign(0.5)
-					:xy(diffTabW - 6, diffTabH / 2)
-					:zoom(0.26):diffuse(dimText)
+					:xy(diffTabW - 5, diffTabH / 2)
+					:zoom(0.30):diffuse(dimText)
 			end,
 			SetCommand = function(self)
 				local data = HV.CurrentSongData
-				if not data.song then self:settext("") return end
+				local entry = data.displayCharts[i + data.chartOffset]
+				if not entry or entry.isPlaceholder then 
+					self:settext("") 
+					return 
+				end
 				
-				local found = data.diffAvailability[dname]
-				if not found then self:settext("") return end
-
-				local showMSD = (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true) or ThemePrefs.Get("HV_ShowMSD") == true
-				
+				local showMSD = (ThemePrefs.Get("HV_ShowMSD") == "true" or ThemePrefs.Get("HV_ShowMSD") == true)
 				if showMSD then
-					local msd = data.diffMSDs[dname]
-					if msd and msd > 0 then
+					local msd = entry.steps:GetMSD(data.rate, 1) or 0
+					if msd > 0 then
 						self:settext(string.format("%.2f", msd))
 						self:diffuse(HVColor.GetMSDRatingColor(msd))
 					else
@@ -894,9 +1087,7 @@ for di, dname in ipairs(diffNames) do
 						self:diffuse(dimText)
 					end
 				else
-					-- Show chart meter if MSD is disabled
-					local meter = data.diffMeters[dname] or 0
-					self:settext(tostring(meter))
+					self:settext(tostring(entry.steps:GetMeter()))
 					self:diffuse(mainText)
 				end
 			end,
@@ -905,6 +1096,7 @@ for di, dname in ipairs(diffNames) do
 	}
 end
 
+
 -- Difficulty selector click handler (vertical layout)
 t[#t + 1] = Def.ActorFrame {
 	Name = "DiffSelectorClickHandler",
@@ -912,48 +1104,56 @@ t[#t + 1] = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
 		
-		-- Cleanup existing
 		if HV.DiffSelectorInputCallback then
 			pcall(function() screen:RemoveInputCallback(HV.DiffSelectorInputCallback) end)
 		end
 		
 		HV.DiffSelectorInputCallback = function(event)
 			if not event or not event.DeviceInput then return false end
-			
-			-- Screen name check to avoid leaking into text entry or other overlays
 			local top = SCREENMAN:GetTopScreen()
 			if not top or top:GetName() ~= "ScreenSelectMusic" then return false end
-			
 			if event.type ~= "InputEventType_FirstPress" then return false end
-			
-			-- Block input if an overlay tab is active
 			if (HV.ActiveTab and HV.ActiveTab ~= "") then return false end
 
-			local btn = event.DeviceInput.button
-			if btn ~= "DeviceButton_left mouse button" then return false end
-			
-			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
-			local song = GAMESTATE:GetCurrentSong()
+			local data = HV.CurrentSongData
+			local song = data.song
 			if not song then return false end
+
+			local mx, my = INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY()
+			local btn = event.DeviceInput.button
 			
-			for di2, dname2 in ipairs(diffNames) do
-				local tx = diffSelectorX
-				local ty = diffSelectorTopY + 16 + (di2 - 1) * (diffTabH + 3)
-				if mx >= tx and mx <= tx + diffTabW and my >= ty and my <= ty + diffTabH then
-					local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-					if allSteps then
-						for _, st in ipairs(allSteps) do
-							if ToEnumShortString(st:GetDifficulty()) == dname2 then
-								GAMESTATE:SetCurrentSteps(PLAYER_1, st)
-								return true
-							end
+			-- Chart Slot Click
+			if btn == "DeviceButton_left mouse button" then
+				for i = 1, maxVisibleCharts do
+					local tx = diffSelectorX
+					local ty = diffSelectorTopY + 16 + (i - 1) * (diffTabH + 3)
+					if mx >= tx and mx <= tx + diffTabW and my >= ty and my <= ty + diffTabH then
+						local entry = data.displayCharts[i + data.chartOffset]
+						if entry and not entry.isPlaceholder then
+							GAMESTATE:SetCurrentSteps(PLAYER_1, entry.steps)
+							return true
 						end
 					end
 				end
 			end
+
+			-- Scroll Handling (Mouse Wheel)
+			if btn == "DeviceButton_mouse wheel up" then
+				if data.chartOffset > 0 then
+					data.chartOffset = data.chartOffset - 1
+					MESSAGEMAN:Broadcast("DelayedChartUpdate")
+					return true
+				end
+			elseif btn == "DeviceButton_mouse wheel down" then
+				if data.chartOffset < (#data.displayCharts - maxVisibleCharts) then
+					data.chartOffset = data.chartOffset + 1
+					MESSAGEMAN:Broadcast("DelayedChartUpdate")
+					return true
+				end
+			end
+
 			return false
 		end
-		
 		screen:AddInputCallback(HV.DiffSelectorInputCallback)
 	end
 }

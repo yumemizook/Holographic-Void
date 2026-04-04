@@ -749,7 +749,6 @@ local dotLife = 2.0  -- seconds
 local ewmaValue = 0
 local ewmaAlpha = 0.07
 local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
-if HV.MinimalisticMode() then ebMode = "Off" end
 local showEWMA = (ebMode == "EWMAOnly" or ebMode == "Both")
 local showStandard = (ebMode == "Standard" or ebMode == "Both")
 

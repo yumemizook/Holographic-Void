@@ -36,7 +36,6 @@ local function playMusic(self, delta)
 
 	-- dont override sample music with this if in chart preview mode
 	if isChartPreviewActive() then 
-		SOUND:StopMusic() -- Ensure we fall back if we were playing something
 		return 
 	end
 
@@ -143,6 +142,13 @@ local t = Def.ActorFrame{
 			self:SetUpdateFunctionInterval(0.002)
 			SOUND:StopMusic()
 		end
+	end,
+	ChartPreviewOnMessageCommand = function(self)
+		self.stoppedForPreview = true
+		SOUND:StopMusic()
+	end,
+	ChartPreviewOffMessageCommand = function(self)
+		self.stoppedForPreview = false
 	end
 }
 
