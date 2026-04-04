@@ -260,14 +260,14 @@ local HVPrefs = {
 	-- Gameplay: NPS Window Size (seconds)
 	HV_NPSWindowSize = {
 		Default = 1,
-		Choices = {"1s", "2s", "3s", "4s", "5s"},
+		Choices = {"1", "2", "3", "4", "5"},
 		Values = {1, 2, 3, 4, 5}
 	},
 
 	-- Gameplay: Error Bar Mode (Off, Standard, EWMA Only, Both)
 	HV_ErrorBarMode = {
 		Default = "Standard",
-		Choices = {"Off", "Standard", "EWMA Only", "Both"},
+		Choices = {"Off", "Standard", "EWMA", "Both"},
 		Values = {"Off", "Standard", "EWMAOnly", "Both"}
 	},
 
@@ -288,7 +288,7 @@ local HVPrefs = {
 	-- Gameplay: Mini Pacemaker Target Type
 	HV_PacemakerTargetType = {
 		Default = "Target",
-		Choices = {"Target", "PB", "PB Replay"},
+		Choices = {"Target", "PB", "PB (Replay)"},
 		Values = {"Target", "PB", "PBReplay"}
 	},
 
@@ -306,9 +306,9 @@ local HVPrefs = {
 			"71%", "72%", "73%", "74%", "75%", "76%", "77%", "78%", "79%", "80%",
 			"81%", "82%", "83%", "84%", "85%", "86%", "87%", "88%", "89%", "90%",
 			"91%", "92%", "93%", "94%", "95%", "96%", "97%", "98%", "99%",
-			"99.50%", "99.60%", "99.70%", "99.80%", "99.90%", "99.95%",
+			"99.50%", "99.60%", "99.70%", "99.80%", "99.90%", "99.95%", "99.955%",
 			"99.96%", "99.97%", "99.98%", "99.99%",
-			"99.990%", "99.991%", "99.992%", "99.993%", "99.994%",
+			"99.990%", "99.991%", "99.992%", "99.993%", "99.9935%", "99.994%",
 			"99.995%", "99.996%", "99.997%", "99.998%", "99.999%", "100%"
 		},
 		Values = {
@@ -322,9 +322,9 @@ local HVPrefs = {
 			71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
 			81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
 			91, 92, 93, 94, 95, 96, 97, 98, 99,
-			99.50, 99.60, 99.70, 99.80, 99.90, 99.95,
+			99.50, 99.60, 99.70, 99.80, 99.90, 99.95, 99.955,
 			99.96, 99.97, 99.98, 99.99,
-			99.990, 99.991, 99.992, 99.993, 99.994,
+			99.990, 99.991, 99.992, 99.993, 99.9935, 99.994,
 			99.995, 99.996, 99.997, 99.998, 99.999, 100
 		}
 	},
@@ -355,16 +355,16 @@ local HVPrefs = {
 	
 	-- Gameplay: Show Hit Mean Display
 	HV_ShowHitMean = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true}
+		Default = "Mean",
+		Choices = {"Off", "Mean", "Std Dev", "J4 Score"},
+		Values = {"Off", "Mean", "StdDev", "J4"}
 	},
 
 	-- Gameplay: Show Hit Mean Display (Legacy compatibility)
 	HV_ShowMean = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true}
+		Default = "Mean",
+		Choices = {"Off", "Mean", "Std Dev", "J4 Score"},
+		Values = {"Off", "Mean", "StdDev", "J4"}
 	},
 
 	-- Gameplay: Mini (Receptor Size)
@@ -510,6 +510,34 @@ local HVPrefs = {
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
+
+	-- Gameplay: Prioritize Lower Judgements
+	HV_PrioritizeLowerJudgements = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+	
+	-- Visual: Judgment Animation
+	HV_JudgmentAnimation = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Visual: Combo Animation
+	HV_ComboAnimation = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Visual: Recent Judgement Display
+	HV_RecentJudgmentDisplay = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.
@@ -649,9 +677,12 @@ function HV.ShowGoalTrackerText()
 	return isTrue(ThemePrefs.Get("HV_ShowGoalTracker"))
 end
 
---- Check if hit mean display should be shown.
-function HV.ShowHitMean()
-	return isTrue(ThemePrefs.Get("HV_ShowMean"))
+--- Get Notefield Stat Display type
+function HV.GetNotefieldStat()
+	local val = ThemePrefs.Get("HV_ShowMean")
+	if val == true or val == "true" then return "Mean" end
+	if val == false or val == "false" then return "Off" end
+	return val or "Mean"
 end
 
 --- Check if minimalistic mode is enabled.
@@ -672,6 +703,26 @@ end
 --- Check if NG indicator should be shown.
 function HV.ShowNGIndicator()
 	return isTrue(ThemePrefs.Get("HV_ShowNGIndicator"))
+end
+
+--- Check if lower judgments should be prioritized.
+function HV.PrioritizeLowerJudgements()
+	return isTrue(ThemePrefs.Get("HV_PrioritizeLowerJudgements"))
+end
+
+--- Check if judgment animations are enabled.
+function HV.JudgmentAnimation()
+	return isTrue(ThemePrefs.Get("HV_JudgmentAnimation"))
+end
+
+--- Check if combo animations are enabled.
+function HV.ComboAnimation()
+	return isTrue(ThemePrefs.Get("HV_ComboAnimation"))
+end
+
+--- Check if recent judgment display is enabled.
+function HV.RecentJudgmentDisplay()
+	return isTrue(ThemePrefs.Get("HV_RecentJudgmentDisplay"))
 end
 
 Trace("Holographic Void: 03 HVThemePrefs.lua loaded.")

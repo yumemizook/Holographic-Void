@@ -188,9 +188,9 @@ local HVPrefRows = {
 
 	-- Show Mean on Notefield
 	HV_ShowMean = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true},
+		Default = "Mean",
+		Choices = {"Off", "Mean", "Std Dev", "J4 Score"},
+		Values = {"Off", "Mean", "StdDev", "J4"},
 	},
 	
 	-- Accent Color
@@ -306,6 +306,34 @@ local HVPrefRows = {
 		Choices = {"Off", "On"},
 		Values = {false, true},
 	},
+
+	-- Prioritize Lower Judgements
+	HV_PrioritizeLowerJudgements = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- Judgment Animation
+	HV_JudgmentAnimation = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- Combo Animation
+	HV_ComboAnimation = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- Recent Judgement Display
+	HV_RecentJudgmentDisplay = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -358,7 +386,7 @@ function HVThemeOptionsLines()
 		"HV_ShowMSD", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
 		
 		-- Gameplay HUD
-		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_ShowCombo", "HV_ShowCurrentWife",
+		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
 			"HV_ShowJudgeCounter", "HV_JudgeCounterMode", "HV_ShowNGIndicator",
 		"HV_ShowPlayerInfo", "HV_ProgressBarPosition", "HV_ShowInGameLeaderboard",
 		
@@ -449,7 +477,28 @@ function OptionRowShowNPS()
 end
 
 function OptionRowShowMean()
-	return HVThemePrefRow("HV_ShowMean", "Show Mean on Notefield")
+	local row = HVThemePrefRow("HV_ShowMean", "Mean Display")
+	row.LoadSelections = function(self, list, pn)
+		local val = ThemePrefs.Get("HV_ShowMean")
+		if val == true or val == "true" then
+			list[2] = true -- "Mean"
+		elseif val == false or val == "false" then
+			list[1] = true -- "Off"
+		else
+			local found = false
+			for i, v in ipairs(self.Values) do
+				if v == val then
+					list[i] = true
+					found = true
+					break
+				end
+			end
+			if not found then
+				list[2] = true -- Fallback to "Mean"
+			end
+		end
+	end
+	return row
 end
 
 function OptionRowPacemakerType()
@@ -640,6 +689,22 @@ end
 
 function OptionRowShowNGIndicator()
 	return HVThemePrefRow("HV_ShowNGIndicator", "Show NG Indicator")
+end
+
+function OptionRowPrioritizeLowerJudgements()
+	return HVThemePrefRow("HV_PrioritizeLowerJudgements", "Prioritize Lower Judgements")
+end
+
+function OptionRowJudgmentAnimation()
+	return HVThemePrefRow("HV_JudgmentAnimation", "Judgment Animation")
+end
+
+function OptionRowComboAnimation()
+	return HVThemePrefRow("HV_ComboAnimation", "Combo Animation")
+end
+
+function OptionRowRecentJudgmentDisplay()
+	return HVThemePrefRow("HV_RecentJudgmentDisplay", "Recent Judgement Display")
 end
 
 -- Practice Mode toggle (used in ScreenPlayerOptions)

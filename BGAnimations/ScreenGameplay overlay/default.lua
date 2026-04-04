@@ -48,6 +48,22 @@ local t = Def.ActorFrame {
 				ps:GetPlayerOptions("ModsLevel_Current"):Reverse(0)
 			end
 		end
+
+		-- Input Callback for Ghost Tapping feedback
+		local screen = SCREENMAN:GetTopScreen()
+		if screen then
+			screen:AddInputCallback(function(event)
+				if event.type == "InputEventType_FirstPress" then
+					local b = event.button
+					-- Filter for common gameplay buttons to avoid menu buttons triggering HUD animations
+					if b == "Left" or b == "Down" or b == "Up" or b == "Right" or
+					   b == "Key 1" or b == "Key 2" or b == "Key 3" or b == "Key 4" or
+					   b == "Key 5" or b == "Key 6" or b == "Key 7" then
+						MESSAGEMAN:Broadcast("GhostTap")
+					end
+				end
+			end)
+		end
 	end,
 	
 
@@ -503,9 +519,10 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "NotefieldMean",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
-		-- Check if hit mean should be shown
-		local showMean = HV.ShowHitMean() and not HV.MinimalisticMode() and not isSync
-		self:visible(showMean)
+		-- Check if notefield stat should be shown
+		local statType = HV.GetNotefieldStat()
+		local showStat = statType ~= "Off" and not HV.MinimalisticMode() and not isSync
+		self:visible(showStat)
 	end,
 	OnCommand = function(self)
 		self:linear(0.2):diffusealpha(0.8)
@@ -513,20 +530,65 @@ t[#t + 1] = Def.ActorFrame {
 
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:zoom(0.35):diffuse(mainText):settext("0.00ms")
+				self:zoom(0.35):diffuse(mainText)
+				local statType = HV.GetNotefieldStat()
+				self.statType = statType
+				self.currWifePoints = 0
+				if statType == "J4" then
+					self:settext("100.0000%")
+				else
+					self:settext("0.00ms")
+				end
 			end,
-			JudgmentMessageCommand = function(self)
+			JudgmentMessageCommand = function(self, msg)
+				if self.statType == "J4" then
+					if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
+						local ts = ms.JudgeScalers[4] or 1.0
+						if msg.TapNoteOffset then
+							self.currWifePoints = self.currWifePoints + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
+						elseif msg.TapNoteScore == "TapNoteScore_Miss" then
+							self.currWifePoints = self.currWifePoints - 5.5
+						elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
+							self.currWifePoints = self.currWifePoints - 7.0
+						end
+					elseif msg.HoldNoteScore == "HoldNoteScore_LetGo" then
+						self.currWifePoints = self.currWifePoints - 4.5
+					end
+				end
 				self:queuecommand("Update")
 			end,
 			UpdateCommand = function(self)
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-				if pss then
+				if not pss then return end
+
+				if self.statType == "J4" then
+					local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
+									   pss:GetTapNoteScores("TapNoteScore_W2") +
+									   pss:GetTapNoteScores("TapNoteScore_W3") +
+									   pss:GetTapNoteScores("TapNoteScore_W4") +
+									   pss:GetTapNoteScores("TapNoteScore_W5") +
+									   pss:GetTapNoteScores("TapNoteScore_Miss")
+					local maxPoints = notesPassed * 2
+					if maxPoints > 0 then
+						local j4 = math.min((self.currWifePoints / maxPoints) * 100, 100)
+						self:settextf("%.4f%%", j4)
+					else
+						self:settext("100.0000%")
+					end
+				elseif self.statType == "StdDev" then
+					local dvt = pss:GetOffsetVector()
+					if dvt and #dvt > 0 then
+						self:settextf("%.2fms", wifeSd(dvt))
+					end
+				else
 					local dvt = pss:GetOffsetVector()
 					if dvt and #dvt > 0 then
 						self:settextf("%.2fms", wifeMean(dvt))
 					end
 				end
 			end,
+			PracticeModeResetMessageCommand = function(self) self.currWifePoints = 0; self:queuecommand("Update") end,
+			PracticeModeReloadMessageCommand = function(self) self.currWifePoints = 0; self:queuecommand("Update") end
 		
 		}
 	}
@@ -578,6 +640,8 @@ t[#t + 1] = Def.ActorFrame {
 	},
 
 	JudgmentMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		self.isHoldEnd = (params.HoldNoteScore ~= nil)
 		self.params = params
 		self:queuecommand("Update")
 	end,
@@ -623,6 +687,11 @@ t[#t + 1] = Def.ActorFrame {
 			
 			numActor:settext(tostring(combo)):diffuse(brightText)
 			
+			-- Apply Animation if enabled (Skip for hold/roll ends)
+			if HV.ComboAnimation and HV.ComboAnimation() and not self.isHoldEnd then
+				self:stoptweening():zoom(1.2):linear(0.05):zoom(1.0)
+			end
+			
 			-- Shadow display logic: 25% threshold + No combo breaks (FC status so far)
 			local isFC = (ct ~= "MF" and ct ~= "SDCB" and ct ~= "Clear" and ct ~= "Failed")
 			
@@ -639,6 +708,13 @@ t[#t + 1] = Def.ActorFrame {
 			numActor:settext("0"):diffuse(dimText):shadowlength(0)
 			graphic:visible(true):diffusealpha(0.5)
 			text:visible(false)
+		end
+	end,
+
+	GhostTapMessageCommand = function(self)
+		if HV.ComboAnimation and HV.ComboAnimation() then
+			-- Subtle pulse for ghost tapping
+			self:stoptweening():zoom(1.08):linear(0.05):zoom(1.0)
 		end
 	end,
 
