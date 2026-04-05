@@ -9,6 +9,23 @@ t[#t + 1] = Def.Quad {
 	end
 }
 
+-- Song Background Sprite
+t[#t + 1] = Def.Sprite {
+	Name = "SongBackground",
+	InitCommand = function(self)
+		local song = GAMESTATE:GetCurrentSong()
+		local showBG = HV.ShowSongBackground()
+		if song and showBG and song:GetBackgroundPath() then
+			self:visible(true):LoadBackground(song:GetBackgroundPath())
+			self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
+			local brightness = HV.GetSongBackgroundBrightness()
+			self:diffusealpha(brightness)
+		else
+			self:visible(false)
+		end
+	end
+}
+
 -- Subtle grid
 for i = 1, 8 do
 	t[#t + 1] = Def.Quad {

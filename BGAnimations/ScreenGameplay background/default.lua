@@ -3,12 +3,27 @@
 
 local t = Def.ActorFrame {}
 
--- Full-screen filter/background
+-- Full-screen black base
 t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		local filterVal = tonumber(ThemePrefs.Get("HV_ScreenFilter")) or 0
-		self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
-			:diffuse(color("0,0,0,1")):diffusealpha(math.max(1, filterVal))
+		self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,1"))
+	end
+}
+
+-- Song Background Sprite
+t[#t + 1] = Def.Sprite {
+	Name = "SongBackground",
+	InitCommand = function(self)
+		local song = GAMESTATE:GetCurrentSong()
+		local showBG = HV.ShowSongBackground()
+		if song and showBG and song:GetBackgroundPath() then
+			self:visible(true):LoadBackground(song:GetBackgroundPath())
+			self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
+			local brightness = HV.GetSongBackgroundBrightness()
+			self:diffusealpha(brightness)
+		else
+			self:visible(false)
+		end
 	end
 }
 

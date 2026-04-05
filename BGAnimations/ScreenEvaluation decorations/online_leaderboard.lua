@@ -17,7 +17,9 @@ local brightText = color("1,1,1,1")
 local dimText = brightText
 local subText = brightText
 local mainText = brightText
-local bgCard = color("0.06,0.06,0.06,0.95")
+local bgCard = color("0.06,0.06,0.06,0.7")
+
+local offsetScoreID
 
 local lbActor
 local isLocal = true
@@ -28,7 +30,18 @@ local curPage = 1
 local alreadyPulled = false
 local scoreList = hsTable
 local showAllRates = false
-local offsetScoreID
+
+local function getJudge(score)
+	local scale = (score and type(score.GetJudgeScale) == "function") and score:GetJudgeScale() or 1.0
+	if not scale then return "J4" end
+	scale = math.floor(scale * 100 + 0.5) / 100
+	for k, v in pairs(ms.JudgeScalers) do
+		if math.floor(v * 100 + 0.5) / 100 == scale then
+			return "J" .. math.max(4, k)
+		end
+	end
+	return "J4"
+end
 
 local function updateLeaderBoardForCurrentChart()
 	alreadyPulled = true
@@ -60,34 +73,42 @@ end
 
 local function refreshScores(self)
 	if isLocal then
-		if showAllRates then
-			-- All rates: gather all scores across rates
-			scoreList = {}
-			local song = GAMESTATE:GetCurrentSong()
-			if song and steps then
-				local chartKey = steps:GetChartKey()
-				local scoresByKey = SCOREMAN:GetScoresByKey(chartKey)
-				if scoresByKey then
-					for rateStr, rateScores in pairs(scoresByKey) do
-						local scores = rateScores:GetScores()
-						for j = 1, #scores do
-							scoreList[#scoreList + 1] = scores[j]
-						end
+		scoreList = {}
+		local targetRate = getCurRate()
+		local ck = (steps and steps.GetChartKey) and steps:GetChartKey() or ""
+		local scoresByKey = (ck ~= "") and SCOREMAN:GetScoresByKey(ck) or nil
+
+		if scoresByKey then
+			for rateStr, rateScores in pairs(scoresByKey) do
+				-- If showing all rates, add everything. 
+				-- Otherwise, only add scores for the current rate.
+				if showAllRates or rateStr == targetRate then
+					local scores = rateScores:GetScores()
+					for j = 1, #scores do
+						scoreList[#scoreList + 1] = scores[j]
 					end
 				end
 			end
-			if #scoreList == 0 then
-				scoreList = hsTable
-			end
-		else
-			scoreList = getScoreTable(pn, getCurRate()) or {}
 		end
-		-- Sort local scores: SSR for All Rates, Wife% for Current Rate
+
+		-- Fallback to initial table if nothing found (shouldn't happen with current play)
+		if #scoreList == 0 then
+			scoreList = hsTable
+		end
+
+		-- Sort local scores: Highest SSR then J4% for All Rates, J4% for Current Rate
 		table.sort(scoreList, function(a, b)
-			local sa = showAllRates and (a:GetSkillsetSSR("Overall") or 0) or (a:GetWifeScore() or 0)
-			local sb = showAllRates and (b:GetSkillsetSSR("Overall") or 0) or (b:GetWifeScore() or 0)
-			if math.abs(sa - sb) > 0.000001 then return sa > sb end
-			return a:GetDate() > b:GetDate()
+			if showAllRates then
+				local sa = a:GetSkillsetSSR("Overall") or 0
+				local sb = b:GetSkillsetSSR("Overall") or 0
+				if math.abs(sa - sb) > 0.0001 then return sa > sb end
+				return (getJ4NormalizedPercentage(a) or 0) > (getJ4NormalizedPercentage(b) or 0)
+			else
+				local wa = getJ4NormalizedPercentage(a) or 0
+				local wb = getJ4NormalizedPercentage(b) or 0
+				if math.abs(wa - wb) > 0.000001 then return wa > wb end
+				return (a:GetSkillsetSSR("Overall") or 0) > (b:GetSkillsetSSR("Overall") or 0)
+			end
 		end)
 	else
 		scoreList = DLMAN:GetChartLeaderBoard(steps:GetChartKey(), currentCountry)
@@ -95,12 +116,19 @@ local function refreshScores(self)
 			updateLeaderBoardForCurrentChart()
 		end
 		if scoreList then
-			-- Sort online scores: SSR for All Rates, Wife% for Current Rate
+			-- Sort online scores: Highest SSR then Wife% for All Rates, Wife% for Current Rate
 			table.sort(scoreList, function(a, b)
-				local sa = showAllRates and (a:GetSkillsetSSR("Overall") or 0) or (a:GetWifeScore() or 0)
-				local sb = showAllRates and (b:GetSkillsetSSR("Overall") or 0) or (b:GetWifeScore() or 0)
-				if math.abs(sa - sb) > 0.000001 then return sa > sb end
-				return a:GetDate() > b:GetDate()
+				if showAllRates then
+					local sa = a:GetSkillsetSSR("Overall") or 0
+					local sb = b:GetSkillsetSSR("Overall") or 0
+					if math.abs(sa - sb) > 0.0001 then return sa > sb end
+					return (a:GetWifeScore() or 0) > (b:GetWifeScore() or 0)
+				else
+					local wa = a:GetWifeScore() or 0
+					local wb = b:GetWifeScore() or 0
+					if math.abs(wa - wb) > 0.000001 then return wa > wb end
+					return (a:GetSkillsetSSR("Overall") or 0) > (b:GetSkillsetSSR("Overall") or 0)
+				end
 			end)
 		end
 	end
@@ -145,20 +173,25 @@ local function scoreItem(i)
 
 		-- Rank #
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(-15, 12):zoom(0.45):diffuse(accentColor) end,
+			InitCommand = function(self) self:xy(10, 21):zoom(0.45):diffuse(accentColor):halign(0) end,
 			SetScoreCommand = function(self, params)
 				self:settext(params.index)
 			end
 		},
 
-		-- Player name (online only) or date (local)
+		-- Player name (online only) or date (local + optional judge)
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 8):zoom(0.4):halign(0):diffuse(brightText) end,
+			InitCommand = function(self) self:xy(40, 8):zoom(0.4):halign(0):diffuse(brightText) end,
 			SetScoreCommand = function(self, params)
+				local s = scoreList[params.index]
 				if isLocal then
-					self:settext(scoreList[params.index]:GetDate())
+					local judgeStr = ""
+					if not PREFSMAN:GetPreference("SortBySSRNormPercent") then
+						judgeStr = " (" .. getJudge(s) .. ")"
+					end
+					self:settext(s:GetDate() .. judgeStr)
 				else
-					local name = scoreList[params.index]:GetDisplayName()
+					local name = s:GetDisplayName()
 					if name and name ~= "" then
 						self:settext(name)
 					else
@@ -170,7 +203,7 @@ local function scoreItem(i)
 
 		-- Grade
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(16, 26):zoom(0.5):halign(0) end,
+			InitCommand = function(self) self:xy(40, 26):zoom(0.5):halign(0) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
 				local grade = s:GetWifeGrade()
@@ -181,7 +214,7 @@ local function scoreItem(i)
 
 		-- Score %
 		LoadFont("Common Normal") .. {
-			InitCommand = function(self) self:xy(70, 26):zoom(0.5):halign(0):diffuse(mainText) end,
+			InitCommand = function(self) self:xy(90, 26):zoom(0.5):halign(0):diffuse(mainText) end,
 			SetScoreCommand = function(self, params)
 				local ws = scoreList[params.index]:GetWifeScore()
 				if ws >= 0.99 then
@@ -324,6 +357,7 @@ local t = Def.ActorFrame {
 		Name = "CurrentRateTab",
 		InitCommand = function(self)
 			self:xy(160, -38):zoomto(70, 16):halign(0):valign(0)
+			-- Flipped back as per user request
 			self:diffuse(color("#555555")):diffusealpha(not showAllRates and 0.4 or 0.1)
 		end,
 		RefreshOnlineScoreboardMessageCommand = function(self)
@@ -332,7 +366,12 @@ local t = Def.ActorFrame {
 		MouseDownCommand = function(self)
 			if isOver(self) and not isLocal and showAllRates then
 				showAllRates = false
-				pcall(function() DLMAN:ToggleRateFilter() end)
+				-- SetRateFilter(true) means Filter ON (Current Rate only)
+				if DLMAN and DLMAN.SetRateFilter then
+					pcall(function() DLMAN:SetRateFilter(true) end)
+				else
+					pcall(function() DLMAN:ToggleRateFilter() end)
+				end
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
 			end
@@ -347,6 +386,7 @@ local t = Def.ActorFrame {
 		Name = "AllRatesTab",
 		InitCommand = function(self)
 			self:xy(234, -38):zoomto(60, 16):halign(0):valign(0)
+			-- Flipped back as per user request
 			self:diffuse(color("#555555")):diffusealpha(isLocal and 0 or (showAllRates and 0.4 or 0.1))
 		end,
 		RefreshOnlineScoreboardMessageCommand = function(self)
@@ -355,7 +395,12 @@ local t = Def.ActorFrame {
 		MouseDownCommand = function(self)
 			if isOver(self) and not isLocal and not showAllRates then
 				showAllRates = true
-				pcall(function() DLMAN:ToggleRateFilter() end)
+				-- SetRateFilter(false) means Filter OFF (All Rates)
+				if DLMAN and DLMAN.SetRateFilter then
+					pcall(function() DLMAN:SetRateFilter(false) end)
+				else
+					pcall(function() DLMAN:ToggleRateFilter() end)
+				end
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
 			end

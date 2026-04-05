@@ -33,6 +33,7 @@ local onlineScores = {}
 local displayedScores = {}
 local onlineLoading = false
 local filterCurrentRate = true
+local displayAsJ4 = PREFSMAN:GetPreference("SortBySSRNormPercent")
 
 -- ============================================================
 -- DATA HELPERS
@@ -44,6 +45,70 @@ local function GetSSR(s)
 	if s.GetSkillsetSum then return s:GetSkillsetSum() end
 	if s.GetSkillSetSum then return s:GetSkillSetSum() end
 	return 0
+end
+
+local function getRescoreElementsFromScore(score)
+	local o = {}
+	if not score or not score:HasReplayData() then return nil end
+	local replay = score:GetReplay()
+	local ok = pcall(function() replay:LoadAllData() end)
+	if not ok then return nil end
+	
+	local dvtTmp = replay:GetOffsetVector()
+	local tvt = replay:GetTapNoteTypeVector()
+	local dvt = {}
+	if tvt ~= nil and #tvt > 0 then
+		for i, d in ipairs(dvtTmp) do
+			local ty = tvt[i]
+			if ty == "TapNoteType_Tap" or ty == "TapNoteType_HoldHead" or ty == "TapNoteType_Lift" then
+				dvt[#dvt+1] = d
+			end
+		end
+	else
+		dvt = dvtTmp
+	end
+	o["dvt"] = dvt
+	
+	o["misses"] = score:GetTapNoteScore("TapNoteScore_Miss")
+	o["holdsMissed"] = score:GetHoldNoteScore("HoldNoteScore_LetGo")
+	o["rollsMissed"] = 0
+	o["minesHit"] = score:GetTapNoteScore("TapNoteScore_HitMine")
+	
+	local hits = 0
+	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
+		hits = hits + score:GetTapNoteScore("TapNoteScore_"..name)
+	end
+	o["tapsHit"] = hits
+	o["notesPassed"] = hits + o["misses"]
+	
+	local steps = GAMESTATE:GetCurrentSteps()
+	local radar = steps and steps:GetRadarValues(PLAYER_1)
+	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or score:GetHoldNoteScore("HoldNoteScore_Held") + o["holdsMissed"]
+	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
+	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or score:GetTapNoteScore("TapNoteScore_AvoidMine") + o["minesHit"]
+	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
+	
+	return o
+end
+
+local function getJ4NormalizedPercentage(score)
+	if not score then return 0 end
+	
+	-- 1. Engine method (Fastest, most reliable for newer Etterna)
+	if type(score.GetRescoredWifeScore) == "function" then
+		return score:GetRescoredWifeScore(4) * 100
+	end
+	
+	-- 2. Manual rescore if replay exists
+	if score:HasReplayData() then
+		local rst = getRescoreElementsFromScore(score)
+		if rst and rst.dvt then
+			return getRescoredWife3Judge(3, 4, rst)
+		end
+	end
+	
+	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
+	return score:GetWifeScore() * 100
 end
 
 local function SortScores(scoreTable)
@@ -61,8 +126,8 @@ local function SortScores(scoreTable)
 			return sA:GetWifeScore() > sB:GetWifeScore()
 		else
 			-- Wife% sort
-			local wA = sA:GetWifeScore()
-			local wB = sB:GetWifeScore()
+			local wA = displayAsJ4 and getJ4NormalizedPercentage(sA) or sA:GetWifeScore() * 100
+			local wB = displayAsJ4 and getJ4NormalizedPercentage(sB) or sB:GetWifeScore() * 100
 			if math.abs(wA - wB) > 0.000001 then return wA > wB end
 			-- Fallback to SSR
 			return GetSSR(sA) > GetSSR(sB)
@@ -303,6 +368,30 @@ local t = Def.ActorFrame {
 		},
 	},
 
+	-- J4 Display Toggle Button
+	Def.ActorFrame {
+		Name = "J4ToggleFrame",
+		InitCommand = function(self) self:xy(overlayW/2 - 285, -overlayH/2 + 18) end,
+		RefreshScoresCommand = function(self)
+			local normPref = PREFSMAN:GetPreference("SortBySSRNormPercent")
+			self:visible(not normPref)
+		end,
+		Def.Quad {
+			Name = "J4BtnBg",
+			InitCommand = function(self) self:zoomto(65, 18):diffuse(accentColor):diffusealpha(0.15) end,
+			RefreshScoresCommand = function(self)
+				self:diffusealpha(displayAsJ4 and 0.5 or 0.15)
+			end,
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self) self:zoom(0.24):diffuse(brightText) end,
+			RefreshScoresCommand = function(self)
+				self:settext(displayAsJ4 and "Display: J4" or "Display: Raw")
+				self:diffusealpha(displayAsJ4 and 1 or 0.5)
+			end,
+		},
+	},
+
 	-- Page info
 	LoadFont("Common Normal") .. {
 		Name = "PageInfo",
@@ -419,7 +508,12 @@ for i = 1, pageSize do
 					local miss = s:GetTapNoteScore("TapNoteScore_Miss")
 					self:GetChild("Judgments"):settextf("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
 
+					-- Wife% display
 					local wife = s:GetWifeScore() * 100
+					if displayAsJ4 then
+						wife = getJ4NormalizedPercentage(s)
+					end
+					
 					if wife >= 99.7 then
 						self:GetChild("Wife"):settextf("%.4f%%", wife)
 					else
@@ -428,7 +522,9 @@ for i = 1, pageSize do
 					
 					local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
 					local judgeIndex = ""
-					if not norm and type(s.GetJudgeScale) == "function" then
+					if displayAsJ4 then
+						judgeIndex = "J4"
+					elseif not norm and type(s.GetJudgeScale) == "function" then
 						local scale = s:GetJudgeScale()
 						if scale then
 							scale = math.floor(scale * 100 + 0.5) / 100
@@ -444,6 +540,11 @@ for i = 1, pageSize do
 						end
 					end
 					self:GetChild("Judge"):settext(judgeIndex)
+					if displayAsJ4 then
+						self:GetChild("Judge"):diffuse(accentColor)
+					else
+						self:GetChild("Judge"):diffuse(subText)
+					end
 
 					local ssr = 0
 					if s.GetSkillsetSSR then ssr = s:GetSkillsetSSR("Overall")
@@ -616,6 +717,17 @@ t[#t + 1] = Def.ActorFrame {
 				-- Sort button
 				if IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 215, SCREEN_CENTER_Y - overlayH/2 + 18, 65, 18) then
 					currentSort = (currentSort == SORT_SSR) and SORT_WIFE or SORT_SSR
+					currentPage = 1
+					SortScores(localScores)
+					SortScores(onlineScores)
+					scoresActor:playcommand("RefreshScores")
+					return true
+				end
+
+				-- J4 Display button
+				local normPref = PREFSMAN:GetPreference("SortBySSRNormPercent")
+				if not normPref and IsMouseOverCentered(SCREEN_CENTER_X + overlayW/2 - 285, SCREEN_CENTER_Y - overlayH/2 + 18, 65, 18) then
+					displayAsJ4 = not displayAsJ4
 					currentPage = 1
 					SortScores(localScores)
 					SortScores(onlineScores)

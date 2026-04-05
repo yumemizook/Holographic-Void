@@ -1158,13 +1158,9 @@ t[#t + 1] = Def.ActorFrame {
 	end
 }
 
--- ============================================================
--- PERSONAL BEST DISPLAY (Under MSD rating in sidebar)
--- ============================================================
-local pbY = msdY + 60
 local function getRescoreElementsFromScore(score)
 	local o = {}
-	if not score:HasReplayData() then return nil end
+	if not score or not score:HasReplayData() then return nil end
 	local replay = score:GetReplay()
 	local ok = pcall(function() replay:LoadAllData() end)
 	if not ok then return nil end
@@ -1205,6 +1201,94 @@ local function getRescoreElementsFromScore(score)
 	
 	return o
 end
+
+local function getJ4NormalizedPercentage(score)
+	if not score then return 0 end
+	
+	-- 1. Engine method (Fastest, most reliable for newer Etterna)
+	if type(score.GetRescoredWifeScore) == "function" then
+		return score:GetRescoredWifeScore(4) * 100
+	end
+	
+	-- 2. Manual rescore if replay exists
+	if score:HasReplayData() then
+		local rst = getRescoreElementsFromScore(score)
+		if rst and rst.dvt then
+			return getRescoredWife3Judge(3, 4, rst)
+		end
+	end
+	
+	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
+	return score:GetWifeScore() * 100
+end
+
+local function GetDisplayScore()
+	local pn = PLAYER_1
+	local steps = GAMESTATE:GetCurrentSteps()
+	if not steps then return nil end
+	
+	local currentRateValue = getCurRateValue()
+	local rateTable = getRateTable(pn, steps)
+	if not rateTable then return nil end
+
+	-- 1. Try current rate first
+	local currentRateStr = getCurRateString()
+	local currentScores = rateTable[currentRateStr]
+	if currentScores and #currentScores > 0 then
+		-- Use J4-normalized comparison to find the best for this rate
+		local bestOfRate = currentScores[1]
+		local bestOfRatePct = getJ4NormalizedPercentage(bestOfRate)
+		for i = 2, #currentScores do
+			local p = getJ4NormalizedPercentage(currentScores[i])
+			if p > bestOfRatePct then
+				bestOfRatePct = p
+				bestOfRate = currentScores[i]
+			end
+		end
+		return bestOfRate
+	end
+
+	-- 2. No scores for current rate, find the closest one
+	local closestRate = nil
+	local minDiff = math.huge
+	local bestScore = nil
+	local bestScorePct = -math.huge
+
+	for rateStr, scores in pairs(rateTable) do
+		if scores and #scores > 0 then
+			local rNum = tonumber((rateStr:gsub("x", ""))) or 0
+			local diff = math.abs(rNum - currentRateValue)
+			
+			-- Find the best score for this specific rate first
+			local bestInThisRate = scores[1]
+			local bestInThisRatePct = getJ4NormalizedPercentage(bestInThisRate)
+			for i = 2, #scores do
+				local p = getJ4NormalizedPercentage(scores[i])
+				if p > bestInThisRatePct then
+					bestInThisRatePct = p
+					bestInThisRate = scores[i]
+				end
+			end
+
+			if diff < minDiff then
+				minDiff = diff
+				closestRate = rateStr
+				bestScore = bestInThisRate
+				bestScorePct = bestInThisRatePct
+			elseif math.abs(diff - minDiff) < 0.0001 then
+				-- If rates are equally close, pick the one with better J4 normalized percentage
+				if bestInThisRatePct > bestScorePct then
+					bestScore = bestInThisRate
+					bestScorePct = bestInThisRatePct
+				end
+			end
+		end
+	end
+
+	return bestScore
+end
+
+ local pbY = msdY + 60
 
 t[#t + 1] = Def.ActorFrame {
 	Name = "PersonalBestFrame",

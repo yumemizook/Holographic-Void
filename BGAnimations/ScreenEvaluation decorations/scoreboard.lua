@@ -8,7 +8,25 @@ local pn = GAMESTATE:GetEnabledPlayers()[1]
 local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 local steps = GAMESTATE:GetCurrentSteps()
 local score = pss:GetHighScore()
-local hsTable = getScoreTable(pn, getCurRate()) or {}
+local hsTable = {}
+local targetRate = getCurRate()
+local ck = (steps and steps.GetChartKey) and steps:GetChartKey() or ""
+local scoresByKey = (ck ~= "") and SCOREMAN:GetScoresByKey(ck) or nil
+if scoresByKey then
+	-- Manual filter to ensure only target rate scores are included
+	for rateStr, rateScores in pairs(scoresByKey) do
+		if rateStr == targetRate then
+			local scores = rateScores:GetScores()
+			for j = 1, #scores do
+				hsTable[#hsTable + 1] = scores[j]
+			end
+		end
+	end
+end
+-- Fallback in case manual scan failed or was empty
+if #hsTable == 0 then
+	hsTable = getScoreTable(pn, targetRate) or {}
+end
 
 -- Currently selected score index (for viewing)
 local selectedScoreIndex = 0
@@ -22,11 +40,12 @@ end
 -- Initialize selected score to current play
 selectedScoreIndex = scoreIndex
 
--- Sort by SSR (descending)
+-- Sort by J4 Normalized% (descending)
 table.sort(hsTable, function(a, b)
-	local sa = a:GetSkillsetSSR("Overall")
-	local sb = b:GetSkillsetSSR("Overall")
-	return sa > sb
+	local wa = getJ4NormalizedPercentage(a)
+	local wb = getJ4NormalizedPercentage(b)
+	if math.abs(wa - wb) > 0.000001 then return wa > wb end
+	return (a:GetSkillsetSSR("Overall") or 0) > (b:GetSkillsetSSR("Overall") or 0)
 end)
 
 -- Re-find scoreIndex after sort
@@ -68,7 +87,7 @@ local brightText = color("1,1,1,1")
 local dimText = brightText
 local subText = brightText
 local mainText = brightText
-local bgCard = color("0.06,0.06,0.06,0.95")
+local bgCard = color("0.06,0.06,0.06,0.7")
 local selectedHighlight = color("#00CFFF")
 
 -- Judgment colors (same as main eval for tally coloring)

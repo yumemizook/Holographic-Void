@@ -225,6 +225,14 @@ local HVPrefs = {
 	-- Gameplay: UI/Background Dim (0.0 - 1.0)
 	HV_ScreenFilter = {
 		Default = 0.0,
+		Choices = {"0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"},
+		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+	},
+
+
+	-- Visual: Song Background Brightness (0.0 - 1.0)
+	HV_SongBackgroundBrightness = {
+		Default = 0.0,
 		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
 		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 	},
@@ -723,6 +731,21 @@ end
 --- Check if recent judgment display is enabled.
 function HV.RecentJudgmentDisplay()
 	return isTrue(ThemePrefs.Get("HV_RecentJudgmentDisplay"))
+end
+
+--- Check if song background should be shown.
+function HV.ShowSongBackground()
+	return HV.GetSongBackgroundBrightness() > 0.0
+end
+
+--- Get song background brightness (0.0-1.0).
+function HV.GetSongBackgroundBrightness()
+	return tonumber(ThemePrefs.Get("HV_SongBackgroundBrightness")) or 0.5
+end
+
+--- Get screen filter / lane cover opacity (0.0-1.0).
+function HV.GetScreenFilter()
+	return tonumber(ThemePrefs.Get("HV_ScreenFilter")) or 0.0
 end
 
 Trace("Holographic Void: 03 HVThemePrefs.lua loaded.")

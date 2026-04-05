@@ -96,7 +96,7 @@ local function scoreItem(i)
 		-- Rank #
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(-10, (i - 1) * 36 + 16):zoom(0.28):diffuse(dimText)
+				self:xy(8, (i - 1) * 36 + 16):zoom(0.28):diffuse(dimText):halign(0)
 			end,
 			UpdateNetScoreCommand = function(self)
 				if not multiscores[i] then return end
@@ -113,7 +113,7 @@ local function scoreItem(i)
 		LoadFont("Common Normal") .. {
 			Name = "user",
 			InitCommand = function(self)
-				self:xy(10, (i - 1) * 36 + 6):zoom(0.3):halign(0):maxwidth(200 / 0.3):diffuse(brightText)
+				self:xy(35, (i - 1) * 36 + 6):zoom(0.3):halign(0):maxwidth(180 / 0.3):diffuse(brightText)
 			end,
 			UpdateNetScoreCommand = function(self)
 				if not multiscores[i] then return end
@@ -125,7 +125,7 @@ local function scoreItem(i)
 		LoadFont("Common Normal") .. {
 			Name = "wife",
 			InitCommand = function(self)
-				self:xy(10, (i - 1) * 36 + 18):zoom(0.28):halign(0):maxwidth(180 / 0.28):diffuse(mainText)
+				self:xy(35, (i - 1) * 36 + 18):zoom(0.28):halign(0):maxwidth(160 / 0.28):diffuse(mainText)
 			end,
 			UpdateNetScoreCommand = function(self)
 				if not multiscores[i] then return end
@@ -168,7 +168,7 @@ local function scoreItem(i)
 		LoadFont("Common Normal") .. {
 			Name = "judge",
 			InitCommand = function(self)
-				self:xy(10, (i - 1) * 36 + 28):zoom(0.24):halign(0):diffuse(subText)
+				self:xy(35, (i - 1) * 36 + 28):zoom(0.24):halign(0):diffuse(subText)
 			end,
 			UpdateNetScoreCommand = function(self)
 				if not multiscores[i] then return end

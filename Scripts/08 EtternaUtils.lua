@@ -430,22 +430,52 @@ function GetDisplayScore()
 	local currentRateStr = getCurRateString()
 	local currentScores = rateTable[currentRateStr]
 	if currentScores and #currentScores > 0 then
-		return currentScores[1]
+		-- Use J4-normalized comparison to find the best for this rate
+		local bestOfRate = currentScores[1]
+		local bestOfRatePct = getJ4NormalizedPercentage(bestOfRate)
+		for i = 2, #currentScores do
+			local p = getJ4NormalizedPercentage(currentScores[i])
+			if p > bestOfRatePct then
+				bestOfRatePct = p
+				bestOfRate = currentScores[i]
+			end
+		end
+		return bestOfRate
 	end
 
 	-- 2. No scores for current rate, find the closest one
 	local closestRate = nil
 	local minDiff = math.huge
 	local bestScore = nil
+	local bestScorePct = -math.huge
 
 	for rateStr, scores in pairs(rateTable) do
 		if scores and #scores > 0 then
 			local rNum = tonumber((rateStr:gsub("x", ""))) or 0
 			local diff = math.abs(rNum - currentRateValue)
+			
+			-- Find the best score for this specific rate first
+			local bestInThisRate = scores[1]
+			local bestInThisRatePct = getJ4NormalizedPercentage(bestInThisRate)
+			for i = 2, #scores do
+				local p = getJ4NormalizedPercentage(scores[i])
+				if p > bestInThisRatePct then
+					bestInThisRatePct = p
+					bestInThisRate = scores[i]
+				end
+			end
+
 			if diff < minDiff then
 				minDiff = diff
 				closestRate = rateStr
-				bestScore = scores[1]
+				bestScore = bestInThisRate
+				bestScorePct = bestInThisRatePct
+			elseif math.abs(diff - minDiff) < 0.0001 then
+				-- If rates are equally close, pick the one with better J4 normalized percentage
+				if bestInThisRatePct > bestScorePct then
+					bestScore = bestInThisRate
+					bestScorePct = bestInThisRatePct
+				end
 			end
 		end
 	end
@@ -528,13 +558,12 @@ function getBestScore(pn, ignore, rate, percent)
 	local highest = -math.huge
 	local bestScore
 	local hsTable = getScoreTable(pn, rate)
-	local steps = GAMESTATE:GetCurrentSteps()
 	if hsTable ~= nil and #hsTable >= 1 then
 		for k, v in ipairs(hsTable) do
 			if k ~= ignore then
 				local indexScore = hsTable[k]
 				if indexScore ~= nil then
-					local temp = getScore(indexScore, steps, percent)
+					local temp = getJ4NormalizedPercentage(indexScore)
 					if temp >= highest then
 						highest = temp
 						bestScore = indexScore
@@ -784,42 +813,100 @@ end
 
 function getRescoreElements(pss, score)
 	local o = {}
-	o["dvt"] = pss:GetOffsetVector()
 	
 	-- Base counts from PlayerStageStats (Live Stats)
-	o["misses"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_Miss")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_Miss")) or 0)
-	o["holdsMissed"] = math.max(0, (pss.GetHoldNoteScores and pss:GetHoldNoteScores("HoldNoteScore_LetGo")) or (pss.GetHoldNoteScore and pss:GetHoldNoteScore("HoldNoteScore_LetGo")) or 0)
-	o["rollsMissed"] = 0
-	o["minesHit"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_HitMine")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_HitMine")) or 0)
+	if pss then
+		o["dvt"] = pss:GetOffsetVector()
+		o["misses"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_Miss")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_Miss")) or 0)
+		o["holdsMissed"] = math.max(0, (pss.GetHoldNoteScores and pss:GetHoldNoteScores("HoldNoteScore_LetGo")) or (pss.GetHoldNoteScore and pss:GetHoldNoteScore("HoldNoteScore_LetGo")) or 0)
+		o["rollsMissed"] = 0
+		o["minesHit"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_HitMine")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_HitMine")) or 0)
+		
+		-- Count hits
+		local hits = 0
+		for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
+			local count = (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_"..name)) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_"..name)) or 0
+			if count ~= -1 then hits = hits + count end
+		end
+		o["tapsHit"] = hits
+		o["notesPassed"] = hits + o["misses"]
+		
+		local steps = GAMESTATE:GetCurrentSteps()
+		local radar = steps and steps:GetRadarValues(PLAYER_1)
+		o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or 0
+		o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
+		o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or 0
+		o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
+	elseif score then
+		-- Use the Score-based retrieval (Moved from SelectMusic for global use)
+		return getRescoreElementsFromScore(score)
+	end
 	
-	-- Count hits
+	return o
+end
+
+function getRescoreElementsFromScore(score)
+	local o = {}
+	if not score or not score:HasReplayData() then return nil end
+	local replay = score:GetReplay()
+	local ok = pcall(function() replay:LoadAllData() end)
+	if not ok then return nil end
+	
+	local dvtTmp = replay:GetOffsetVector()
+	local tvt = replay:GetTapNoteTypeVector()
+	local dvt = {}
+	if tvt ~= nil and #tvt > 0 then
+		for i, d in ipairs(dvtTmp) do
+			local ty = tvt[i]
+			if ty == "TapNoteType_Tap" or ty == "TapNoteType_HoldHead" or ty == "TapNoteType_Lift" then
+				dvt[#dvt+1] = d
+			end
+		end
+	else
+		dvt = dvtTmp
+	end
+	o["dvt"] = dvt
+	
+	o["misses"] = score:GetTapNoteScore("TapNoteScore_Miss")
+	o["holdsMissed"] = score:GetHoldNoteScore("HoldNoteScore_LetGo")
+	o["rollsMissed"] = 0
+	o["minesHit"] = score:GetTapNoteScore("TapNoteScore_HitMine")
+	
 	local hits = 0
 	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
-		local count = (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_"..name)) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_"..name)) or 0
-		if count ~= -1 then hits = hits + count end
+		hits = hits + score:GetTapNoteScore("TapNoteScore_"..name)
 	end
 	o["tapsHit"] = hits
-	o["notesPassed"] = o["tapsHit"] + o["misses"]
+	o["notesPassed"] = hits + o["misses"]
 	
-	-- Radar totals (Chart-wide) - Use Steps object for maximum stability
 	local steps = GAMESTATE:GetCurrentSteps()
 	local radar = steps and steps:GetRadarValues(PLAYER_1)
-	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or 0
+	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or score:GetHoldNoteScore("HoldNoteScore_Held") + o["holdsMissed"]
 	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
-	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or 0
-	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or 0
+	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or score:GetTapNoteScore("TapNoteScore_AvoidMine") + o["minesHit"]
+	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
 	
-	-- Ensure >= 0
-	o["totalHolds"] = math.max(0, o["totalHolds"])
-	o["totalRolls"] = math.max(0, o["totalRolls"])
-	o["totalMines"] = math.max(0, o["totalMines"])
-	o["totalNotes"] = math.max(0, o["totalNotes"])
-	
-
-	if score and score ~= pss then
-	end
-
 	return o
+end
+
+function getJ4NormalizedPercentage(score)
+	if not score then return 0 end
+	
+	-- 1. Engine method (Fastest, most reliable for newer Etterna)
+	if type(score.GetRescoredWifeScore) == "function" then
+		return score:GetRescoredWifeScore(4) * 100
+	end
+	
+	-- 2. Manual rescore if replay exists
+	if score:HasReplayData() then
+		local rst = getRescoreElementsFromScore(score)
+		if rst and rst.dvt then
+			return getRescoredWife3Judge(3, 4, rst)
+		end
+	end
+	
+	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
+	return score:GetWifeScore() * 100
 end
 
 ------------------------------------------------------------

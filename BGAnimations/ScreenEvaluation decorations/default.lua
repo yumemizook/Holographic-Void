@@ -140,6 +140,8 @@ end
 local songTotalNotes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
 local songMaxPoints = songTotalNotes * 2
 
+
+
 local function getRunningWife(wife, judged)
 	if judged == 0 then return 0 end
 	return wife * (songTotalNotes / judged)
@@ -202,7 +204,7 @@ local brightText = color("1,1,1,1")
 local dimText = brightText
 local subText = brightText
 local mainText = brightText
-local bgCard = color("0.06,0.06,0.06,0.95")
+local bgCard = color("0.06,0.06,0.06,0.7")
 local dividerColor = color("0.2,0.2,0.2,1")
 
 -- Judgment colors (HV palette)
@@ -338,13 +340,18 @@ local t = Def.ActorFrame {
 				return 
 			end
 
-			-- Only log once per screen entry
+			-- Only log once per screen entry AND only if we just came from gameplay
 			if not screen.HV_GradeCounted then
-				if GRADECOUNTERSTORAGE and GRADECOUNTERSTORAGE.incrementSession then
+				if HV.GameplaySessionValid and GRADECOUNTERSTORAGE and GRADECOUNTERSTORAGE.incrementSession then
 					GRADECOUNTERSTORAGE:incrementSession(pss:GetWifeGrade())
+					-- Clear the flag after a short delay to allow other actors (like XP display) to see it first
+					self:sleep(0.5):queuecommand("ClearFlag")
 				end
 				screen.HV_GradeCounted = true
 			end
+		end,
+		ClearFlagCommand = function(self)
+			HV.GameplaySessionValid = false
 		end
 	},
 	ScoreChangedMessageCommand = function(self)
@@ -384,7 +391,10 @@ local function scoreBoard(pn)
 
 	local board = Def.ActorFrame {
 		InitCommand = function(self)
-			self:xy(frameX, frameY)
+			self:xy(frameX - 55, frameY):diffusealpha(0)
+		end,
+		OnCommand = function(self)
+			self:sleep(0.25):linear(0.4):x(frameX):diffusealpha(1)
 		end,
 		OffsetPlotModificationMessageCommand = function(self, params)
 			if params.Name == "Coin" then
@@ -501,17 +511,20 @@ local function scoreBoard(pn)
 
 		-- Main BG
 		Def.Quad {
-			InitCommand = function(self) self:halign(0):valign(0):zoomto(frameW, frameH):diffuse(bgCard) end
+			InitCommand = function(self) self:halign(0):valign(0):zoomto(frameW, frameH):diffuse(bgCard):diffusealpha(0) end,
+			OnCommand = function(self)
+				self:sleep(0.05):linear(0.35):diffusealpha(0.7):x(0)
+			end
 		},
 
 		-- Banner + Profile Display
 		Def.ActorFrame {
 			Name = "TopHeader",
-			InitCommand = function(self) self:xy(0, pad + 10) end,
+			InitCommand = function(self) self:xy(20, pad + 10) end,
 
 			Def.Sprite {
 				Name = "Banner",
-				InitCommand = function(self) self:halign(0):valign(0):xy(pad + 10, 0):diffusealpha(0) end,
+				InitCommand = function(self) self:halign(0):valign(0):xy(pad + 30, 0):diffusealpha(0) end,
 				OnCommand = function(self)
 					if song then
 						local bpath = song:GetBannerPath()
@@ -526,7 +539,7 @@ local function scoreBoard(pn)
 			Def.ActorFrame {
 				Name = "ProfileDisplay",
 				InitCommand = function(self) 
-					self:xy(pad + (frameW - pad * 3) * 0.5 + pad, 0):diffusealpha(0) 
+					self:xy(pad + (frameW - pad * 3) * 0.5 + pad - 20, 0):diffusealpha(0) 
 				end,
 				OnCommand = function(self)
 					self:sleep(0.1):linear(0.25):diffusealpha(1)
@@ -1549,7 +1562,7 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "RightPanel",
 	InitCommand = function(self) self:x(rightX + 50):diffusealpha(0) end,
 	OnCommand = function(self)
-		self:sleep(0.6):linear(0.4):x(rightX):diffusealpha(1)
+		self:sleep(0.25):linear(0.4):x(rightX):diffusealpha(1)
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
 		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
 			if event.type == "InputEventType_FirstPress" then
@@ -1593,7 +1606,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- Toggle Offset Plot / Graphs
 	Def.Quad {
 		InitCommand = function(self)
-			self:xy(rightW, 20):zoomto(110, 24):halign(1):diffuse(accentColor):diffusealpha(0.2)
+			self:xy(rightW, 22):zoomto(110, 24):halign(1):diffuse(accentColor):diffusealpha(0.2)
 		end,
 		UpdateToggleMessageCommand = function(self)
 			self:diffusealpha(showGraphs and 0.4 or 0.2)
@@ -1608,7 +1621,7 @@ t[#t + 1] = Def.ActorFrame {
 	},
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(rightW - 55, 20):zoom(0.42):settext("Toggle Graphs"):diffuse(brightText)
+			self:xy(rightW - 55, 22):zoom(0.42):settext("Toggle Graphs"):diffuse(brightText)
 		end
 	},
 
@@ -1824,7 +1837,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 local scoreboardFrame = Def.ActorFrame {
 	Name = "ScoreboardContainer",
-	InitCommand = function(self) self:xy(rightX + 10, offsetPlotHeight + 130) end,
+	InitCommand = function(self) self:xy(rightX + 10, offsetPlotHeight + 110) end,
 }
 
 if inMulti then

@@ -74,6 +74,14 @@ local HVPrefRows = {
 		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 	},
 
+
+	-- Song Background Brightness
+	HV_SongBackgroundBrightness = {
+		Default = 0.5,
+		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
+		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
+	},
+
 	-- Lane Cover
 	HV_LaneCoverSudden = {
 		Default = 0,
@@ -380,6 +388,7 @@ function HVThemeOptionsLines()
 	local l = table.concat({
 		-- General / Visual
 		"HV_BGAnimIntensity", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
+		"HV_SongBackgroundBrightness",
 		
 		-- Music Select
 		-- Music Select
@@ -705,6 +714,10 @@ end
 
 function OptionRowRecentJudgmentDisplay()
 	return HVThemePrefRow("HV_RecentJudgmentDisplay", "Recent Judgement Display")
+end
+
+function OptionRowSongBackgroundBrightness()
+	return HVThemePrefRow("HV_SongBackgroundBrightness", "Background Brightness")
 end
 
 -- Practice Mode toggle (used in ScreenPlayerOptions)

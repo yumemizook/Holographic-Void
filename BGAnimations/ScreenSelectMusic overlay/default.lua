@@ -1301,7 +1301,23 @@ local profileOverlay = Def.ActorFrame {
 					local w4 = score:GetTapNoteScore("TapNoteScore_W4")
 					local w5 = score:GetTapNoteScore("TapNoteScore_W5")
 					local m = score:GetTapNoteScore("TapNoteScore_Miss")
-					metadata = string.format("%s  |  %d/%d/%d/%d/%d/%d", THEME:GetString("ClearTypes", ct), w1, w2, w3, w4, w5, m)
+					
+					-- Judge calculation
+					local jIndex = 4
+					if not PREFSMAN:GetPreference("SortBySSRNormPercent") and type(score.GetJudgeScale) == "function" then
+						local scale = score:GetJudgeScale()
+						if scale then
+							scale = math.floor(scale * 100 + 0.5) / 100
+							for k, v in pairs(ms.JudgeScalers) do
+								if math.floor(v * 100 + 0.5) / 100 == scale then
+									jIndex = k
+									if jIndex >= 4 then break end
+								end
+							end
+							jIndex = math.max(4, math.min(9, jIndex))
+						end
+					end
+					metadata = string.format("J%d  |  %s  |  %d/%d/%d/%d/%d/%d", jIndex, THEME:GetString("ClearTypes", ct), w1, w2, w3, w4, w5, m)
 				end
 				
 				local ssrLabel = row:GetChild("SSR")
