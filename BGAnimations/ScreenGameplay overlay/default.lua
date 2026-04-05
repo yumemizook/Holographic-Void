@@ -53,6 +53,7 @@ local t = Def.ActorFrame {
 		local screen = SCREENMAN:GetTopScreen()
 		if screen then
 			screen:AddInputCallback(function(event)
+				if event.type == "InputEventType_Release" then return end
 				if event.type == "InputEventType_FirstPress" then
 					local b = event.button
 					-- Filter for common gameplay buttons to avoid menu buttons triggering HUD animations
