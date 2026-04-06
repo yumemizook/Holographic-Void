@@ -1,6 +1,10 @@
 local pn = GAMESTATE:GetEnabledPlayers()[1] or PLAYER_1
 local lScreen = Var "LoadingScreen" or ""
 local isSync = lScreen:find("Sync") ~= nil
+local HV_PointsLost = 0
+local HV_MaxPoints = 1 -- Placeholder, will be set in BeginCommand
+local HV_PBThreshold = 0
+local HV_JudgeScale = 1.0
 
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
@@ -38,6 +42,23 @@ local t = Def.ActorFrame {
 		
 		HV.LastGameplayTime = os.time()
 		HV.GameplaySessionValid = true
+
+		-- Properly initialize total chart points once song/steps are loaded
+		HV_MaxPoints = (getMaxNotes(PLAYER_1) or 1) * 2
+		HV_PointsLost = 0
+		HV_JudgeScale = PREFSMAN:GetPreference("TimingWindowScale") or 1.0
+
+		-- Initialize Auto-Fail Personal Best threshold if needed
+		local condition = ThemePrefs.Get("HV_AutoFailCondition")
+		if condition == "Personal Best" then
+			local best = GetDisplayScore()
+			if best then
+				HV_PBThreshold = getJ4NormalizedPercentage(best)
+			else
+				-- Fallback to Wife Percent threshold if no PB exists
+				HV_PBThreshold = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Wife")) or 93.00
+			end
+		end
 	end,
 	OnCommand = function(self)
 		-- Double check mods on OnCommand just in case
@@ -81,6 +102,45 @@ local t = Def.ActorFrame {
 				co:CMod(400)
 				co:Reverse(0)
 			end
+		end
+	end,
+	
+	-- Shared PointsLost Accumulator (Wife3 Adherent)
+	-- Fully compliant with Etterna's internal wife3 scoring and evaluation mechanics
+	JudgmentMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		
+		-- Exclude non-tap judgements
+		local s = params.TapNoteScore
+		if params.HoldNoteScore or not s or s == "TapNoteScore_None" or s == "TapNoteScore_AvoidMine" or 
+		   s == "TapNoteScore_CheckpointHit" or s == "TapNoteScore_CheckpointMiss" then
+			return 
+		end
+
+		if params.TapNoteOffset then
+			local offset = math.abs(params.TapNoteOffset) * 1000
+			local weight = wife3(offset, HV_JudgeScale, "Wife3")
+			HV_PointsLost = HV_PointsLost + (2.0 - weight)
+		elseif s == "TapNoteScore_Miss" then
+			-- A full miss loses 7.5 points relative to the 2.0 potential max per tap (2.0 - (-5.5) = 7.5)
+			HV_PointsLost = HV_PointsLost + 7.5
+		end
+		
+		MESSAGEMAN:Broadcast("HV_PointsUpdate")
+	end,
+
+	MineHitMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		-- Match EtternaUtils rescoring logic (7.0 points)
+		HV_PointsLost = HV_PointsLost + 7.0
+		MESSAGEMAN:Broadcast("HV_PointsUpdate")
+	end,
+
+	HoldNoteScoreMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		if params.HoldNoteScore == "HoldNoteScore_LetGo" then
+			HV_PointsLost = HV_PointsLost + 4.5
+			MESSAGEMAN:Broadcast("HV_PointsUpdate")
 		end
 	end
 }
@@ -414,44 +474,40 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "ScoreValue",
 		InitCommand = function(self)
 			self:zoom(0.45):diffuse(brightText):diffusealpha(0.7)
-			self:settext("0.0000%")
+			local scoreMode = ThemePrefs.Get("HV_ScoreDisplayMode") or "Normal"
+			if scoreMode == "Subtractive" then
+				self:settext("100.0000%")
+			else
+				self:settext("0.0000%")
+			end
 		end,
-		JudgmentMessageCommand = function(self, params)
-			self.params = params
-			self:queuecommand("Update")
+		HV_PointsUpdateMessageCommand = function(self)
+			self:playcommand("Update")
 		end,
 		UpdateCommand = function(self)
-			local params = self.params
-			if not params then return end
 			local wifePct
-			if params and params.WifePercent then
-				wifePct = params.WifePercent
+			local scoreMode = ThemePrefs.Get("HV_ScoreDisplayMode") or "Normal"
+			
+			if scoreMode == "Subtractive" then
+				wifePct = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
 			else
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if pss then
 					local totalTaps = pss:GetTotalTaps()
 					if totalTaps > 0 then
-						-- Correct accuracy so far: points / (events * 2)
 						wifePct = (pss:GetWifeScore() / (totalTaps * 2)) * 100
 					else
 						wifePct = 0
 					end
 				end
 			end
+			
 			if not wifePct then return end
 			self:settext(string.format("%.4f%%", wifePct))
-			-- Color based on wife%
-			local gradeStr = "F"
-			if     wifePct >= 99.9935 then gradeStr = "AAAAA"
-			elseif wifePct >= 99.955  then gradeStr = "AAAA"
-			elseif wifePct >= 99.70   then gradeStr = "AAA"
-			elseif wifePct >= 93.00   then gradeStr = "AA"
-			elseif wifePct >= 80.00   then gradeStr = "A"
-			elseif wifePct >= 70.00   then gradeStr = "B"
-			elseif wifePct >= 60.00   then gradeStr = "C"
-			elseif wifePct >= 0       then gradeStr = "D"
-			end
-			self:diffuse(HVColor.GetGradeColor(gradeStr)):diffusealpha(0.7)
+			
+			-- Use standard Etterna grade tiers and theme colors
+			local tier = getEtternaGrade(wifePct)
+			self:diffuse(HVColor.GetGradeColor(tier)):diffusealpha(0.7)
 		end,
 
 	}
@@ -645,6 +701,18 @@ t[#t + 1] = Def.ActorFrame {
 		self.isHoldEnd = (params.HoldNoteScore ~= nil)
 		self.params = params
 		self:queuecommand("Update")
+
+		-- Apply Combo Animation if enabled
+		-- Triggering here avoids Engine race conditions on key release
+		if HV.ComboAnimation and HV.ComboAnimation() then
+			local tns = params.TapNoteScore
+			if tns and tns ~= "TapNoteScore_None" and tns ~= "TapNoteScore_Miss" and tns ~= "TapNoteScore_HitMine" and tns ~= "TapNoteScore_AvoidMine" and tns ~= "TapNoteScore_CheckpointHit" and tns ~= "TapNoteScore_CheckpointMiss" then
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				if pss and pss:GetCurrentCombo() > 0 then
+					self:stoptweening():zoom(1.3):linear(0.05):zoom(1.0)
+				end
+			end
+		end
 	end,
 	UpdateCommand = function(self)
 		local params = self.params
@@ -688,10 +756,9 @@ t[#t + 1] = Def.ActorFrame {
 			
 			numActor:settext(tostring(combo)):diffuse(brightText)
 			
-			-- Apply Animation if enabled (Skip for hold/roll ends)
-			if HV.ComboAnimation and HV.ComboAnimation() and not self.isHoldEnd then
-				self:stoptweening():zoom(1.2):linear(0.05):zoom(1.0)
-			end
+			-- Animation logic moved to JudgmentMessageCommand
+			-- to avoid 1.2 zoom mistakenly triggering on hold releases
+
 			
 			-- Shadow display logic: 25% threshold + No combo breaks (FC status so far)
 			local isFC = (ct ~= "MF" and ct ~= "SDCB" and ct ~= "Clear" and ct ~= "Failed")
@@ -714,7 +781,6 @@ t[#t + 1] = Def.ActorFrame {
 
 	GhostTapMessageCommand = function(self)
 		if HV.ComboAnimation and HV.ComboAnimation() then
-			-- Subtle pulse for ghost tapping
 			self:stoptweening():zoom(1.08):linear(0.05):zoom(1.0)
 		end
 	end,
@@ -1488,6 +1554,115 @@ end
 if not isSync then
 	t[#t + 1] = LoadActor("scoretracking")
 	t[#t + 1] = LoadActor("pacemaker")
+	t[#t + 1] = Def.ActorFrame {
+		Name = "AutofailDisplay",
+		InitCommand = function(self)
+			self:xy(10, SCREEN_CENTER_Y + 40)
+			self:visible(false)
+		end,
+		BeginCommand = function(self)
+			self:queuecommand("Refresh")
+		end,
+		ThemePrefChangedMessageCommand = function(self, params)
+			if not params or not params.Name then return end
+			if params.Name:find("HV_AutoFail") then
+				self:queuecommand("Refresh")
+			end
+		end,
+		HV_PointsUpdateMessageCommand = function(self)
+			self:queuecommand("Refresh")
+		end,
+		RefreshCommand = function(self)
+			local actionMode = ThemePrefs.Get("HV_AutoFailMode")
+			if actionMode == "Off" or not actionMode then
+				self:visible(false)
+				return
+			end
+			if HV.MinimalisticMode() then
+				self:visible(false)
+				return
+			end
+			self:visible(true)
+			local condition = ThemePrefs.Get("HV_AutoFailCondition")
+			local iconWife = self:GetChild("IconWife")
+			local iconPB = self:GetChild("IconPB")
+			local iconTarget = self:GetChild("IconTarget")
+			if iconWife then iconWife:visible(condition == "Wife Percent") end
+			if iconPB then iconPB:visible(condition == "Personal Best") end
+			if iconTarget then iconTarget:visible(condition == "Judgement Count") end
+			local txt = self:GetChild("Value")
+			if not txt then return end
+			local display = ""
+			local c = color("1,1,1,1")
+			if condition == "Wife Percent" then
+				local threshold = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Wife")) or 93.00
+				local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
+				display = string.format("%.4f%%", threshold)
+				txt:xy(11, 20)
+			elseif condition == "Personal Best" then
+				if not HV_PBThreshold or HV_PBThreshold == 0 then
+					local best = GetDisplayScore()
+					if best then
+						HV_PBThreshold = getJ4NormalizedPercentage(best)
+					else
+						HV_PBThreshold = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Wife")) or 93.00
+					end
+				end
+				local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
+				display = string.format("%.4f%%", HV_PBThreshold or 0)
+				txt:xy(11, 20)
+			elseif condition == "Judgement Count" then
+				local limit = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Count")) or 10
+				local judgePref = ThemePrefs.Get("HV_AutoFailJudgement") or "Miss"
+				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+				local currentCount = 0
+				if pss then
+					local order = {"W2","W3","W4","W5","Miss"}
+					local idx = 5
+					for i=1, #order do
+						if order[i] == judgePref then idx = i break end
+					end
+					for i=idx, #order do
+						currentCount = currentCount + pss:GetTapNoteScores("TapNoteScore_" .. order[i])
+					end
+				end
+				local remaining = math.max(0, limit - currentCount)
+				display = tostring(remaining)
+				c = HVColor.GetJudgmentColor(judgePref)
+				txt:xy(24, 20)
+			end
+			txt:settext(display)
+			txt:diffuse(c)
+		end,
+		Def.Sprite {
+			Name = "IconWife",
+			Texture = THEME:GetPathG("", "wife.png"),
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(0, 0):zoom(0.20):visible(false)
+			end
+		},
+		Def.Sprite {
+			Name = "IconPB",
+			Texture = THEME:GetPathG("", "pb.png"),
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(0, 0):zoom(0.20):visible(false)
+			end
+		},
+		Def.Sprite {
+			Name = "IconTarget",
+			Texture = THEME:GetPathG("", "target.png"),
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(0, 0):zoom(0.20):visible(false)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Value",
+			InitCommand = function(self)
+				self:halign(0):valign(0.5):xy(11, 20):zoom(0.55)
+				self:settext("")
+			end
+		}
+	}
 	t[#t + 1] = LoadActor("npscalc")
 	t[#t + 1] = LoadActor("multiplayer")
 	t[#t + 1] = LoadActor("leaderboard")
@@ -1746,5 +1921,79 @@ t[#t+1] = Def.ActorFrame{
 }
 
 
+
+-- ============================================================
+-- AUTO-FAIL / RESTART MECHANIC
+-- ============================================================
+t[#t + 1] = Def.Actor {
+	Name = "AutoFailController",
+	InitCommand = function(self)
+		self.hasTriggered = false
+	end,
+	HV_PointsUpdateMessageCommand = function(self)
+		local actionMode = ThemePrefs.Get("HV_AutoFailMode")
+		if actionMode == "Off" or not actionMode or self.hasTriggered then return end
+		
+		local condition = ThemePrefs.Get("HV_AutoFailCondition")
+		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		if not pss then return end
+		
+		local triggered = false
+
+		if condition == "Wife Percent" then
+			local threshold = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Wife")) or 93.00
+			local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
+			if subtractiveWife < threshold then 
+				triggered = true 
+			end
+		elseif condition == "Personal Best" then
+			local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
+			if subtractiveWife < HV_PBThreshold then
+				triggered = true
+			end
+		elseif condition == "Judgement Count" then
+			local limit = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Count")) or 10
+			local judgePref = ThemePrefs.Get("HV_AutoFailJudgement") or "Miss"
+			local order = {"W2","W3","W4","W5","Miss"}
+			local idx = 5
+			for i=1, #order do
+				if order[i] == judgePref then idx = i break end
+			end
+			local currentCount = 0
+			for i=idx, #order do
+				currentCount = currentCount + pss:GetTapNoteScores("TapNoteScore_" .. order[i])
+			end
+			if currentCount > 0 and currentCount >= limit then 
+				triggered = true 
+			end
+		end
+
+		if triggered then
+			-- Prevent multiple triggers
+			self:playcommand("ActionTriggered")
+		end
+	end,
+	ActionTriggeredCommand = function(self)
+		if self.hasTriggered then return end
+		self.hasTriggered = true
+
+		local actionMode = ThemePrefs.Get("HV_AutoFailMode")
+		local top = SCREENMAN:GetTopScreen()
+		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		
+		if top and pss then
+			-- Explicitly mark the score as Failed for the engine's stats committer
+			if pss.FailPlayer then
+				pss:FailPlayer()
+			end
+			
+			if actionMode == "Fail" then
+				top:PostScreenMessage("SM_BeginFailed", 0)
+			elseif actionMode == "Restart" then
+				SCREENMAN:SetNewScreen("ScreenGameplay")
+			end
+		end
+	end
+}
 
 return t

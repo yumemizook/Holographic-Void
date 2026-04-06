@@ -233,7 +233,7 @@ local HVPrefs = {
 	-- Visual: Song Background Brightness (0.0 - 1.0)
 	HV_SongBackgroundBrightness = {
 		Default = 0.0,
-		Choices = {"Off", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "Max"},
+		Choices = {"0%", "10%", "20%", "30%", "40%", "50%", "60%", "70%", "80%", "90%", "100%"},
 		Values = {0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0},
 	},
 
@@ -545,6 +545,78 @@ local HVPrefs = {
 		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
+	},
+
+	-- Gameplay: Score Display Mode
+	HV_ScoreDisplayMode = {
+		Default = "Normal",
+		Choices = {"Normal", "Subtractive"},
+		Values = {"Normal", "Subtractive"}
+	},
+
+	-- Gameplay: Auto-Fail Action Mode
+	HV_AutoFailMode = {
+		Default = "Off",
+		Choices = {"Off", "Fail", "Restart"},
+		Values = {"Off", "Fail", "Restart"}
+	},
+
+	-- Gameplay: Auto-Fail Trigger Condition
+	HV_AutoFailCondition = {
+		Default = "Wife Percent",
+		Choices = {"Wife Percent", "Judgement Count", "Personal Best"},
+		Values = {"Wife Percent", "Judgement Count", "Personal Best"}
+	},
+
+	-- Gameplay: Auto-Fail Judgement
+	HV_AutoFailJudgement = {
+		Default = "Miss",
+		Choices = {"Perfect", "Great", "Good", "Bad", "Miss"},
+		Values = {"W2", "W3", "W4", "W5", "Miss"}
+	},
+
+	-- Gameplay: Auto-Fail Threshold Wife Percent
+	HV_AutoFailThreshold_Wife = {
+		Default = 93,
+		Choices = {
+			"0%", "1%", "2%", "3%", "4%", "5%", "6%", "7%", "8%", "9%", "10%",
+			"11%", "12%", "13%", "14%", "15%", "16%", "17%", "18%", "19%", "20%",
+			"21%", "22%", "23%", "24%", "25%", "26%", "27%", "28%", "29%", "30%",
+			"31%", "32%", "33%", "34%", "35%", "36%", "37%", "38%", "39%", "40%",
+			"41%", "42%", "43%", "44%", "45%", "46%", "47%", "48%", "49%", "50%",
+			"51%", "52%", "53%", "54%", "55%", "56%", "57%", "58%", "59%", "60%",
+			"61%", "62%", "63%", "64%", "65%", "66%", "67%", "68%", "69%", "70%",
+			"71%", "72%", "73%", "74%", "75%", "76%", "77%", "78%", "79%", "80%",
+			"81%", "82%", "83%", "84%", "85%", "86%", "87%", "88%", "89%", "90%",
+			"91%", "92%", "93%", "94%", "95%", "96%", "97%", "98%", "99%",
+			"99.50%", "99.60%", "99.70%", "99.80%", "99.90%", "99.95%", "99.955%",
+			"99.96%", "99.97%", "99.98%", "99.99%",
+			"99.990%", "99.991%", "99.992%", "99.993%", "99.9935%", "99.994%",
+			"99.995%", "99.996%", "99.997%", "99.998%", "99.999%", "100%"
+		},
+		Values = {
+			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+			11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+			21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+			31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+			41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+			51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
+			61, 62, 63, 64, 65, 66, 67, 68, 69, 70,
+			71, 72, 73, 74, 75, 76, 77, 78, 79, 80,
+			81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+			91, 92, 93, 94, 95, 96, 97, 98, 99,
+			99.50, 99.60, 99.70, 99.80, 99.90, 99.95, 99.955,
+			99.96, 99.97, 99.98, 99.99,
+			99.990, 99.991, 99.992, 99.993, 99.9935, 99.994,
+			99.995, 99.996, 99.997, 99.998, 99.999, 100
+		}
+	},
+
+	-- Gameplay: Auto-Fail Judgement Limit 0 to 99
+	HV_AutoFailThreshold_Count = {
+		Default = 10,
+		Choices = (function() local c = {}; for i=0, 99 do c[#c+1]=tostring(i) end return c end)(),
+		Values = (function() local v = {}; for i=0, 99 do v[#v+1]=i end return v end)(),
 	},
 }
 
