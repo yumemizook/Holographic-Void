@@ -110,14 +110,17 @@ local t = Def.ActorFrame {
 	JudgmentMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
 		
-		-- Exclude non-tap judgements
+		-- Exclude non-tap judgements that don't affect points
 		local s = params.TapNoteScore
 		if params.HoldNoteScore or not s or s == "TapNoteScore_None" or s == "TapNoteScore_AvoidMine" or 
 		   s == "TapNoteScore_CheckpointHit" or s == "TapNoteScore_CheckpointMiss" then
 			return 
 		end
 
-		if params.TapNoteOffset then
+		if s == "TapNoteScore_HitMine" then
+			-- Match Etterna engine internal Wife3 rescoring logic (-350% weight = 7.0 points lost)
+			HV_PointsLost = HV_PointsLost + 7.0
+		elseif params.TapNoteOffset then
 			local offset = math.abs(params.TapNoteOffset) * 1000
 			local weight = wife3(offset, HV_JudgeScale, "Wife3")
 			HV_PointsLost = HV_PointsLost + (2.0 - weight)
@@ -129,16 +132,17 @@ local t = Def.ActorFrame {
 		MESSAGEMAN:Broadcast("HV_PointsUpdate")
 	end,
 
-	MineHitMessageCommand = function(self, params)
-		if params.Player ~= PLAYER_1 then return end
-		-- Match EtternaUtils rescoring logic (7.0 points)
-		HV_PointsLost = HV_PointsLost + 7.0
-		MESSAGEMAN:Broadcast("HV_PointsUpdate")
-	end,
-
 	HoldNoteScoreMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
-		if params.HoldNoteScore == "HoldNoteScore_LetGo" then
+		if params.HoldNoteScore == "HoldNoteScore_LetGo" or params.HoldNoteScore == "HoldNoteScore_MissedHold" then
+			HV_PointsLost = HV_PointsLost + 4.5
+			MESSAGEMAN:Broadcast("HV_PointsUpdate")
+		end
+	end,
+	
+	RollNoteScoreMessageCommand = function(self, params)
+		if params.Player ~= PLAYER_1 then return end
+		if params.RollNoteScore == "RollNoteScore_LetGo" or params.RollNoteScore == "RollNoteScore_MissedRoll" then
 			HV_PointsLost = HV_PointsLost + 4.5
 			MESSAGEMAN:Broadcast("HV_PointsUpdate")
 		end
@@ -654,13 +658,13 @@ t[#t + 1] = Def.ActorFrame {
 -- CENTERED COMBO / MISS COMBO
 -- ============================================================
 local showCombo = HV.ShowCombo() and not HV.MinimalisticMode()
-local missStreak = 0
 
 if showCombo then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 55)
+		self.comboBreaks = 0
 	end,
 
 	LoadFont("combo/_mochiy pop one 24px") .. {
@@ -698,43 +702,51 @@ t[#t + 1] = Def.ActorFrame {
 
 	JudgmentMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
-		self.isHoldEnd = (params.HoldNoteScore ~= nil)
-		self.params = params
-		self:queuecommand("Update")
+		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
+		if not pss then return end
+
+		-- Synchronously calculate consecutive combo breaks 
+		-- This prevents C++ CNote jumps from overwriting 'Update' queue params resulting in total missed sums
+		if not params.HoldNoteScore and params.TapNoteScore then
+			local tns = params.TapNoteScore
+			if tns == "TapNoteScore_Miss" or tns == "TapNoteScore_W5" or tns == "TapNoteScore_W4" then
+				self.comboBreaks = self.comboBreaks + 1
+			elseif tns == "TapNoteScore_W1" or tns == "TapNoteScore_W2" or tns == "TapNoteScore_W3" then
+				self.comboBreaks = 0
+			end
+		end
 
 		-- Apply Combo Animation if enabled
 		-- Triggering here avoids Engine race conditions on key release
 		if HV.ComboAnimation and HV.ComboAnimation() then
-			local tns = params.TapNoteScore
-			if tns and tns ~= "TapNoteScore_None" and tns ~= "TapNoteScore_Miss" and tns ~= "TapNoteScore_HitMine" and tns ~= "TapNoteScore_AvoidMine" and tns ~= "TapNoteScore_CheckpointHit" and tns ~= "TapNoteScore_CheckpointMiss" then
-				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-				if pss and pss:GetCurrentCombo() > 0 then
-					self:stoptweening():zoom(1.3):linear(0.05):zoom(1.0)
+			-- Avoid 1.3 zoom mistakenly triggering on hold releases
+			if not params.HoldNoteScore then
+				local tns = params.TapNoteScore
+				if tns and tns ~= "TapNoteScore_None" and tns ~= "TapNoteScore_Miss" and tns ~= "TapNoteScore_HitMine" and tns ~= "TapNoteScore_AvoidMine" and tns ~= "TapNoteScore_CheckpointHit" and tns ~= "TapNoteScore_CheckpointMiss" then
+					if pss:GetCurrentCombo() > 0 then
+						self.lastHitTime = GetTimeSinceStart()
+						self:stoptweening():zoom(1.3):linear(0.05):zoom(1.0)
+					end
 				end
 			end
 		end
-	end,
-	UpdateCommand = function(self)
-		local params = self.params
-		if not params then return end
-		if params.TapNoteScore == "TapNoteScore_Miss" or params.TapNoteScore == "TapNoteScore_W5" then
-			missStreak = missStreak + 1
-		else
-			missStreak = 0
-		end
 		
-		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-		if not pss then return end
-		local combo = pss:GetCurrentCombo()
-		if combo == 0 and missStreak >= 5 then
+		-- Redraw miss UI if combo is 0 (as combo=0 judgments don't reliably trigger ComboChanged per C++ implementation)
+		if pss:GetCurrentCombo() == 0 then
 			local numActor = self:GetChild("ComboNumber")
 			local labelContainer = self:GetChild("ComboLabel")
 			local graphic = labelContainer:GetChild("ComboGraphic")
 			local text = labelContainer:GetChild("MissesText")
 			
-			numActor:settext(tostring(missStreak)):diffuse(color("#FF5050"))
-			graphic:visible(false)
-			text:visible(true):settext(THEME:GetString("ScreenGameplay", "Misses"))
+			if self.comboBreaks >= 5 then
+				numActor:settext(tostring(self.comboBreaks)):diffuse(color("#FF5050")):shadowlength(0)
+				graphic:visible(false)
+				text:visible(true):settext(THEME:GetString("ScreenGameplay", "Misses"))
+			else
+				numActor:settext("0"):diffuse(dimText):shadowlength(0)
+				graphic:visible(true):diffusealpha(0.5)
+				text:visible(false)
+			end
 		end
 	end,
 
@@ -756,10 +768,6 @@ t[#t + 1] = Def.ActorFrame {
 			
 			numActor:settext(tostring(combo)):diffuse(brightText)
 			
-			-- Animation logic moved to JudgmentMessageCommand
-			-- to avoid 1.2 zoom mistakenly triggering on hold releases
-
-			
 			-- Shadow display logic: 25% threshold + No combo breaks (FC status so far)
 			local isFC = (ct ~= "MF" and ct ~= "SDCB" and ct ~= "Clear" and ct ~= "Failed")
 			
@@ -772,7 +780,7 @@ t[#t + 1] = Def.ActorFrame {
 			
 			graphic:visible(true):diffusealpha(1)
 			text:visible(false)
-		elseif missStreak < 5 then
+		elseif self.comboBreaks < 5 then
 			numActor:settext("0"):diffuse(dimText):shadowlength(0)
 			graphic:visible(true):diffusealpha(0.5)
 			text:visible(false)
@@ -781,6 +789,8 @@ t[#t + 1] = Def.ActorFrame {
 
 	GhostTapMessageCommand = function(self)
 		if HV.ComboAnimation and HV.ComboAnimation() then
+			-- Prevent Ghost Tap from overriding the 1.3 zoom from a valid hit
+			if self.lastHitTime and GetTimeSinceStart() - self.lastHitTime < 0.05 then return end
 			self:stoptweening():zoom(1.08):linear(0.05):zoom(1.0)
 		end
 	end,
