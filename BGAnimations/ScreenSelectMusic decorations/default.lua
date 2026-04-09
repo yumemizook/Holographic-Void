@@ -254,7 +254,44 @@ t[#t + 1] = Def.Actor {
 	TriggerDelayedUpdateCommand = function(self)
 		self:playcommand("UpdateHeavyData")
 		MESSAGEMAN:Broadcast("DelayedChartUpdate")
-	end
+	end,
+	
+	-- Permamirror Sync Logic
+	SyncPermamirrorCommand = function(self)
+		local st = GAMESTATE:GetCurrentSteps()
+		local isPM = false
+		if st and st.IsPermaMirror then
+			isPM = st:IsPermaMirror()
+		else
+			local prof = (GetPlayerOrMachineProfile and GetPlayerOrMachineProfile(PLAYER_1)) or PROFILEMAN:GetProfile(PLAYER_1)
+			isPM = prof and prof:IsCurrentChartPermamirror() or false
+		end
+		
+		local po = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptions("ModsLevel_Preferred")
+
+		if isPM then
+			-- If Permamirror is ON, the engine mirrors the chart data.
+			-- We MUST set the Mirror mod to false to avoid a "double-flip" that cancels it out.
+			po:Mirror(false)
+		end
+	end,
+	
+	ReportPermamirrorCommand = function(self)
+		local st = GAMESTATE:GetCurrentSteps()
+		local isPM = false
+		if st and st.IsPermaMirror then
+			isPM = st:IsPermaMirror()
+		else
+			local prof = (GetPlayerOrMachineProfile and GetPlayerOrMachineProfile(PLAYER_1)) or PROFILEMAN:GetProfile(PLAYER_1)
+			isPM = prof and prof:IsCurrentChartPermamirror() or false
+		end
+		ms.ok("Permamirror: " .. (isPM and "ON" or "OFF"))
+	end,
+	
+	PermamirrorChangedMessageCommand = function(self) 
+		self:stoptweening():sleep(0.05):queuecommand("SyncPermamirror"):queuecommand("ReportPermamirror")
+	end,
+	DelayedChartUpdateMessageCommand = function(self) self:playcommand("SyncPermamirror") end
 }
 
 -- ============================================================

@@ -249,10 +249,105 @@ local clearTypeNames = {
 	[10]="ClearType_EXHC", [11]="ClearType_HClear", [12]="ClearType_Clear",
 	[13]="ClearType_EClear", [14]="ClearType_AClear", [15]="ClearType_Failed",
 	[16]="ClearType_Invalid", [17]="ClearType_Noplay", [18]="ClearType_None",
+	[19]="ClearType_SoftInvalid",
 }
 
 local clearTypeReverse = {}
 for k, v in pairs(clearTypeNames) do clearTypeReverse[v] = k end
+
+------------------------------------------------------------
+-- INVALIDATING MODIFIERS DETECTION
+------------------------------------------------------------
+function GetInvalidatingMods(pn)
+	local ps = GAMESTATE:GetPlayerState(pn)
+	if not ps then return {} end
+	
+	local mods = {}
+	local modStr = ps:GetPlayerOptionsString("ModsLevel_Current"):lower()
+	
+	-- Remove mods (note-reduction)
+	local checks = {
+		["no mines"] = "NoMines", ["no holds"] = "NoHolds", ["no rolls"] = "NoRolls",
+		["no hands"] = "NoHands", ["no jumps"] = "NoJumps", ["no lifts"] = "NoLifts",
+		["no quads"] = "NoQuads", ["no stretch"] = "NoStretch", ["no fakes"] = "NoFakes",
+		["little"] = "Little",
+		-- Insert mods (note-addition)
+		["wide"] = "Wide", ["big"] = "Big", ["quick"] = "Quick",
+		["bmrize"] = "BMRize", ["skippy"] = "Skippy",
+		-- Pattern Transform mods
+		["echo"] = "Echo", ["stomp"] = "Stomp", ["jackjs"] = "JackJS",
+		["anchorjs"] = "AnchorJS", ["icyworld"] = "IcyWorld",
+		-- Turn mods (multi-word first to avoid partial matches)
+		["soft shuffle"] = "SoftShuffle", ["super shuffle"] = "SuperShuffle",
+		["hran shuffle"] = "HRanShuffle", ["shuffle"] = "Shuffle",
+		["backwards"] = "Backwards",
+		-- Hold Transform mods
+		["planted"] = "Planted", ["floored"] = "Floored",
+		["twister"] = "Twister", ["holdrolls"] = "HoldRolls",
+	}
+	
+	for pattern, name in pairs(checks) do
+		if modStr:find(pattern) then
+			table.insert(mods, name)
+		end
+	end
+	
+	-- Left/Right turns: use word-boundary frontier pattern to avoid false positives
+	if modStr:find("%f[%a]left%f[%A]") then table.insert(mods, "TurnLeft") end
+	if modStr:find("%f[%a]right%f[%A]") then table.insert(mods, "TurnRight") end
+	
+	-- Additive Mines: 'mines' present but NOT as 'no mines'
+	if modStr:find("mines") and not modStr:find("no mines") then
+		table.insert(mods, "Mines")
+	end
+	
+	-- Gameplay Aids
+	if getAutoplay and getAutoplay() ~= 0 then table.insert(mods, "Autoplay") end
+	if GAMESTATE:IsPracticeMode() then table.insert(mods, "PracticeMode") end
+	
+	return mods
+end
+
+function IsScoreInvalid(score)
+	if not score then return false end
+	
+	local mods = ""
+	if score.GetModifiers then
+		mods = score:GetModifiers():lower()
+	elseif score.GetTapNoteScores then
+		-- For live PlayerStageStats, check current game state
+		if getAutoplay and getAutoplay() ~= 0 then return true end
+		if GAMESTATE:IsPracticeMode() then return true end
+		mods = GAMESTATE:GetPlayerState(PLAYER_1):GetPlayerOptionsString("ModsLevel_Current"):lower()
+	else
+		return false
+	end
+
+	local invalidating = {
+		"no mines", "no holds", "no rolls", "no hands",
+		"no jumps", "no lifts", "no quads", "no stretch",
+		"no fakes", "little", "wide", "big", "quick",
+		"bmrize", "skippy", "echo", "stomp", "jackjs",
+		"anchorjs", "icyworld", "autoplay", "practice",
+		-- Turns
+		"backwards", "soft shuffle", "super shuffle", "hran shuffle", "shuffle",
+		-- Hold Transforms
+		"planted", "floored", "twister", "holdrolls",
+	}
+	for _, m in ipairs(invalidating) do
+		if mods:find(m) then return true end
+	end
+	-- Left/Right turns (word boundary)
+	if mods:find("%f[%a]left%f[%A]") then return true end
+	if mods:find("%f[%a]right%f[%A]") then return true end
+	-- Additive mines
+	if mods:find("mines") and not mods:find("no mines") then return true end
+	
+	-- 2. J4 Check (Legacy/Fallback)
+	-- If the score is somehow flagged by engine, we can check here
+	
+	return false
+end
 
 function getClearTypeText(ct)
 	return THEME:GetString("ClearTypes", ct)
@@ -273,8 +368,10 @@ function getClearLevel(pn, steps, score)
 	if score.GetWifeGrade then grade = score:GetWifeGrade()
 	else grade = score:GetGrade() end
 
-	if grade == nil then return 17
-	elseif grade == "Grade_Failed" then return 15 end
+	if grade == nil then return 17 end
+	-- Check invalid mods FIRST: a failed invalid score should still be Invalid
+	if IsScoreInvalid(score) then return 16 end
+	if grade == "Grade_Failed" then return 15 end
 
 	local tns = {}
 	if score.GetTapNoteScore then
@@ -310,7 +407,11 @@ function getClearLevel(pn, steps, score)
 		+ (steps:GetRadarValues(pn):GetValue("RadarCategory_Rolls") or 0)
 
 	local totalTaps = tns.W1 + tns.W2 + tns.W3 + tns.W4 + tns.W5 + tns.Miss
-	if totalTaps ~= maxNotes then return 16 end -- Invalid
+	if totalTaps ~= maxNotes then return 16 end -- note count mismatch
+
+	-- Soft Invalid check (< 83% J4)
+	local j4Pct = getJ4NormalizedPercentage(score)
+	if j4Pct < 83 then return 19 end
 
 	-- MFC
 	if tns.W1 == maxNotes and hns.Held == maxHolds then return 1 end
@@ -356,7 +457,10 @@ function getHighestClearType(pn, steps, scoreList, ignore)
 			if i ~= ignore then
 				local hScore = scoreList[i]
 				if hScore ~= nil then
-					highest = math.min(highest, getClearLevel(pn, steps, hScore))
+					local cl = getClearLevel(pn, steps, hScore)
+					if cl ~= 16 then
+						highest = math.min(highest, cl)
+					end
 				end
 			end
 		end
@@ -391,6 +495,8 @@ function getDetailedClearType(obj)
 		wifeScore = obj:GetWifeScore()
 	end
 
+	-- Check invalid mods FIRST: a failed invalid score should still be Invalid
+	if IsScoreInvalid(obj) then return "Invalid" end
 	if grade == "Grade_Failed" or grade == "Grade_None" or wifeScore <= 0 then
 		return "Failed"
 	end
@@ -411,6 +517,9 @@ function getDetailedClearType(obj)
 		elseif w2 < 10 then return "SDP"
 		else return "PFC" end
 	end
+	local j4Pct = getJ4NormalizedPercentage(obj)
+	if j4Pct < 83 then return "Soft Invalid" end
+
 	return "MFC"
 end
 
@@ -431,13 +540,16 @@ function GetDisplayScore()
 	local currentScores = rateTable[currentRateStr]
 	if currentScores and #currentScores > 0 then
 		-- Use J4-normalized comparison to find the best for this rate
-		local bestOfRate = currentScores[1]
-		local bestOfRatePct = getJ4NormalizedPercentage(bestOfRate)
-		for i = 2, #currentScores do
-			local p = getJ4NormalizedPercentage(currentScores[i])
-			if p > bestOfRatePct then
-				bestOfRatePct = p
-				bestOfRate = currentScores[i]
+		local bestOfRate = nil
+		local bestOfRatePct = -math.huge
+		for i = 1, #currentScores do
+			local s = currentScores[i]
+			if not IsScoreInvalid(s) then
+				local p = getJ4NormalizedPercentage(s)
+				if p > bestOfRatePct then
+					bestOfRatePct = p
+					bestOfRate = s
+				end
 			end
 		end
 		return bestOfRate
@@ -455,22 +567,25 @@ function GetDisplayScore()
 			local diff = math.abs(rNum - currentRateValue)
 			
 			-- Find the best score for this specific rate first
-			local bestInThisRate = scores[1]
-			local bestInThisRatePct = getJ4NormalizedPercentage(bestInThisRate)
-			for i = 2, #scores do
-				local p = getJ4NormalizedPercentage(scores[i])
-				if p > bestInThisRatePct then
-					bestInThisRatePct = p
-					bestInThisRate = scores[i]
+			local bestInThisRate = nil
+			local bestInThisRatePct = -math.huge
+			for i = 1, #scores do
+				local s = scores[i]
+				if not IsScoreInvalid(s) then
+					local p = getJ4NormalizedPercentage(s)
+					if p > bestInThisRatePct then
+						bestInThisRatePct = p
+						bestInThisRate = s
+					end
 				end
 			end
 
-			if diff < minDiff then
+			if bestInThisRate and diff < minDiff then
 				minDiff = diff
 				closestRate = rateStr
 				bestScore = bestInThisRate
 				bestScorePct = bestInThisRatePct
-			elseif math.abs(diff - minDiff) < 0.0001 then
+			elseif bestInThisRate and math.abs(diff - minDiff) < 0.0001 then
 				-- If rates are equally close, pick the one with better J4 normalized percentage
 				if bestInThisRatePct > bestScorePct then
 					bestScore = bestInThisRate
@@ -562,7 +677,7 @@ function getBestScore(pn, ignore, rate, percent)
 		for k, v in ipairs(hsTable) do
 			if k ~= ignore then
 				local indexScore = hsTable[k]
-				if indexScore ~= nil then
+				if indexScore ~= nil and not IsScoreInvalid(indexScore) then
 					local temp = getJ4NormalizedPercentage(indexScore)
 					if temp >= highest then
 						highest = temp
@@ -584,7 +699,7 @@ function getBestMissCount(pn, ignore, rate)
 		for i = 1, #hsTable do
 			if i ~= ignore then
 				local indexScore = hsTable[i]
-				if indexScore ~= nil then
+				if indexScore ~= nil and not IsScoreInvalid(indexScore) then
 					if indexScore:GetGrade() ~= "Grade_Failed" then
 						local temp = getScoreComboBreaks(indexScore)
 						if temp < lowest then
@@ -608,7 +723,7 @@ function getBestMaxCombo(pn, ignore, rate)
 		for i = 1, #hsTable do
 			if i ~= ignore then
 				local indexScore = hsTable[i]
-				if indexScore ~= nil then
+				if indexScore ~= nil and not IsScoreInvalid(indexScore) then
 					local temp = getScoreMaxCombo(indexScore)
 					if temp > highest then
 						highest = temp
@@ -892,13 +1007,23 @@ end
 function getJ4NormalizedPercentage(score)
 	if not score then return 0 end
 	
+	-- Detect if this is a live PlayerStageStats object (has GetTapNoteScores but not GetModifiers)
+	local isLivePSS = (type(score.GetTapNoteScores) == "function" and type(score.GetModifiers) ~= "function")
+	if isLivePSS then
+		-- For live gameplay: use raw wife score as best approximation
+		if type(score.GetWifeScore) == "function" then
+			return score:GetWifeScore() * 100
+		end
+		return 0
+	end
+	
 	-- 1. Engine method (Fastest, most reliable for newer Etterna)
 	if type(score.GetRescoredWifeScore) == "function" then
 		return score:GetRescoredWifeScore(4) * 100
 	end
 	
 	-- 2. Manual rescore if replay exists
-	if score:HasReplayData() then
+	if type(score.HasReplayData) == "function" and score:HasReplayData() then
 		local rst = getRescoreElementsFromScore(score)
 		if rst and rst.dvt then
 			return getRescoredWife3Judge(3, 4, rst)
@@ -906,7 +1031,10 @@ function getJ4NormalizedPercentage(score)
 	end
 	
 	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
-	return score:GetWifeScore() * 100
+	if type(score.GetWifeScore) == "function" then
+		return score:GetWifeScore() * 100
+	end
+	return 0
 end
 
 ------------------------------------------------------------

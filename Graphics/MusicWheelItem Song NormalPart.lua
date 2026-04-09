@@ -129,10 +129,12 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 									local scoreList = scoresAtRate:GetScores()
 									if scoreList then
 										for _, s in ipairs(scoreList) do
-											local w = s:GetWifeScore()
-											if w > bestWife then
-												bestWife = w
-												bestGrade = s:GetWifeGrade()
+											if not IsScoreInvalid(s) then
+												local w = s:GetWifeScore()
+												if w > bestWife then
+													bestWife = w
+													bestGrade = s:GetWifeGrade()
+												end
 											end
 										end
 									end
@@ -174,6 +176,52 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		else
 			self:settext("")
 		end
+	end
+}
+
+-- Permamirror Indicator
+t[#t + 1] = LoadFont("Common Normal") .. {
+	Name = "PermamirrorIndicator",
+	InitCommand = function(self)
+		-- Position left of the MSD value 
+		self:halign(1):x(wheelItemW/2 - 35):y(-6)
+			:zoom(0.35):diffuse(color("#FF6666")):settext("(MR)")
+	end,
+	SetMessageCommand = function(self, params)
+		local song = (params and params.Song) or self.hv_lastSong
+		self.hv_lastSong = song
+		local curSteps = GAMESTATE:GetCurrentSteps()
+		
+		if not song or not curSteps then 
+			self:visible(false)
+			return 
+		end
+
+		local targetDiffOption = curSteps:GetDifficulty()
+		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+		
+		local isPM = false
+		if allSteps then
+			for _, st in ipairs(allSteps) do
+				if st:GetDifficulty() == targetDiffOption then
+					if st.IsPermaMirror and st:IsPermaMirror() then
+						isPM = true
+					end
+					break
+				end
+			end
+		end
+
+		self:visible(isPM)
+	end,
+	CurrentStepsChangedMessageCommand = function(self)
+		self:playcommand("Set", {Song = self.hv_lastSong})
+	end,
+	PermamirrorUpdatedMessageCommand = function(self)
+		self:stoptweening():sleep(0.05):queuecommand("Set", {Song = self.hv_lastSong})
+	end,
+	PermamirrorChangedMessageCommand = function(self)
+		self:stoptweening():sleep(0.05):queuecommand("Set", {Song = self.hv_lastSong})
 	end
 }
 

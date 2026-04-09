@@ -128,6 +128,14 @@ local main_af = Def.ActorFrame {
 			end,
 			function() ms.ok("Login Canceled") end
 		)
+	end,
+	
+	CodeMessageCommand = function(self, params)
+		if params.Name == "Permamirror" then
+			-- The engine has already toggled the flag because the code was matched.
+			-- We just need to trigger the UI update.
+			MESSAGEMAN:Broadcast("PermamirrorChanged")
+		end
 	end
 }
 
@@ -206,6 +214,13 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
 			local evType = event.type or ""
+			
+			-- Banish Enter/Start inputs for a short window immediately after search is closed 
+			-- to prevent double-tap bouncing or repeating inputs from starting the game natively.
+			if HV.recentlyClosedSearchTime and GetTimeSinceStart() - HV.recentlyClosedSearchTime < 0.3 then
+				local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
+				if isEnter then return true end
+			end
 			
 			-- Log to the isolated debugger if it's loaded
 			if HV_DEBUG_LOG then
@@ -532,6 +547,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						-- Filter now if not instant
 						if not instant and whee then whee:SongSearch(searchString) end
 						-- CLOSE SEARCH but keep filter.
+						HV.recentlyClosedSearchTime = GetTimeSinceStart()
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString, applied = true})
 					end
@@ -1383,9 +1399,9 @@ local profileOverlay = Def.ActorFrame {
 			SCREENMAN:set_input_redirected(PLAYER_1, true)
 			SCREENMAN:set_input_redirected(PLAYER_2, true)
 		else
-			-- Delay unlocking redirection by 1 tick (0.01s) to ensure the Enter/Start event 
-			-- that triggered this close is fully swallowed by the input callback.
-			self:stoptweening():sleep(0.01):queuecommand("UnlockInput")
+			-- Delay unlocking redirection (0.05s) to ensure the Enter/Start event 
+			-- that triggered this close is fully swallowed by the input callback without race condition.
+			self:stoptweening():sleep(0.05):queuecommand("UnlockInput")
 		end
 
 		if targetTab == "PROFILE" then

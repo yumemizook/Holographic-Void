@@ -28,13 +28,6 @@ local t = Def.ActorFrame{
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 50)
 		self:diffusealpha(0)
 	end,
-	BeginCommand = function(self)
-		-- Fetch invalidating mods
-		local po = GAMESTATE:GetPlayerState():GetCurrentPlayerOptions()
-		if po and po.GetInvalidatingMods then
-			invalidMods = po:GetInvalidatingMods()
-		end
-	end,
 	CurrentSongChangedMessageCommand = function(self)
 		self:stoptweening()
 		self:decelerate(0.8)
@@ -193,30 +186,52 @@ t[#t+1] = LoadFont("Common Normal") .. {
 }
 
 -- ============================================================
--- INVALIDATING MODS WARNING
+-- INVALIDATING MODS BADGE ROW
 -- ============================================================
+-- Shorthand abbreviations for each mod ID
+local modShorthand = {
+	NoMines = "NM",   Mines = "+M",
+	NoHolds = "NH",   NoRolls = "NR",
+	NoHands = "NHD",  NoJumps = "NJ",
+	NoLifts = "NL",   NoQuads = "NQ",
+	NoStretch = "NST",NoFakes = "NF",
+	Little = "LIT",
+	Wide = "WD",  Big = "BIG",  Quick = "QCK",
+	BMRize = "BMR", Skippy = "SKP",
+	Echo = "ECH", Stomp = "STP",
+	JackJS = "JJS", AnchorJS = "AJS", IcyWorld = "ICY",
+	Backwards = "BWD", TurnLeft = "LFT", TurnRight = "RGT",
+	Shuffle = "SHF", SoftShuffle = "SSH",
+	SuperShuffle = "SUP", HRanShuffle = "HRS",
+	Planted = "PLT", Floored = "FLR",
+	Twister = "TWS", HoldRolls = "H>R",
+	Autoplay = "AP",  PracticeMode = "PRC",
+}
+
 t[#t+1] = LoadFont("Common Normal") .. {
-	Name = "InvalidModsText",
+	Name = "InvalidModsBadges",
 	InitCommand = function(self)
-		self:y(totalH / 2 + 14):zoom(0.35):valign(0)
-		self:diffuse(color("#CF9898")):diffusealpha(0)
-	end,
-	BeginCommand = function(self)
-		if #invalidMods > 0 then
-			local translated = {}
-			for _, mod in ipairs(invalidMods) do
-				table.insert(translated, THEME:HasString("OptionNames", mod) and THEME:GetString("OptionNames", mod) or mod)
-			end
-			local header = THEME:HasString("ScreenGameplay", "InvalidMods")
-				and THEME:GetString("ScreenGameplay", "InvalidMods")
-				or "SCORE INVALIDATED BY:"
-			self:settext(header .. "\n" .. table.concat(translated, ", "))
-		end
+		self:y(totalH / 2 + 14):zoom(0.38):valign(0)
+		self:diffuse(color("#CF7070")):diffusealpha(0)
+		self:shadowlength(1):shadowcolor(color("0,0,0,0.8"))
 	end,
 	CurrentSongChangedMessageCommand = function(self)
+		-- Repopulate mods here — this fires after screen is fully loaded
+		-- and player options are applied, avoiding the BeginCommand ordering bug
+		if GetInvalidatingMods then
+			invalidMods = GetInvalidatingMods(PLAYER_1)
+		end
 		if #invalidMods > 0 then
+			local badges = {}
+			for _, mod in ipairs(invalidMods) do
+				local short = modShorthand[mod] or mod:sub(1, 3):upper()
+				table.insert(badges, "[" .. short .. "]")
+			end
+			self:settext("INVALIDATING MODS ACTIVE:  " .. table.concat(badges, "  "))
 			self:stoptweening()
 			self:decelerate(0.8):diffusealpha(1)
+		else
+			self:diffusealpha(0)
 		end
 	end,
 	SongStartingMessageCommand = function(self)

@@ -1,8 +1,20 @@
 --- Holographic Void: Utility Functions
 -- Ported and adapted from Til Death for consistent engine-level interactions.
 
--- ms fallback for notifications
+-- ms fallback for notifications and judge scaling
 ms = ms or {}
+ms.JudgeScalers = {
+	1.5,   -- J1
+	1.33,  -- J2
+	1.16,  -- J3
+	1.0,   -- J4 (Standard)
+	0.84,  -- J5
+	0.66,  -- J6
+	0.5,   -- J7
+	0.33,  -- J8
+	0.2,   -- J9
+}
+
 function ms.ok(text)
 	SCREENMAN:SystemMessage(text)
 end

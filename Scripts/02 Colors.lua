@@ -214,6 +214,7 @@ HVColor.ClearTypeHolographic = {
 	Invalid = color("#454545"), -- Dim Gray
 	NoPlay  = color("#252525"), -- Darkest Gray
 	None    = color("#252525"), -- Darkest Gray
+	SoftInvalid = color("#A68060"), -- Muted Bronze/Amber
 }
 
 HVColor.ClearTypeClassic = {
@@ -255,6 +256,8 @@ function HVColor.GetClearTypeColor(ct)
 	if s:find("PERFECT")   then return palette.PFC end
 	if s:find("COMBO")     then return palette.FC end
 	if s:find("FAILED")    then return palette.Failed end
+	if s:find("INVALID")   then return palette.Invalid end
+	if s:find("SOFT")      then return palette.SoftInvalid end
 	return palette.Clear
 end
 
