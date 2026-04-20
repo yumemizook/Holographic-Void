@@ -34,6 +34,12 @@ local numbersafterthedecimal = 0
 
 local totalRows = #ms.SkillSets + 2
 
+local function releaseFilterInputRedirection()
+	if (HV.ActiveTab or "") ~= "" then return end
+	if HV.SuppressSearchCloseEnter then return end
+	SCREENMAN:set_input_redirected(PLAYER_1, false)
+end
+
 -- Numeric input handler (runs when a filter cell is being edited)
 local function FilterInput(event)
 	if event.type ~= "InputEventType_Release" and ActiveSS > 0 and active then
@@ -41,7 +47,7 @@ local function FilterInput(event)
 		if event.button == "Start" or event.button == "Back" then
 			ActiveSS = 0
 			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			releaseFilterInputRedirection()
 			return true
 		elseif event.DeviceInput.button == "DeviceButton_backspace" then
 			SSQuery[activebound][ActiveSS] = SSQuery[activebound][ActiveSS]:sub(1, -2)
@@ -126,14 +132,14 @@ local t = Def.ActorFrame {
 				HV.ActiveTab = ""
 				active = false
 				ActiveSS = 0
-				SCREENMAN:set_input_redirected(PLAYER_1, false)
+				releaseFilterInputRedirection()
 			end
 		else
 			self:visible(false)
 			if HV.ActiveTab == "FILTERS" then HV.ActiveTab = "" end
 			active = false
 			ActiveSS = 0
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			releaseFilterInputRedirection()
 		end
 	end,
 
@@ -142,7 +148,7 @@ local t = Def.ActorFrame {
 			ActiveSS = 0
 			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
 			MESSAGEMAN:Broadcast("HV_FilterUpdated")
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			releaseFilterInputRedirection()
 		end
 	end,
 
@@ -626,7 +632,7 @@ t[#t + 1] = UIElements.TextButton(1, 1, "Common Normal") .. {
 			MESSAGEMAN:Broadcast("HV_ResetFilter")
 			MESSAGEMAN:Broadcast("HV_NumericInputEnded")
 			MESSAGEMAN:Broadcast("HV_FilterModeChanged")
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
+			releaseFilterInputRedirection()
 			if whee then whee:SongSearch("") end
 		end
 	end,
@@ -653,7 +659,6 @@ local function SharedInputHandler(event)
 	if btn == "DeviceButton_left mouse button" then
 		if not IsMouseOverCentered(SCREEN_CENTER_X, SCREEN_CENTER_Y, overlayW, overlayH) then
 			ActiveSS = 0
-			SCREENMAN:set_input_redirected(PLAYER_1, false)
 			MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 			return true
 		end
@@ -662,7 +667,6 @@ local function SharedInputHandler(event)
 	-- Escape/Back closes the overlay
 	if event.button == "Back" or btn == "DeviceButton_escape" then
 		ActiveSS = 0
-		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 		return true
 	end

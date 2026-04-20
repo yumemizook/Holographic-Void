@@ -691,9 +691,7 @@ t[#t + 1] = Def.ActorFrame {
 				if not pss then return end
 				local ps = GAMESTATE:GetPlayerState(pn)
 				local isAuto = false
-				if GAMESTATE:IsPracticeMode() then
-					isAuto = true
-				elseif getAutoplay and getAutoplay() ~= 0 then
+				if getAutoplay and getAutoplay() ~= 0 then
 					isAuto = true
 				elseif ps then
 					local modStr = ps:GetPlayerOptionsString("ModsLevel_Current"):lower()
@@ -718,7 +716,7 @@ t[#t + 1] = Def.ActorFrame {
 						local raw = math.max(0, (HV_MaxPoints + self.currWifePoints) / HV_MaxPoints)
 						self:settextf("%.4f%%", raw * 100)
 					else
-						self:settext("100.0000%")
+						self:settext("0.0000%")
 					end
 				elseif self.statType == "StdDev" then
 					local dvt = pss:GetOffsetVector()

@@ -69,6 +69,7 @@ local main_af = Def.ActorFrame {
 		HV = HV or {}
 		HV.SSM = SCREENMAN:GetTopScreen()
 		HV.ActiveTab = ""
+		HV.SuppressSearchCloseEnter = false
 		HV.GameplaySessionValid = false
 		HV.ChartPreviewActive = false
 		
@@ -214,12 +215,16 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
 			local evType = event.type or ""
+			local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
 			
-			-- Banish Enter/Start inputs for a short window immediately after search is closed 
-			-- to prevent double-tap bouncing or repeating inputs from starting the game natively.
-			if HV.recentlyClosedSearchTime and GetTimeSinceStart() - HV.recentlyClosedSearchTime < 0.3 then
-				local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
-				if isEnter then return true end
+			-- After search confirm closes the tab, keep swallowing only the triggering Enter/Start
+			-- until its release event arrives. This avoids leaking the confirm input into the
+			-- native music wheel without trapping unrelated keyboard input.
+			if HV.SuppressSearchCloseEnter and isEnter then
+				if evType == "InputEventType_Release" then
+					HV.SuppressSearchCloseEnter = false
+				end
+				return true
 			end
 			
 			-- Log to the isolated debugger if it's loaded
@@ -539,7 +544,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				end
 
 				-- Handle Enter / Escape (Deactivate)
-				local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
 				local isEscape = (event.button == "Back" or btn:lower() == "devicebutton_escape")
 				
 				if isEnter then
@@ -547,7 +551,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						-- Filter now if not instant
 						if not instant and whee then whee:SongSearch(searchString) end
 						-- CLOSE SEARCH but keep filter.
-						HV.recentlyClosedSearchTime = GetTimeSinceStart()
+						HV.SuppressSearchCloseEnter = true
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString, applied = true})
 					end
@@ -1399,9 +1403,8 @@ local profileOverlay = Def.ActorFrame {
 			SCREENMAN:set_input_redirected(PLAYER_1, true)
 			SCREENMAN:set_input_redirected(PLAYER_2, true)
 		else
-			-- Delay unlocking redirection (0.05s) to ensure the Enter/Start event 
-			-- that triggered this close is fully swallowed by the input callback without race condition.
-			self:stoptweening():sleep(0.05):queuecommand("UnlockInput")
+			-- Unlock is driven by the hide tween path below. Do not queue it here,
+			-- because the subsequent stoptweening() for the fade-out would cancel it.
 		end
 
 		if targetTab == "PROFILE" then
@@ -1409,7 +1412,7 @@ local profileOverlay = Def.ActorFrame {
 				:diffusealpha(0):linear(0.15):diffusealpha(1)
 			self:playcommand("UpdateAllScores")
 		else
-			self:stoptweening():linear(0.1):diffusealpha(0):queuecommand("Hide")
+			self:stoptweening():linear(0.1):diffusealpha(0):queuecommand("UnlockInput"):queuecommand("Hide")
 		end
 	end,
 	HideCommand = function(self) self:visible(false) end,

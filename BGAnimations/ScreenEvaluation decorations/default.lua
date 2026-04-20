@@ -13,30 +13,78 @@ local profile = PROFILEMAN:GetProfile(pn)
 -- State variables (declared early for function visibility)
 local curScore = pss:GetHighScore()
 local judge = 4
-local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
-if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
-	local scale = curScore:GetJudgeScale()
-	if scale then
-		scale = math.floor(scale * 100 + 0.5) / 100
-		for k, v in pairs(ms.JudgeScalers) do
-			if math.floor(v * 100 + 0.5) / 100 == scale then
-				judge = k
-				if judge >= 4 then break end
-			end
-		end
-		judge = math.max(4, math.min(9, judge))
-	end
-else
-	judge = GetTimingDifficulty()
-end
 local judges = {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"}
 
 -- Rescoring/offset plot state
 local nrv, dvt, ctt, ntt, totalTaps
+local rescoredPercentage
+local usingCustomWindows = false
+local lastSnapshot = nil
+local showRATally = false
+
+local function roundTo(value, places)
+	if value == nil then return 0 end
+	if notShit and type(notShit.round) == "function" then
+		return notShit.round(value, places)
+	end
+	local scale = 10 ^ (places or 0)
+	return math.floor(value * scale + 0.5) / scale
+end
+
+local function getJudgeForScore(score)
+	local playedJudge = 4
+	local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
+	if not norm and score and type(score.GetJudgeScale) == "function" then
+		local scale = score:GetJudgeScale()
+		if scale then
+			scale = roundTo(scale, 2)
+			for k, v in pairs(ms.JudgeScalers) do
+				if roundTo(v, 2) == scale then
+					playedJudge = k
+					if playedJudge >= 4 then break end
+				end
+			end
+		end
+	else
+		playedJudge = GetTimingDifficulty()
+	end
+	return math.max(4, math.min(9, playedJudge))
+end
+
+local function formatWifePercent(pct)
+	local precision = pct >= 99 and 4 or 2
+	local rounded = roundTo(pct, precision)
+	return string.format("%." .. precision .. "f%%", rounded)
+end
+
+local function setDPTextActors(wholeActor, decimalActor, dp, precision)
+	local roundedDp = roundTo(dp, precision)
+	local format = "%0." .. precision .. "f"
+	local formatted = string.format(format, roundedDp)
+	local whole, decimal = formatted:match("^(%-?%d+)%.(%d+)$")
+	if wholeActor and whole then
+		wholeActor:settext(whole)
+	end
+	if decimalActor and decimal then
+		decimalActor:settext("." .. decimal)
+		decimalActor:x(wholeActor:GetWidth() * wholeActor:GetZoom() + 1)
+	end
+end
+
+local function refreshRescoredPercentage()
+	local rst = getRescoreElements(pss, curScore)
+	if not rst then
+		rescoredPercentage = nil
+		return
+	end
+	rst.dvt = dvt
+	rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
+end
+
 local function updateVectors()
 	local replay = curScore and curScore:GetReplay() or nil
 	local hasReplay = replay and replay:LoadAllData()
-	
+
 	if hasReplay then
 		nrv = replay:GetNoteRowVector()
 		ctt = replay:GetTrackVector()
@@ -59,7 +107,9 @@ local function updateVectors()
 	end
 	songTotalNotes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
 end
+judge = getJudgeForScore(curScore)
 updateVectors()
+refreshRescoredPercentage()
 
 -- Local timing helpers (to avoid nil global issues if scripts haven't reloaded)
 local function localWifeMean(dvt) return wifeMean(dvt) end
@@ -112,10 +162,6 @@ end
 
 local hjudges = {"HoldNoteScore_Held","HoldNoteScore_LetGo","HoldNoteScore_MissedHold"}
 local rate = getCurRate()
-local rescoredPercentage
-local usingCustomWindows = false
-local lastSnapshot = nil
-local showRATally = false
 
 -- Cache for RA/LA ratios to avoid repeated replay loading
 local cachedRatios = nil
@@ -140,8 +186,6 @@ end
 local songTotalNotes = steps:GetRadarValues(pn):GetValue("RadarCategory_Notes")
 local songMaxPoints = songTotalNotes * 2
 
-
-
 local function getRunningWife(wife, judged)
 	if judged == 0 then return 0 end
 	return wife * (songTotalNotes / judged)
@@ -153,7 +197,6 @@ local function clampJudge()
 end
 clampJudge()
 
--- Score table
 local hsTable = getScoreTable(pn, rate)
 local scoreIndex = 0
 if hsTable then
@@ -162,7 +205,6 @@ end
 local recScore = getBestScore(pn, scoreIndex, rate, true)
 local clearType = getClearType(pn, steps, curScore)
 
--- Left/Right CB tracking
 local tracks = pss:GetTrackVector()
 local devianceTable = pss:GetOffsetVector()
 local cbl, cbr, cbm = 0, 0, 0
@@ -177,8 +219,7 @@ local function recountCBs()
 	if not ctt or not dvt then return end
 	for i = 1, #dvt do
 		if ctt[i] then
-			-- Standard Etterna CB threshold is 90ms (J4). Scales with judge.
-			if math.abs(dvt[i]) > tso * 90 then 
+			if math.abs(dvt[i]) > tso * 90 then
 				if ctt[i] < middleCol then cbl = cbl + 1
 				elseif ctt[i] > middleCol then cbr = cbr + 1
 				else cbm = cbm + 1 end
@@ -198,7 +239,6 @@ local function getStatInfo()
 	}
 end
 
--- HV Color Palette
 local accentColor = HVColor.Accent
 local brightText = color("1,1,1,1")
 local dimText = brightText
@@ -207,22 +247,13 @@ local mainText = brightText
 local bgCard = color("0.06,0.06,0.06,0.7")
 local dividerColor = color("0.2,0.2,0.2,1")
 
--- Judgment colors (HV palette)
 local judgmentColors = {
 	HVColor.GetJudgmentColor("W1"), HVColor.GetJudgmentColor("W2"), HVColor.GetJudgmentColor("W3"),
 	HVColor.GetJudgmentColor("W4"), HVColor.GetJudgmentColor("W5"), HVColor.GetJudgmentColor("Miss")
 }
 
--- [NEW] Combo Graph Configuration
---   local comboConfig = {
---    	{ name = "Marvelous",  window = 22.5,  judgment = 4, color = judgmentColors[1] },
---    	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = judgmentColors[2] },
---    	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = judgmentColors[2] },
---    	{ name = "J4 Perfect", window = 45.0,  judgment = 4, color = judgmentColors[2] },
---    	{ name = "Great",      window = 90.0,  judgment = 4, color = judgmentColors[3] },
---    	{ name = "Good",       window = 135.0, judgment = 4, color = judgmentColors[4] },
---    }
- local comboConfig = {
+-- Combo Graph Configuration
+local comboConfig = {
  	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
  	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
  	{ name = "15ms FA+", window = 15.0,  judgment = 4, color = color("#39d1ff") },
@@ -231,17 +262,7 @@ local judgmentColors = {
  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
  }
 
---  local comboConfig = {
---  	{ name = "Absolute",  window = 5.0,  judgment = 4, color = color("#c3f1ff") },
---  	{ name = "Ludicrous",  window = 12.25,  judgment = 7, color = color("#c3f1ff") },
---  	{ name = "Ridiculous", window = 22.5,  judgment = 7, color = color("#86e3ff") },
---  	{ name = "Marvelous", window = 22.5,  judgment = 4, color = color("#39d1ff") },
---  	{ name = "J5 Perfect", window = 45.0,  judgment = 5, color = color("#feffafff")] },
---  	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
---  }
-
--- [NEW] Life Difficulty Color Helper (1-7 scale)
--- TODO: Fix me
+-- Life Difficulty Color Helper (1-7 scale)
 local function getLifeDifficultyColor(diff)
 	local c1 = color("#A0CFAB") -- Easy / Green
 	local c2 = color("#CFD198") -- Normal / Gold
@@ -253,8 +274,7 @@ local function getLifeDifficultyColor(diff)
 	end
 end
 
--- [NEW] Combo Graph Calculation Logic (custom)
--- The coloring of the text is broken. Get some glasses, i'm not fixing it.
+-- Combo Graph Calculation Logic (custom)
 local function calculateMaxStreaks(dvt, nrv, config)
 	local results = {}
 	for i = 1, #config do
@@ -326,6 +346,16 @@ local t = Def.ActorFrame {
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
 		SCREENMAN:SetSystemCursorVisible(true)
 		INPUTFILTER:SetMouseVisible(true)
+		self:sleep(0):queuecommand("RefreshJudgeDisplay")
+	end,
+
+	RefreshJudgeDisplayCommand = function(self)
+		judge = getJudgeForScore(curScore)
+		updateVectors()
+		clearRatioCache()
+		refreshRescoredPercentage()
+		recountCBs()
+		self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 	end,
 
 	-- Dedicated actor for logging session grades
@@ -363,20 +393,24 @@ local t = Def.ActorFrame {
 		else
 			curScore = pss:GetHighScore()
 		end
+		hsTable = getScoreTable(pn, rate)
+		scoreIndex = 0
+		if hsTable then
+			scoreIndex = getHighScoreIndex(hsTable, curScore)
+		end
+		recScore = getBestScore(pn, scoreIndex, rate, true)
+		clearType = getClearType(pn, steps, curScore)
 
+		judge = getJudgeForScore(curScore)
 		updateVectors()
 		clearRatioCache()
+		refreshRescoredPercentage()
 		self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 		self:RunCommandsOnChildren(function(self) self:playcommand("On") end)
-		
-		local rst = getRescoreElements(pss, curScore)
-		rst.dvt = dvt -- Inject correct offset vector
-		rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 	end
 }
 
 -- Rescore data + rescore delegate to the corrected global functions in 08 EtternaUtils.lua.
-
 
 ------------------------------------------------------------
 -- LEFT PANEL: SCORE CARD
@@ -387,7 +421,6 @@ local function scoreBoard(pn)
 	local frameW = SCREEN_CENTER_X - 20
 	local frameH = SCREEN_HEIGHT - 20
 	local pad = 12
-
 
 	local board = Def.ActorFrame {
 		InitCommand = function(self)
@@ -411,37 +444,23 @@ local function scoreBoard(pn)
 				return
 			end
 
-			local rst = getRescoreElements(pss, curScore)
 			if params.Name == "PrevJudge" and judge > 1 then
 				judge = judge - 1
 				clampJudge()
-				rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
+				refreshRescoredPercentage()
 			elseif params.Name == "NextJudge" and judge < 9 then
 				judge = judge + 1
 				clampJudge()
-				rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
+				refreshRescoredPercentage()
 			end
 			if params.Name == "ResetJudge" then
-				judge = 4
-				local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
-				if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
-					local scale = curScore:GetJudgeScale()
-					if scale then
-						scale = math.floor(scale * 100 + 0.5) / 100
-						for k, v in pairs(ms.JudgeScalers) do
-							if math.floor(v * 100 + 0.5) / 100 == scale then
-								judge = k
-								if judge >= 4 then break end
-							end
-						end
-						judge = math.max(4, math.min(9, judge))
-					end
-				else
-					judge = GetTimingDifficulty()
-				end
+				judge = getJudgeForScore(curScore)
 				clampJudge()
+				refreshRescoredPercentage()
 				self:RunCommandsOnChildren(function(self) self:playcommand("ResetJudge") end)
+				self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 			elseif params.Name ~= "ToggleHands" then
+				refreshRescoredPercentage()
 				self:RunCommandsOnChildren(function(self) self:playcommand("SetJudge") end)
 			end
 			recountCBs()
@@ -851,7 +870,8 @@ local function scoreBoard(pn)
 			Name = "GradeScoreLabel",
 			InitCommand = function(self) self:halign(0):valign(0):xy(0, 0):zoom(0.85):diffuse(mainText):diffusealpha(0) end,
 			OnCommand = function(self)
-				local grade = pss:GetWifeGrade()
+				local grade = rescoredPercentage and GetGradeFromPercent(rescoredPercentage / 100) or pss:GetWifeGrade()
+				if grade and not tostring(grade):find("^Grade_") then grade = "Grade_" .. grade end
 				self:settext(HV.GetGradeName(ToEnumShortString(grade)))
 				self:diffuse(HVColor.GetGradeColor(ToEnumShortString(grade)))
 				self:stoptweening():sleep(0.3):linear(0.2):zoom(0.7):diffusealpha(1)
@@ -907,7 +927,7 @@ local function scoreBoard(pn)
 			InitCommand = function(self) self:xy(110, 5) end,
 			OnCommand = function(self)
 				local label = self:GetChild("WifeScoreLabel")
-				local wife = pss:GetWifeScore()
+				local wife = rescoredPercentage or (pss:GetWifeScore() * 100)
 				label:sleep(0.35):linear(0.15):diffusealpha(1)
 				
 				-- Incremental counting
@@ -919,12 +939,7 @@ local function scoreBoard(pn)
 					curTime = curTime + delta
 					local progress = math.min(1, curTime / duration)
 					local currentWifeDisplay = targetWife * math.sin(progress * (math.pi / 2)) -- Ease out Sine
-					
-					if currentWifeDisplay >= 0.99 then
-						label:settextf("%.4f%%", math.floor(currentWifeDisplay * 1000000) / 10000)
-					else
-						label:settextf("%.2f%%", math.floor(currentWifeDisplay * 10000) / 100)
-					end
+					label:settext(formatWifePercent(currentWifeDisplay))
 					
 					if progress >= 1 then
 						self:SetUpdateFunction(nil)
@@ -945,34 +960,17 @@ local function scoreBoard(pn)
 				end,
 				SetJudgeCommand = function(self)
 					if usingCustomWindows then return end
-					local playedJudge = 4
-					local norm = PREFSMAN:GetPreference("SortBySSRNormPercent")
-					if not norm and curScore and type(curScore.GetJudgeScale) == "function" then
-						local scale = curScore:GetJudgeScale()
-						if scale then
-							scale = math.floor(scale * 100 + 0.5) / 100
-							for k, v in pairs(ms.JudgeScalers) do
-								if math.floor(v * 100 + 0.5) / 100 == scale then
-									playedJudge = k
-									if playedJudge >= 4 then break end
-								end
-							end
-							playedJudge = math.max(4, math.min(9, playedJudge))
-						end
-					else
-						playedJudge = GetTimingDifficulty()
-					end
+					local playedJudge = getJudgeForScore(curScore)
 
 					if playedJudge > 4 then
 						local rst = getRescoreElements(pss, curScore)
-						rst.dvt = dvt
-						local j4Pct = getRescoredWife3Judge(3, 4, rst)
+						local j4Pct = nil
+						if rst then
+							rst.dvt = dvt
+							j4Pct = getRescoredWife3Judge(3, 4, rst)
+						end
 						if j4Pct then
-							if j4Pct >= 99 then
-								self:settextf("J4: %.4f%%", math.floor(j4Pct * 10000) / 10000)
-							else
-								self:settextf("J4: %.2f%%", math.floor(j4Pct * 100) / 100)
-							end
+							self:settext("J4: " .. formatWifePercent(j4Pct))
 							self:visible(judge ~= 4)
 						else
 							self:visible(false)
@@ -989,21 +987,13 @@ local function scoreBoard(pn)
 				SetJudgeCommand = function(self)
 					if usingCustomWindows then return end
 					if rescoredPercentage then
-						if rescoredPercentage >= 99 then
-							self:settextf("%.4f%%", math.floor(rescoredPercentage * 10000) / 10000)
-						else
-							self:settextf("%.2f%%", math.floor(rescoredPercentage * 100) / 100)
-						end
+						self:settext(formatWifePercent(rescoredPercentage))
 					end
 				end,
 				LoadedCustomWindowMessageCommand = function(self)
 					if not lastSnapshot then return end
 					local wife = lastSnapshot:GetWifePercent() * 100
-					if wife >= 99 then
-						self:settextf("%.4f%%", math.floor(wife * 10000) / 10000)
-					else
-						self:settextf("%.2f%%", math.floor(wife * 100) / 100)
-					end
+					self:settext(formatWifePercent(wife))
 				end,
 			},
 
@@ -1069,7 +1059,8 @@ local function scoreBoard(pn)
 			OnCommand = function(self)
 				local wholePart = self:GetChild("WholeDP")
 				local decimalPart = self:GetChild("DecimalDP")
-				local dp = curScore.GetWifePoints and curScore:GetWifePoints() or (pss:GetWifeScore() * songMaxPoints)
+				local displayPct = rescoredPercentage or (pss:GetWifeScore() * 100)
+				local dp = (displayPct / 100) * songMaxPoints
 				local targetDP = dp
 				
 				local duration = 0.8
@@ -1081,19 +1072,8 @@ local function scoreBoard(pn)
 					curTime = curTime + delta
 					local progress = math.min(1, curTime / duration)
 					local currentDP = targetDP * math.sin(progress * (math.pi / 2))
-					
-					local whole = math.floor(currentDP)
-					wholePart:settext(whole)
-					
-					-- Sync Decimal part
-					if decimalPart then
-						local wife = pss:GetWifeScore()
-						local precision = (wife >= 0.93) and 4 or 2
-						local format = "%." .. precision .. "f"
-						local decimalStr = string.format(format, currentDP):match("%.(.*)")
-						decimalPart:settext("." .. decimalStr)
-						decimalPart:x(wholePart:GetWidth() * wholePart:GetZoom() + 1)
-					end
+					local precision = (displayPct >= 99) and 4 or 2
+					setDPTextActors(wholePart, decimalPart, currentDP, precision)
 					
 					if progress >= 1 then
 						self:SetUpdateFunction(nil)
@@ -1113,15 +1093,9 @@ local function scoreBoard(pn)
 					self:GetParent():SetUpdateFunction(nil)
 					if rescoredPercentage then
 						local dp = (rescoredPercentage / 100) * songMaxPoints
-						self:settext(math.floor(dp))
 						local decimalPart = self:GetParent():GetChild("DecimalDP")
-						if decimalPart then
-							local precision = (rescoredPercentage >= 93) and 4 or 2
-							local format = "%." .. precision .. "f"
-							local decimalStr = string.format(format, dp):match("%.(.*)")
-							decimalPart:settext("." .. decimalStr)
-							decimalPart:x(self:GetWidth() * self:GetZoom() + 1)
-						end
+						local precision = (rescoredPercentage >= 99) and 4 or 2
+						setDPTextActors(self, decimalPart, dp, precision)
 					end
 				end,
 			},
@@ -1190,7 +1164,8 @@ local function scoreBoard(pn)
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:halign(0):valign(0):zoom(0.5) end,
 				OnCommand = function(self)
-					self:settext(getClearTypeText(clearType)):diffuse(getClearTypeColor(clearType))
+					local currentCT = clearType or "Clear"
+					self:settext(getClearTypeText(currentCT)):diffuse(getClearTypeColor(currentCT))
 				end
 			},
 			-- Best Clear Type Comparison (Below)
@@ -1202,7 +1177,7 @@ local function scoreBoard(pn)
 					InitCommand = function(self) self:halign(0):valign(0):zoom(0.4) end,
 					OnCommand = function(self)
 						if hsTable then
-							local recCT = getHighestClearType(pn, steps, hsTable, scoreIndex)
+							local recCT = getHighestClearType(pn, steps, hsTable, scoreIndex) or "Clear"
 							self:settextf("Best: %s", getClearTypeText(recCT))
 							self:diffuse(getClearTypeColor(recCT)):diffusealpha(0.6)
 						end
