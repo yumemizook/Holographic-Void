@@ -817,26 +817,30 @@ end
 -- For Window-based Scoring
 function getRescoredJudge(offsetVector, judgeScale, judge)
 	local tso = ms.JudgeScalers
-	local ts = tso[judgeScale]
+	local ts = (tso and tso[judgeScale]) or 1.0
+	judge = tonumber(judge) or 1
 	local windows = {22.5, 45.0, 90.0, 135.0, 180.0, 500.0}
 	local lowerBound = judge > 1 and windows[judge - 1] * ts or -1.0
 	local upperBound = judge == 5 and math.max(windows[judge] * ts, 180.0) or windows[judge] * ts
 	local judgeCount = 0
 
-	if offsetVector == nil then return judgeCount end
+	if type(offsetVector) ~= "table" then return judgeCount end
 
 	if judge > 5 then
 		lowerBound = math.max(lowerBound, 180.0)
 		for i = 1, #offsetVector do
-			local x = math.abs(offsetVector[i])
-			if (x > lowerBound) then
+			local x = tonumber(offsetVector[i])
+			if x and math.abs(x) > lowerBound then
 				judgeCount = judgeCount + 1
 			end
 		end
 	else
 		for i = 1, #offsetVector do
-			local x = math.abs(offsetVector[i])
-			if (x > lowerBound and x <= upperBound) then
+			local x = tonumber(offsetVector[i])
+			if x then
+				x = math.abs(x)
+			end
+			if x and x > lowerBound and x <= upperBound then
 				judgeCount = judgeCount + 1
 			end
 		end
@@ -868,6 +872,7 @@ function erf(x)
 end
 
 function wife3(maxms, ts, version)
+	maxms = tonumber(maxms) or 0
 	ts = ts or 1.0
 	local max_points = 2
 	local miss_weight = -5.5
@@ -891,32 +896,35 @@ end
 
 -- holy shit this is fugly
 function getRescoredWife3Judge(version, judgeScale, rst, useCurrent)
+	if type(rst) ~= "table" then return 0 end
 	local tso = ms.JudgeScalers
 	local ts = (tso and tso[judgeScale]) or 1.0
 	local totalPoints = 0.0
 	local dvt = rst["dvt"]
 	
-	if dvt then
+	if type(dvt) == "table" then
 		for i = 1, #dvt do
-			local offset = math.abs(dvt[i])
-			totalPoints = totalPoints + wife3(offset, ts, version)
+			local offset = tonumber(dvt[i])
+			if offset then
+				totalPoints = totalPoints + wife3(math.abs(offset), ts, version)
+			end
 		end
 	end
 	
 	-- Penalize holds, rolls, and mines.
 	
-	totalPoints = totalPoints + (math.max(0, rst["holdsMissed"] or 0) * -4.5)
-	totalPoints = totalPoints + (math.max(0, rst["rollsMissed"] or 0) * -4.5)
-	totalPoints = totalPoints + (math.max(0, rst["minesHit"] or 0) * -7)
+	totalPoints = totalPoints + (math.max(0, tonumber(rst["holdsMissed"]) or 0) * -4.5)
+	totalPoints = totalPoints + (math.max(0, tonumber(rst["rollsMissed"]) or 0) * -4.5)
+	totalPoints = totalPoints + (math.max(0, tonumber(rst["minesHit"]) or 0) * -7)
 	
 	-- Use notesPassed for live percentage, totalNotes for evaluation.
 	local maxNotes = 0
 	if useCurrent then
-		maxNotes = math.max(0, rst["notesPassed"] or 0)
+		maxNotes = math.max(0, tonumber(rst["notesPassed"]) or 0)
 	else
-		maxNotes = math.max(0, rst["totalNotes"] or 0)
+		maxNotes = math.max(0, tonumber(rst["totalNotes"]) or 0)
 		-- For evaluation, we must penalize unplayed notes (from failing early) as misses.
-		local unplayed = math.max(0, maxNotes - (rst["notesPassed"] or 0))
+		local unplayed = math.max(0, maxNotes - (tonumber(rst["notesPassed"]) or 0))
 		totalPoints = totalPoints - (unplayed * 5.5) -- unhit notes are unhit
 	end
 	
@@ -926,32 +934,73 @@ function getRescoredWife3Judge(version, judgeScale, rst, useCurrent)
 	return math.min((totalPoints / maxPoints) * 100.0, 100)
 end
 
+local function hvNonNegativeCount(value)
+	value = tonumber(value) or 0
+	if value < 0 then return 0 end
+	return value
+end
+
+local function hvCallNumber(obj, methodName, ...)
+	if obj and type(obj[methodName]) == "function" then
+		local ok, value = pcall(obj[methodName], obj, ...)
+		if ok then
+			return hvNonNegativeCount(value)
+		end
+	end
+	return 0
+end
+
+local function hvTapCount(obj, scoreName)
+	local value = hvCallNumber(obj, "GetTapNoteScores", scoreName)
+	if value > 0 then return value end
+	return hvCallNumber(obj, "GetTapNoteScore", scoreName)
+end
+
+local function hvHoldCount(obj, scoreName)
+	local value = hvCallNumber(obj, "GetHoldNoteScores", scoreName)
+	if value > 0 then return value end
+	return hvCallNumber(obj, "GetHoldNoteScore", scoreName)
+end
+
+local function hvReplayVector(replay, methodName)
+	if replay and type(replay[methodName]) == "function" then
+		local ok, value = pcall(replay[methodName], replay)
+		if ok and type(value) == "table" then
+			return value
+		end
+	end
+	return {}
+end
+
 function getRescoreElements(pss, score)
 	local o = {}
 	
 	-- Base counts from PlayerStageStats (Live Stats)
 	if pss then
-		o["dvt"] = pss:GetOffsetVector()
-		o["misses"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_Miss")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_Miss")) or 0)
-		o["holdsMissed"] = math.max(0, (pss.GetHoldNoteScores and pss:GetHoldNoteScores("HoldNoteScore_LetGo")) or (pss.GetHoldNoteScore and pss:GetHoldNoteScore("HoldNoteScore_LetGo")) or 0)
+		local ok, offsets = pcall(function() return pss:GetOffsetVector() end)
+		o["dvt"] = ok and type(offsets) == "table" and offsets or {}
+		o["misses"] = hvTapCount(pss, "TapNoteScore_Miss")
+		o["holdsMissed"] = hvHoldCount(pss, "HoldNoteScore_LetGo")
 		o["rollsMissed"] = 0
-		o["minesHit"] = math.max(0, (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_HitMine")) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_HitMine")) or 0)
+		o["minesHit"] = hvTapCount(pss, "TapNoteScore_HitMine")
 		
 		-- Count hits
 		local hits = 0
 		for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
-			local count = (pss.GetTapNoteScores and pss:GetTapNoteScores("TapNoteScore_"..name)) or (pss.GetTapNoteScore and pss:GetTapNoteScore("TapNoteScore_"..name)) or 0
-			if count ~= -1 then hits = hits + count end
+			hits = hits + hvTapCount(pss, "TapNoteScore_"..name)
 		end
 		o["tapsHit"] = hits
 		o["notesPassed"] = hits + o["misses"]
 		
 		local steps = GAMESTATE:GetCurrentSteps()
 		local radar = steps and steps:GetRadarValues(PLAYER_1)
-		o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or 0
-		o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
-		o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or 0
-		o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
+		o["totalHolds"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Holds"))
+		o["totalRolls"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Rolls"))
+		o["totalMines"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Mines"))
+		o["totalNotes"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Notes"))
+		if o["totalNotes"] <= 0 then
+			o["totalNotes"] = o["notesPassed"]
+		end
 	elseif score then
 		-- Use the Score-based retrieval (Moved from SelectMusic for global use)
 		return getRescoreElementsFromScore(score)
@@ -962,13 +1011,17 @@ end
 
 function getRescoreElementsFromScore(score)
 	local o = {}
-	if not score or not score:HasReplayData() then return nil end
+	if not score or type(score.HasReplayData) ~= "function" then return nil end
+	local hasReplay = false
+	local hasReplayOk = pcall(function() hasReplay = score:HasReplayData() end)
+	if not hasReplayOk or not hasReplay then return nil end
+	if type(score.GetReplay) ~= "function" then return nil end
 	local replay = score:GetReplay()
 	local ok = pcall(function() replay:LoadAllData() end)
 	if not ok then return nil end
 	
-	local dvtTmp = replay:GetOffsetVector()
-	local tvt = replay:GetTapNoteTypeVector()
+	local dvtTmp = hvReplayVector(replay, "GetOffsetVector")
+	local tvt = hvReplayVector(replay, "GetTapNoteTypeVector")
 	local dvt = {}
 	if tvt ~= nil and #tvt > 0 then
 		for i, d in ipairs(dvtTmp) do
@@ -982,24 +1035,33 @@ function getRescoreElementsFromScore(score)
 	end
 	o["dvt"] = dvt
 	
-	o["misses"] = score:GetTapNoteScore("TapNoteScore_Miss")
-	o["holdsMissed"] = score:GetHoldNoteScore("HoldNoteScore_LetGo")
+	o["misses"] = hvTapCount(score, "TapNoteScore_Miss")
+	o["holdsMissed"] = hvHoldCount(score, "HoldNoteScore_LetGo")
 	o["rollsMissed"] = 0
-	o["minesHit"] = score:GetTapNoteScore("TapNoteScore_HitMine")
+	o["minesHit"] = hvTapCount(score, "TapNoteScore_HitMine")
 	
 	local hits = 0
 	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
-		hits = hits + score:GetTapNoteScore("TapNoteScore_"..name)
+		hits = hits + hvTapCount(score, "TapNoteScore_"..name)
 	end
 	o["tapsHit"] = hits
 	o["notesPassed"] = hits + o["misses"]
 	
 	local steps = GAMESTATE:GetCurrentSteps()
 	local radar = steps and steps:GetRadarValues(PLAYER_1)
-	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or score:GetHoldNoteScore("HoldNoteScore_Held") + o["holdsMissed"]
-	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
-	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or score:GetTapNoteScore("TapNoteScore_AvoidMine") + o["minesHit"]
-	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
+	o["totalHolds"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Holds"))
+	if o["totalHolds"] <= 0 then
+		o["totalHolds"] = hvHoldCount(score, "HoldNoteScore_Held") + o["holdsMissed"]
+	end
+	o["totalRolls"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Rolls"))
+	o["totalMines"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Mines"))
+	if o["totalMines"] <= 0 then
+		o["totalMines"] = hvTapCount(score, "TapNoteScore_AvoidMine") + o["minesHit"]
+	end
+	o["totalNotes"] = hvNonNegativeCount(radar and radar:GetValue("RadarCategory_Notes"))
+	if o["totalNotes"] <= 0 then
+		o["totalNotes"] = o["notesPassed"]
+	end
 	
 	return o
 end
@@ -1012,27 +1074,35 @@ function getJ4NormalizedPercentage(score)
 	if isLivePSS then
 		-- For live gameplay: use raw wife score as best approximation
 		if type(score.GetWifeScore) == "function" then
-			return score:GetWifeScore() * 100
+			local ok, value = pcall(score.GetWifeScore, score)
+			value = ok and tonumber(value) or nil
+			if value then return value * 100 end
 		end
 		return 0
 	end
 	
 	-- 1. Engine method (Fastest, most reliable for newer Etterna)
 	if type(score.GetRescoredWifeScore) == "function" then
-		return score:GetRescoredWifeScore(4) * 100
+		local ok, value = pcall(score.GetRescoredWifeScore, score, 4)
+		value = ok and tonumber(value) or nil
+		if value then
+			return value * 100
+		end
 	end
 	
 	-- 2. Manual rescore if replay exists
-	if type(score.HasReplayData) == "function" and score:HasReplayData() then
-		local rst = getRescoreElementsFromScore(score)
-		if rst and rst.dvt then
-			return getRescoredWife3Judge(3, 4, rst)
-		end
+	local rst = getRescoreElementsFromScore(score)
+	if rst and rst.dvt then
+		return getRescoredWife3Judge(3, 4, rst)
 	end
 	
 	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
 	if type(score.GetWifeScore) == "function" then
-		return score:GetWifeScore() * 100
+		local ok, value = pcall(score.GetWifeScore, score)
+		value = ok and tonumber(value) or nil
+		if value then
+			return value * 100
+		end
 	end
 	return 0
 end

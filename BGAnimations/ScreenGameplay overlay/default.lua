@@ -228,32 +228,6 @@ t[#t + 1] = Def.ActorFrame {
 			self:playcommand("UpdateBars")
 		end)
 	end,
-	-- Interactive Seek (Practice Mode Only)
-	Def.Quad {
-		Name = "MouseHitbox",
-		InitCommand = function(self)
-			self:zoomto(barW + 20, barH + 20):diffusealpha(0)
-		end,
-		UpdateBarsCommand = function(self)
-			if not GAMESTATE:IsPracticeMode() then return end
-			
-			-- Direct polling for smoother dragging and bypass input callback issues
-			if INPUTFILTER:IsBeingPressed("left mouse button") and isOver(self) then
-				local song = GAMESTATE:GetCurrentSong()
-				if song then
-					local mx = INPUTFILTER:GetMouseX()
-					-- Use IsOver's absolute coordinates or calculate manually
-					local rx = mx - self:GetTrueX()
-					local pct = (rx / barW) + 0.5
-					local top = SCREENMAN:GetTopScreen()
-					if top and top.SetSongPosition then
-						top:SetSongPosition(math.max(0, math.min(song:MusicLengthSeconds(), song:MusicLengthSeconds() * pct)))
-					end
-				end
-			end
-		end
-	},
-
 	Def.Quad {
 		Name = "ProgressBarBG",
 		InitCommand = function(self)
@@ -278,40 +252,6 @@ t[#t + 1] = Def.ActorFrame {
 				end
 			end
 		end
-	},
-
-	-- Loop Markers
-	Def.ActorFrame {
-		Name = "LoopMarkers",
-		InitCommand = function(self) self:visible(GAMESTATE:IsPracticeMode()) end,
-		PracticeLoopChangedMessageCommand = function(self) self:queuecommand("Update") end,
-		
-		Def.Quad {
-			Name = "StartMarker",
-			InitCommand = function(self) self:zoomto(2, barH + 6):diffuse(color("#00FF00")):visible(false) end,
-			UpdateCommand = function(self)
-				local song = GAMESTATE:GetCurrentSong()
-				if song and HV.PracticeLoopStart > 0 then
-					local pct = HV.PracticeLoopStart / song:MusicLengthSeconds()
-					self:visible(true):x(-barW/2 + (barW * pct))
-				else
-					self:visible(false)
-				end
-			end
-		},
-		Def.Quad {
-			Name = "EndMarker",
-			InitCommand = function(self) self:zoomto(2, barH + 6):diffuse(color("#FF0000")):visible(false) end,
-			UpdateCommand = function(self)
-				local song = GAMESTATE:GetCurrentSong()
-				if song and HV.PracticeLoopEnd > 0 then
-					local pct = HV.PracticeLoopEnd / song:MusicLengthSeconds()
-					self:visible(true):x(-barW/2 + (barW * pct))
-				else
-					self:visible(false)
-				end
-			end
-		}
 	},
 
 	-- Remaining Time (incorporating music rate and ms)
@@ -522,13 +462,11 @@ t[#t + 1] = Def.ActorFrame {
 			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 			local ps = GAMESTATE:GetPlayerState(pn)
 			local isAuto = false
-			if GAMESTATE:IsPracticeMode() then
-				isAuto = true
-			elseif getAutoplay and getAutoplay() ~= 0 then
+			if getAutoplay and getAutoplay() ~= 0 then
 				isAuto = true
 			elseif ps then
 				local modStr = ps:GetPlayerOptionsString("ModsLevel_Current"):lower()
-				isAuto = modStr:find("autoplay") ~= nil or modStr:find("practice") ~= nil
+				isAuto = modStr:find("autoplay") ~= nil
 			end
 			
 			if isAuto and pss then
@@ -549,9 +487,8 @@ t[#t + 1] = Def.ActorFrame {
 						wifePct = math.min(raw, 100)
 					elseif self.currWifePoints < 0 then
 						-- Handle penalty before any tap notes (e.g. hitting a mine at the start)
-						-- Show penalty relative to total song max points
-						local raw = ((HV_MaxPoints + self.currWifePoints) / HV_MaxPoints) * 100
-						wifePct = math.max(0, raw)
+						-- Show the current penaltied score before the first tap note
+						wifePct = (self.currWifePoints / 2) * 100
 					else
 						wifePct = 100.0000
 					end
@@ -713,7 +650,7 @@ t[#t + 1] = Def.ActorFrame {
 						self:settextf("%.4f%%", j4)
 					elseif self.currWifePoints < 0 then
 						-- Show penalty relative to total song max points until first tap
-						local raw = math.max(0, (HV_MaxPoints + self.currWifePoints) / HV_MaxPoints)
+						local raw = (HV_MaxPoints + self.currWifePoints) / HV_MaxPoints
 						self:settextf("%.4f%%", raw * 100)
 					else
 						self:settext("0.0000%")
@@ -982,21 +919,6 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self) self:zoom(0.35):diffuse(accentColor):diffusealpha(0.8) end
 	}
 }
-
-t[#t + 1] = Def.ActorFrame {
-	Name = "ChordDensityGraphContainer",
-	InitCommand = function(self)
-		self:xy(SCREEN_LEFT + 20, SCREEN_CENTER_Y)
-		-- Only show CDG if it's not a Sync screen AND Practice Mode is ON
-		self:visible(not isSync and GAMESTATE:IsPracticeMode())
-	end,
-	LoadActor("../_chorddensitygraph.lua") .. {
-		InitCommand = function(self)
-			self:zoom(0.8) -- Slightly larger
-		end
-	}
-}
-
 
 t[#t + 1] = LoadActor("replayscrolling.lua")
 

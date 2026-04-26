@@ -16,6 +16,24 @@ local function formatTime(s)
 	return string.format("%d:%02d", m, math.floor(sec))
 end
 
+local function getChartLastSecond(song, steps)
+	if steps then
+		local ok, len = pcall(function() return steps:GetLastSecond() end)
+		if ok and len and len > 0 then return len end
+	end
+	if song then
+		local ok, len = pcall(function() return song:GetLastSecond() end)
+		if ok and len and len > 0 then return len end
+		ok, len = pcall(function() return song:MusicLengthSeconds() end)
+		if ok and len and len > 0 then return len end
+	end
+	return 0
+end
+
+local function getActorLeft(actor)
+	return actor:GetTrueX() - (actor:GetZoomedWidth() * actor:GetHAlign())
+end
+
 local function updateInteraction(self)
 	local mouseX = INPUTFILTER:GetMouseX()
 	local mouseY = INPUTFILTER:GetMouseY()
@@ -29,8 +47,9 @@ local function updateInteraction(self)
 	local song = GAMESTATE:GetCurrentSong()
 	if not steps or not song then return end
 	
-	local musicLength = song:MusicLengthSeconds()
+	local musicLength = getChartLastSecond(song, steps)
 	local rate = getCurRateValue()
+	if musicLength <= 0 then return end
 	
 	-- Update Current Position Marker
 	if curMarker then
@@ -40,7 +59,7 @@ local function updateInteraction(self)
 	end
 	
 	if isOver(bg) then
-		local gx = bg:GetTrueX()
+		local gx = getActorLeft(bg)
 		local p = math.max(0, math.min((mouseX - gx) / wodth, 1))
 		
 		if marker then marker:visible(true):x(p * wodth) end
@@ -156,13 +175,14 @@ local t = Def.ActorFrame {
 			self:zoomto(wodth, hidth):valign(1):diffuse(color("0,0,0,0.5")):halign(0)
 		end,
 		MouseDownCommand = function(self, params)
-			if isOver(self) and params.button == "DeviceButton_left mouse button" then
+			local event = params.event or params.button
+			if isOver(self) and event == "DeviceButton_left mouse button" then
 				local song = GAMESTATE:GetCurrentSong()
 				if song then
 					local mx = INPUTFILTER:GetMouseX()
-					local gx = self:GetTrueX()
+					local gx = getActorLeft(self)
 					local p = math.max(0, math.min((mx - gx) / wodth, 1))
-					local time = p * song:MusicLengthSeconds()
+					local time = p * getChartLastSecond(song, GAMESTATE:GetCurrentSteps())
 					SCREENMAN:GetTopScreen():SetSongPosition(time)
 				end
 			end

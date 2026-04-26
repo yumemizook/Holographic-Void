@@ -66,6 +66,20 @@ local function GetOnlineStatus()
 	return false, "", "Offline"
 end
 
+local function GetPlayableChartSeconds(song, steps)
+	if steps then
+		local ok, len = pcall(function() return steps:GetLengthSeconds() end)
+		if ok and len and len > 0 then return len end
+	end
+	if song then
+		local ok, len = pcall(function() return song:GetStepsSeconds() end)
+		if ok and len and len > 0 then return len end
+		ok, len = pcall(function() return song:MusicLengthSeconds() end)
+		if ok and len and len > 0 then return len end
+	end
+	return 0
+end
+
 
 
 -- ============================================================
@@ -624,7 +638,7 @@ t[#t + 1] = Def.ActorFrame {
 		SetCommand = function(self)
 			local song = HV.CurrentSongData.song
 			if song then
-				local len = song:MusicLengthSeconds()
+				local len = GetPlayableChartSeconds(song, HV.CurrentSongData.steps)
 				local rate = HV.CurrentSongData.rate
 				if rate > 0 then len = len / rate end
 				local mins = math.floor(len / 60)
@@ -1195,70 +1209,6 @@ t[#t + 1] = Def.ActorFrame {
 	end
 }
 
-local function getRescoreElementsFromScore(score)
-	local o = {}
-	if not score or not score:HasReplayData() then return nil end
-	local replay = score:GetReplay()
-	local ok = pcall(function() replay:LoadAllData() end)
-	if not ok then return nil end
-	
-	local dvtTmp = replay:GetOffsetVector()
-	local tvt = replay:GetTapNoteTypeVector()
-	local dvt = {}
-	if tvt ~= nil and #tvt > 0 then
-		for i, d in ipairs(dvtTmp) do
-			local ty = tvt[i]
-			if ty == "TapNoteType_Tap" or ty == "TapNoteType_HoldHead" or ty == "TapNoteType_Lift" then
-				dvt[#dvt+1] = d
-			end
-		end
-	else
-		dvt = dvtTmp
-	end
-	o["dvt"] = dvt
-	
-	o["misses"] = score:GetTapNoteScore("TapNoteScore_Miss")
-	o["holdsMissed"] = score:GetHoldNoteScore("HoldNoteScore_LetGo")
-	o["rollsMissed"] = 0
-	o["minesHit"] = score:GetTapNoteScore("TapNoteScore_HitMine")
-	
-	local hits = 0
-	for _, name in ipairs({"W1","W2","W3","W4","W5"}) do
-		hits = hits + score:GetTapNoteScore("TapNoteScore_"..name)
-	end
-	o["tapsHit"] = hits
-	o["notesPassed"] = hits + o["misses"]
-	
-	local steps = GAMESTATE:GetCurrentSteps()
-	local radar = steps and steps:GetRadarValues(PLAYER_1)
-	o["totalHolds"] = (radar and radar:GetValue("RadarCategory_Holds")) or score:GetHoldNoteScore("HoldNoteScore_Held") + o["holdsMissed"]
-	o["totalRolls"] = (radar and radar:GetValue("RadarCategory_Rolls")) or 0
-	o["totalMines"] = (radar and radar:GetValue("RadarCategory_Mines")) or score:GetTapNoteScore("TapNoteScore_AvoidMine") + o["minesHit"]
-	o["totalNotes"] = (radar and radar:GetValue("RadarCategory_Notes")) or o["notesPassed"]
-	
-	return o
-end
-
-local function getJ4NormalizedPercentage(score)
-	if not score then return 0 end
-	
-	-- 1. Engine method (Fastest, most reliable for newer Etterna)
-	if type(score.GetRescoredWifeScore) == "function" then
-		return score:GetRescoredWifeScore(4) * 100
-	end
-	
-	-- 2. Manual rescore if replay exists
-	if score:HasReplayData() then
-		local rst = getRescoreElementsFromScore(score)
-		if rst and rst.dvt then
-			return getRescoredWife3Judge(3, 4, rst)
-		end
-	end
-	
-	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
-	return score:GetWifeScore() * 100
-end
-
 local function GetDisplayScore()
 	local pn = PLAYER_1
 	local steps = GAMESTATE:GetCurrentSteps()
@@ -1462,11 +1412,8 @@ t[#t + 1] = Def.ActorFrame {
 			local score = HV.CurrentSongData.pbScore
 			if score then
 				local wifePct = score:GetWifeScore() * 100
-				if self:GetParent().isHovering and score:HasReplayData() then
-					local rst = getRescoreElementsFromScore(score)
-					wifePct = rst and getRescoredWife3Judge(3, 4, rst) or wifePct
-				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
-					wifePct = score:GetRescoredWifeScore(4) * 100
+				if self:GetParent().isHovering then
+					wifePct = getJ4NormalizedPercentage(score)
 				end
 				if wifePct >= 99 then
 					self:settext(string.format("%.4f%%", wifePct))
@@ -1492,12 +1439,8 @@ t[#t + 1] = Def.ActorFrame {
 			if score then
 				local gradeStr = score:GetWifeGrade()
 				local wifePct = score:GetWifeScore() * 100
-				if self:GetParent().isHovering and score:HasReplayData() then
-					local rst = getRescoreElementsFromScore(score)
-					wifePct = rst and getRescoredWife3Judge(3, 4, rst) or wifePct
-					gradeStr = GetGradeFromPercent(wifePct / 100)
-				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
-					wifePct = score:GetRescoredWifeScore(4) * 100
+				if self:GetParent().isHovering then
+					wifePct = getJ4NormalizedPercentage(score)
 					gradeStr = GetGradeFromPercent(wifePct / 100)
 				end
 				
@@ -1524,7 +1467,7 @@ t[#t + 1] = Def.ActorFrame {
 			if score then
 				local ct = getDetailedClearType(score)
 				
-				if self:GetParent().isHovering and score:HasReplayData() then
+				if self:GetParent().isHovering then
 					local rst = getRescoreElementsFromScore(score)
 					if rst then
 						local w1 = getRescoredJudge(rst.dvt, 4, 1)
@@ -1556,8 +1499,6 @@ t[#t + 1] = Def.ActorFrame {
 							end
 						end
 					end
-				elseif self:GetParent().isHovering and type(score.GetRescoredWifeScore) == "function" then
-					-- Cannot easily construct ClearType without vectors safely, fallback
 				end
 				
 				local ctStr = THEME:GetString("ClearTypes", ct)
@@ -1628,7 +1569,7 @@ t[#t + 1] = Def.ActorFrame {
 				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
 			}
 			
-			if self:GetParent().isHovering and score:HasReplayData() then
+			if self:GetParent().isHovering then
 				local rst = getRescoreElementsFromScore(score)
 				if rst then
 					for i=1, 6 do
