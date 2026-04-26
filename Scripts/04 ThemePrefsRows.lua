@@ -795,7 +795,7 @@ end
 -- Customize Gameplay toggle (used in ScreenPlayerOptions)
 function OptionRowCustomizeGameplay()
 	return {
-		Name = "CustomizeGameplay",
+		Name = "HV_CustomizeGameplay",
 		LayoutType = "ShowAllInRow",
 		SelectType = "SelectOne",
 		OneChoiceForAllPlayers = true,

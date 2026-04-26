@@ -1685,6 +1685,7 @@ if not isSync then
 	t[#t + 1] = LoadActor("avatar")
 end
 t[#t + 1] = LoadActor("intro")
+t[#t + 1] = LoadActor("messagebox")
 
 -- ============================================================
 -- NG INDICATOR (POPUP)
