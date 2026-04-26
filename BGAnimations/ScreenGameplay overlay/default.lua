@@ -215,6 +215,8 @@ local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bot
 
 local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode() and not isSync
 
+-- Load cursor system for mouse button support (required for practice_input.lua QuadButton)
+t[#t + 1] = LoadActor("../_cursor")
 t[#t + 1] = LoadActor("practice_input.lua")
 
 if showProgressBar then

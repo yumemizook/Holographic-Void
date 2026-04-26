@@ -12,6 +12,7 @@ local wodth = 300
 local hidth = 40
 local loopStartPos
 local loopEndPos
+local graphWidth = wodth * prevZoom
 
 local function notify(message)
 	if ms and ms.ok then
@@ -212,9 +213,9 @@ end
 local function UpdatePreviewPos(self)
 	local top = getTop()
 	if not top then return end
-	local pos = getSongPos() / musicratio
+	local pos = getSongPos() / musicratio * prevZoom
 	local marker = self:GetChild("CurrentPos")
-	if marker then marker:x(pos * prevZoom) end
+	if marker then marker:x(pos) end
 end
 
 local pm = Def.ActorFrame {
@@ -224,6 +225,14 @@ local pm = Def.ActorFrame {
 		local y = MovableValues and MovableValues.PracticeCDGraphY or SCREEN_CENTER_Y
 		self:xy(x, y)
 		self:SetUpdateFunction(UpdatePreviewPos)
+	end,
+	OnCommand = function(self)
+		-- Disable the chord density graph's internal hover marker since it doesn't account for zoom
+		local cdg = self:GetChild("ChordDensityGraph")
+		if cdg then
+			local seekMarker = cdg:GetChild("SeekMarker")
+			if seekMarker then seekMarker:visible(false) end
+		end
 	end,
 	BeginCommand = function(self)
 		local steps = GAMESTATE:GetCurrentSteps()
@@ -256,11 +265,11 @@ local pm = Def.ActorFrame {
 	UIElements.QuadButton(1, 1) .. {
 		Name = "Hitbox",
 		InitCommand = function(self)
-			self:x(wodth * prevZoom / 2):zoomto(wodth * prevZoom, hidth * prevZoom):diffusealpha(0)
+			self:halign(0):zoomto(wodth * prevZoom, hidth * prevZoom):diffusealpha(0)
 		end,
 		MouseDownCommand = function(self, params)
 			local event = params.event or params.button
-			local left = self:GetTrueX() - (wodth * prevZoom / 2)
+			local left = self:GetTrueX()
 			local pos = math.max(0, math.min(wodth, (INPUTFILTER:GetMouseX() - left) / prevZoom)) * musicratio
 			if event == "DeviceButton_left mouse button" then
 				if INPUTFILTER:IsControlPressed() then
@@ -276,11 +285,11 @@ local pm = Def.ActorFrame {
 	Def.Quad {
 		Name = "BookmarkPos",
 		InitCommand = function(self)
-			self:zoomto(2, hidth * prevZoom):diffuse(color(".2,.5,1,1")):halign(0.5):draworder(1100):visible(false)
+			self:zoomto(2, hidth * prevZoom):diffuse(color(".2,.5,1,1")):halign(0):valign(1):draworder(1100):visible(false)
 		end,
 		SetCommand = function(self)
 			if loopStartPos then
-				self:visible(true):zoomto(2, hidth * prevZoom):diffuse(color(".2,.5,1,1")):halign(0.5):x(loopStartPos / musicratio * prevZoom)
+				self:visible(true):zoomto(2, hidth * prevZoom):diffuse(color(".2,.5,1,1")):halign(0):valign(1):x(loopStartPos / musicratio * prevZoom)
 			else
 				self:visible(false)
 			end
@@ -289,7 +298,7 @@ local pm = Def.ActorFrame {
 			if not params or not params.loopLength then
 				self:playcommand("Set")
 			else
-				self:visible(true):x(loopStartPos / musicratio * prevZoom):halign(0):zoomto(params.loopLength / musicratio * prevZoom, hidth * prevZoom):diffuse(color(".7,.2,.7,0.5"))
+				self:visible(true):x(loopStartPos / musicratio * prevZoom):halign(0):valign(1):zoomto(params.loopLength / musicratio * prevZoom, hidth * prevZoom):diffuse(color(".7,.2,.7,0.5"))
 			end
 		end,
 		CurrentRateChangedMessageCommand = function(self)
@@ -306,7 +315,32 @@ local pm = Def.ActorFrame {
 	Def.Quad {
 		Name = "CurrentPos",
 		InitCommand = function(self)
-			self:zoomto(2, hidth * prevZoom):diffuse(HVColor.Accent):halign(0.5):draworder(1101)
+			self:zoomto(2, hidth * prevZoom):diffuse(HVColor.Accent):halign(0.5):valign(1):draworder(1101)
+		end
+	},
+	-- Custom hover marker that accounts for zoom
+	Def.Quad {
+		Name = "HoverMarker",
+		InitCommand = function(self)
+			self:zoomto(1, hidth * prevZoom):diffuse(color("1,1,1,0.5")):halign(0.5):valign(1):visible(false):draworder(1100)
+		end,
+		OnCommand = function(self)
+			self:SetUpdateFunction(function(self)
+				local mouseX = INPUTFILTER:GetMouseX()
+				local mouseY = INPUTFILTER:GetMouseY()
+				local parent = self:GetParent()
+				local left = parent:GetTrueX()
+				local width = wodth * prevZoom
+				local height = hidth * prevZoom
+				local top = parent:GetTrueY() - height  -- valign(1) means top is at y - height
+				
+				if mouseX >= left and mouseX <= left + width and mouseY >= top and mouseY <= top + height then
+					local p = (mouseX - left) / width
+					self:visible(true):x(p * width)
+				else
+					self:visible(false)
+				end
+			end)
 		end
 	}
 }

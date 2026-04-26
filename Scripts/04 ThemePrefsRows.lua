@@ -792,6 +792,36 @@ function OptionRowSongBackgroundBrightness()
 	return HVThemePrefRow("HV_SongBackgroundBrightness", "Background Brightness")
 end
 
+-- Customize Gameplay toggle (used in ScreenPlayerOptions)
+function OptionRowCustomizeGameplay()
+	return {
+		Name = "CustomizeGameplay",
+		LayoutType = "ShowAllInRow",
+		SelectType = "SelectOne",
+		OneChoiceForAllPlayers = true,
+		ExportOnChange = true,
+		Choices = {"Off", "On"},
+		LoadSelections = function(self, list, pn)
+			local enabled = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
+			if enabled then
+				list[2] = true
+			else
+				list[1] = true
+			end
+		end,
+		SaveSelections = function(self, list, pn)
+			if list[2] then
+				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = true
+			else
+				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = false
+			end
+			playerConfig:set_dirty(pn_to_profile_slot(PLAYER_1))
+			playerConfig:save(pn_to_profile_slot(PLAYER_1))
+		end
+	}
+end
+_G["OptionRowCustomizeGameplay"] = OptionRowCustomizeGameplay
+
 -- Practice Mode toggle (used in ScreenPlayerOptions)
 function PracticeMode()
 	return {
