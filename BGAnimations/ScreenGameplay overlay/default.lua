@@ -1,6 +1,7 @@
 local pn = GAMESTATE:GetEnabledPlayers()[1] or PLAYER_1
 local lScreen = Var "LoadingScreen" or ""
 local isSync = lScreen:find("Sync") ~= nil
+local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 local HV_PointsLost = 0
 local HV_MaxPoints = 1 -- Placeholder, will be set in BeginCommand
 local HV_PBThreshold = 0
@@ -223,7 +224,10 @@ if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ProgressBarContainer",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, barY)
+		self:xy(isCustomizeGameplay and (MovableValues.FullProgressBarX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.FullProgressBarY or barY) or barY)
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_9"}, self, self:GetChild("Border"))
 	end,
 	BeginCommand = function(self)
 		self:SetUpdateFunction(function(self)
@@ -294,6 +298,8 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 
 	}
+	,
+	MovableBorder(barW, 16, 1, 0, 0)
 }
 end -- End progress bar visibility check
 
@@ -309,7 +315,7 @@ if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "VerticalLifeBar",
 	InitCommand = function(self)
-		self:xy(lifeBarX, lifeBarY):visible(false)
+		self:xy(isCustomizeGameplay and (MovableValues.LifeP1X or lifeBarX) or lifeBarX, isCustomizeGameplay and (MovableValues.LifeP1Y or lifeBarY) or lifeBarY):rotationz(isCustomizeGameplay and (MovableValues.LifeP1Rotation or 0) or 0):visible(false)
 	end,
 
 	Def.Quad {
@@ -413,7 +419,10 @@ if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 90):diffusealpha(0.8)
+		self:xy(isCustomizeGameplay and (MovableValues.DisplayPercentX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.DisplayPercentY or (SCREEN_CENTER_Y - 90)) or (SCREEN_CENTER_Y - 90)):zoom(isCustomizeGameplay and (MovableValues.DisplayPercentZoom or 1) or 1):diffusealpha(0.8)
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_w", "DeviceButton_e"}, self, self:GetChild("Border"))
 	end,
 
 	LoadFont("Common Normal") .. {
@@ -505,6 +514,8 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 
 	}
+	,
+	MovableBorder(110, 20, 1, 0, 0)
 }
 end
 
@@ -527,7 +538,10 @@ if showGoalTrackerText then
 	t[#t + 1] = Def.ActorFrame {
 		Name = "TextPacemaker",
 		InitCommand = function(self)
-			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 115)
+			self:xy(isCustomizeGameplay and (MovableValues.TargetTrackerX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.TargetTrackerY or (SCREEN_CENTER_Y - 115)) or (SCREEN_CENTER_Y - 115)):zoom(isCustomizeGameplay and (MovableValues.TargetTrackerZoom or 1) or 1)
+		end,
+		OnCommand = function(self)
+			setMovableActor({"DeviceButton_7", "DeviceButton_8"}, self, self:GetChild("Border"))
 		end,
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
@@ -560,6 +574,8 @@ if showGoalTrackerText then
 			end,
 
 		}
+		,
+		MovableBorder(130, 18, 1, 0, 0)
 	}
 end
 
@@ -569,13 +585,14 @@ end
 t[#t + 1] = Def.ActorFrame {
 	Name = "NotefieldMean",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 70):diffusealpha(0)
+		self:xy(isCustomizeGameplay and (MovableValues.DisplayMeanX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.DisplayMeanY or (SCREEN_CENTER_Y + 70)) or (SCREEN_CENTER_Y + 70)):zoom(isCustomizeGameplay and (MovableValues.DisplayMeanZoom or 1) or 1):diffusealpha(0)
 		-- Check if notefield stat should be shown
 		local statType = HV.GetNotefieldStat()
 		local showStat = statType ~= "Off" and not HV.MinimalisticMode() and not isSync
 		self:visible(showStat)
 	end,
 	OnCommand = function(self)
+		setMovableActor({"DeviceButton_m", "DeviceButton_comma"}, self, self:GetChild("Border"))
 		self:linear(0.2):diffusealpha(0.8)
 	end,
 
@@ -672,7 +689,8 @@ t[#t + 1] = Def.ActorFrame {
 			PracticeModeResetMessageCommand = function(self) self.currWifePoints = 0; self:queuecommand("Update") end,
 			PracticeModeReloadMessageCommand = function(self) self.currWifePoints = 0; self:queuecommand("Update") end
 		
-		}
+		},
+		MovableBorder(100, 18, 1, 0, 0)
 	}
 
 -- ============================================================
@@ -684,8 +702,11 @@ if showCombo then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 55)
+		self:xy(isCustomizeGameplay and (SCREEN_CENTER_X + (MovableValues.ComboX or 0)) or SCREEN_CENTER_X, isCustomizeGameplay and (SCREEN_CENTER_Y + (MovableValues.ComboY or 0)) or (SCREEN_CENTER_Y - 55)):zoom(isCustomizeGameplay and (MovableValues.ComboZoom or 1) or 1)
 		self.comboBreaks = 0
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_3", "DeviceButton_4"}, self, self:GetChild("Border"))
 	end,
 
 	LoadFont("combo/_mochiy pop one 24px") .. {
@@ -816,6 +837,7 @@ t[#t + 1] = Def.ActorFrame {
 		end
 	end,
 
+	MovableBorder(120, 40, 1, 0, 0),
 }
 end -- End combo visibility check
 
@@ -944,7 +966,10 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		Name = "ErrorBar",
 		InitCommand = function(self)
 			local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
-			self:xy(SCREEN_CENTER_X, ebCenterY):visible(ebMode ~= "Off" and not isSync)
+			self:xy(isCustomizeGameplay and (MovableValues.ErrorBarX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.ErrorBarY or ebCenterY) or ebCenterY):visible(ebMode ~= "Off" and not isSync)
+		end,
+		OnCommand = function(self)
+			setMovableActor({"DeviceButton_5"}, self, self:GetChild("Border"))
 		end,
 
 	-- Background line
@@ -1050,6 +1075,8 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		end
 		return poolDef
 	end)()
+	,
+	MovableBorder(ebW, ebH + 12, 1, 0, 0)
 }
 
 -- ============================================================
@@ -1064,7 +1091,10 @@ if showJudgeCounter and not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
-		self:xy(tallyX, tallyY):diffusealpha(0.8)
+		self:xy(isCustomizeGameplay and (MovableValues.JudgeCounterX or tallyX) or tallyX, isCustomizeGameplay and (MovableValues.JudgeCounterY or tallyY) or tallyY):diffusealpha(0.8)
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_p"}, self, self:GetChild("Border"))
 	end,
 
 	-- COLUMN 1: Judgments + OK/NG
@@ -1393,6 +1423,8 @@ t[#t + 1] = Def.ActorFrame {
 			PracticeModeReloadMessageCommand = function(self) self:settext("0.00") end
 		}
 	}
+	,
+	MovableBorder(140, 100, 1, 70, 50)
 }
 end
 
@@ -1401,18 +1433,18 @@ end
 -- ============================================================
 if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
-	Name = "SongInfoHUD",
+	Name = "BPMText",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 14)
+		self:xy(isCustomizeGameplay and (MovableValues.BPMTextX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.BPMTextY or (SCREEN_BOTTOM - 20)) or (SCREEN_BOTTOM - 20)):zoom(isCustomizeGameplay and (MovableValues.BPMTextZoom or 1) or 1)
 	end,
 	OnCommand = function(self)
+		setMovableActor({"DeviceButton_x", "DeviceButton_c"}, self, self:GetChild("Border"))
 		self:diffusealpha(0.6)
 	end,
-	
-	-- BPM and Rate display added above song title
 	LoadFont("Common Normal") .. {
+		Name = "Text",
 		InitCommand = function(self)
-			self:y(-18):zoom(0.35):diffuse(subText):maxwidth(SCREEN_WIDTH / 0.35)
+			self:zoom(0.35):diffuse(subText):maxwidth(SCREEN_WIDTH / 0.35)
 		end,
 		PlayingUpdateMessageCommand = function(self)
 			local song = GAMESTATE:GetCurrentSong()
@@ -1424,6 +1456,17 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end
 	},
+	MovableBorder(150, 18, 1, 0, 0)
+}
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "SongInfoHUD",
+	InitCommand = function(self)
+		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 14)
+	end,
+	OnCommand = function(self)
+		self:diffusealpha(0.6)
+	end,
 
 	LoadFont("Zpix Normal") .. {
 		InitCommand = function(self)

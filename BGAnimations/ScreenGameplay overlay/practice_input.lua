@@ -180,12 +180,9 @@ local function handlePracticeCommand(name)
 			notify("Metronome: " .. (not cur and "ON" or "OFF"))
 		end
 	elseif name == "PracAutoplay" then
-		local ps = GAMESTATE:GetPlayerState(PLAYER_1)
-		if ps then
-			local cur = ps:GetPlayerController() == "PlayerController_Autoplay"
-			ps:SetPlayerController(cur and "PlayerController_Human" or "PlayerController_Autoplay")
-			notify("Autoplay: " .. (not cur and "ON" or "OFF"))
-		end
+		local cur = getAutoplay and getAutoplay() ~= 0
+		GAMESTATE:SetAutoplay(not cur)
+		notify("Autoplay: " .. (not cur and "ON" or "OFF"))
 	end
 end
 

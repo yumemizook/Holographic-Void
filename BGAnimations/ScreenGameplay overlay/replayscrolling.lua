@@ -90,14 +90,16 @@ end
 
 local inputAdded = false
 local playerName = "Replay"
+local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
 local t = Def.ActorFrame {
 	Name = "ReplayControls",
 	InitCommand = function(self)
-		self:xy(SCREEN_RIGHT - 40, SCREEN_CENTER_Y + 50)
+		self:xy(isCustomizeGameplay and (MovableValues.ReplayButtonsX or (SCREEN_RIGHT - 40)) or (SCREEN_RIGHT - 40), isCustomizeGameplay and (MovableValues.ReplayButtonsY or (SCREEN_CENTER_Y + 50)) or (SCREEN_CENTER_Y + 50))
 		self:diffusealpha(0)
 	end,
 	OnCommand = function(self)
+		setMovableActor({"DeviceButton_f"}, self, self:GetChild("Border"))
 		-- Fetch name once
 		local screen = SCREENMAN:GetTopScreen()
 		if screen and screen.GetReplayScore then
@@ -203,7 +205,8 @@ local t = Def.ActorFrame {
 			local top = SCREENMAN:GetTopScreen()
 			if top then top:Cancel() end
 		end),
-	}
+	},
+	MovableBorder(btnW + 10, (spacing * 5) + 60, 1, 0, 0)
 }
 
 return t

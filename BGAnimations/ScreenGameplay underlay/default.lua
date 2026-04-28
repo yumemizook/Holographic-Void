@@ -1,7 +1,13 @@
 --- Holographic Void: ScreenGameplay Underlay (Lane Filter)
 -- Localized dimming for the notefield area.
 
-local t = Def.ActorFrame {}
+local t = Def.ActorFrame {
+	EndCommand = function(self)
+		unsetMovableKeymode()
+	end
+}
+
+setMovableKeymode(getCurrentKeyMode())
 
 -- Standard 4K column width (64px each * 4 columns = 256px)
 local filterW = 256

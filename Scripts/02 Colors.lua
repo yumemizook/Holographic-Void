@@ -232,6 +232,7 @@ HVColor.ClearTypeClassic = {
 	Invalid = color("#E61E25"),
 	NoPlay  = color("#666666"),
 	None    = color("#666666"),
+	SoftInvalid = color("#CC8844"),
 }
 
 --- Refresh global clear type colors based on style.
@@ -256,8 +257,8 @@ function HVColor.GetClearTypeColor(ct)
 	if s:find("PERFECT")   then return palette.PFC end
 	if s:find("COMBO")     then return palette.FC end
 	if s:find("FAILED")    then return palette.Failed end
-	if s:find("INVALID")   then return palette.Invalid end
 	if s:find("SOFT")      then return palette.SoftInvalid end
+	if s:find("INVALID")   then return palette.Invalid end
 	return palette.Clear
 end
 

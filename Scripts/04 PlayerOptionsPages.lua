@@ -41,6 +41,10 @@ function PONextScreen(currentKey)
 				if selected then
 					if i == 1 then
 						-- "Gameplay" — exit to gameplay
+						local allowGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
+						if allowGameplay then
+							GAMESTATE:SetAutoplay(true)
+						end
 						SCREENMAN:GetTopScreen():SetNextScreenName(ToGameplay())
 					else
 						-- Navigate to the specific screen for that tab (offset by 1 due to Gameplay)

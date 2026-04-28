@@ -5,8 +5,14 @@ local dotHistory = {}
 local recentJudgmentDisplay = Def.ActorFrame {
 	Name = "RecentJudgmentDisplay",
 	InitCommand = function(self)
-		self:x(-160) -- Moved back to the left
-		self:y(50) -- Kept the 50px down offset
+		if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay then
+			self:xy(MovableValues.RecentJudgmentDisplayX or -160, MovableValues.RecentJudgmentDisplayY or 50):zoom(MovableValues.RecentJudgmentDisplayZoom or 1)
+		else
+			self:xy(-160, 50):zoom(1)
+		end
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_v", "DeviceButton_b"}, self, self:GetChild("Border"))
 	end,
 	UpdateRowsMessageCommand = function(self)
 		self:visible(HV.RecentJudgmentDisplay() and not HV.MinimalisticMode())
@@ -22,20 +28,18 @@ for i = 1, DOT_COUNT do
 	}
 end
 
+recentJudgmentDisplay[#recentJudgmentDisplay + 1] = MovableBorder(12, ((DOT_COUNT - 1) * 8) + 6, 1, 0, (((DOT_COUNT - 1) * 8) + 6) / 2)
+
 local t = Def.ActorFrame {
-	Name = "PlayerJudgment",
-	InitCommand = function(self)
-		self:visible(false)
-		self.lockedUntil = 0
-		self.lockedIndex = -1
-	end,
 	JudgmentMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
 		if not params.TapNoteScore then return end
 		if params.HoldNoteScore then return end -- Skip hold/roll end events
 		
+		local judgment = self:GetChild("PlayerJudgment")
+		if not judgment then return end
 		local tns = ToEnumShortString(params.TapNoteScore)
-		local container = self:GetChild("JudgmentContainer")
+		local container = judgment:GetChild("JudgmentContainer")
 		local sprite = container:GetChild("JudgmentSprite")
 		if not sprite then return end
 		
@@ -87,7 +91,7 @@ local t = Def.ActorFrame {
 		local curTime = GetTimeSinceStart()
 		local displayDuration = 0.5
 		if HV.PrioritizeLowerJudgements and HV.PrioritizeLowerJudgements() then
-			if curTime < self.lockedUntil and jdgIdx <= self.lockedIndex then
+			if curTime < judgment.lockedUntil and jdgIdx <= judgment.lockedIndex then
 				return
 			end
 
@@ -111,19 +115,19 @@ local t = Def.ActorFrame {
 
 			if isLower then
 				displayDuration = 0.3
-				self.lockedUntil = curTime + displayDuration
-				self.lockedIndex = jdgIdx
+				judgment.lockedUntil = curTime + displayDuration
+				judgment.lockedIndex = jdgIdx
 			else
-				self.lockedUntil = 0
-				self.lockedIndex = -1
+				judgment.lockedUntil = 0
+				judgment.lockedIndex = -1
 			end
 		else
-			self.lockedUntil = 0
-			self.lockedIndex = -1
+			judgment.lockedUntil = 0
+			judgment.lockedIndex = -1
 		end
 
 		-- Apply state and show the judgment container
-		self:visible(true)
+		judgment:visible(true)
 		container:stoptweening():visible(true):diffusealpha(1)
 		sprite:setstate(state)
 		
@@ -138,22 +142,36 @@ local t = Def.ActorFrame {
 		
 		container:sleep(displayDuration):linear(0.1):diffusealpha(0)
 	end,
-
 	Def.ActorFrame {
-		Name = "JudgmentContainer",
-		Def.Sprite {
-			Name = "JudgmentSprite",
-			InitCommand = function(self)
-				local path = getAssetPath("judgment")
-				if path and path ~= "" then
-					self:Load(path)
-					if self.pause then self:pause() end
-					self:setstate(0)
-				end
+		Name = "PlayerJudgment",
+		InitCommand = function(self)
+			if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay then
+				self:xy(MovableValues.JudgeX or 0, MovableValues.JudgeY or 0):zoom(MovableValues.JudgeZoom or 1)
 			end
-		}
-	},
+			self:visible(false)
+			self.lockedUntil = 0
+			self.lockedIndex = -1
+		end,
+		OnCommand = function(self)
+			setMovableActor({"DeviceButton_1", "DeviceButton_2"}, self, self:GetChild("Border"))
+		end,
 
+		Def.ActorFrame {
+			Name = "JudgmentContainer",
+			Def.Sprite {
+				Name = "JudgmentSprite",
+				InitCommand = function(self)
+					local path = getAssetPath("judgment")
+					if path and path ~= "" then
+						self:Load(path)
+						if self.pause then self:pause() end
+						self:setstate(0)
+					end
+				end
+			}
+		},
+		MovableBorder(120, 40, 1, 0, 0)
+	},
 	recentJudgmentDisplay
 }
 

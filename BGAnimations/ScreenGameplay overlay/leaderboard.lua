@@ -29,6 +29,7 @@ local cardGap = 3
 local startX = 10
 local startY = 40
 local maxEntries = 5
+local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
 -- Get player profile name
 local profileName = "Player"
@@ -144,7 +145,12 @@ UpdateScores()
 -- ============================================================
 local t = Def.ActorFrame {
 	Name = "InGameLeaderboard",
-	InitCommand = function(self) self:xy(startX, startY) end,
+	InitCommand = function(self)
+		self:xy(isCustomizeGameplay and (MovableValues.LeaderboardX or startX) or startX, isCustomizeGameplay and (MovableValues.LeaderboardY or startY) or startY):zoomtowidth(isCustomizeGameplay and (MovableValues.LeaderboardWidth or 1) or 1):zoomtoheight(isCustomizeGameplay and (MovableValues.LeaderboardHeight or 1) or 1)
+	end,
+	OnCommand = function(self)
+		setMovableActor({"DeviceButton_a", "DeviceButton_s"}, self, self:GetChild("Border"))
+	end,
 	RefreshLeaderboardMessageCommand = function(self)
 		UpdateScores()
 		self:playcommand("RefreshScores")
@@ -318,5 +324,7 @@ t[#t + 1] = Def.ActorFrame {
 
 -- Trigger first refresh
 t.BeginCommand = function(self) self:playcommand("RefreshScores") end
+
+t[#t + 1] = MovableBorder(cardW, ((cardH + cardGap) * (maxEntries + 1)), 1, cardW / 2, ((cardH + cardGap) * (maxEntries + 1)) / 2)
 
 return t
