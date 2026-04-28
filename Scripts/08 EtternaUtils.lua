@@ -410,8 +410,9 @@ function getClearLevel(pn, steps, score)
 	if totalTaps ~= maxNotes then return 16 end -- note count mismatch
 
 	-- Soft Invalid check (< 83% J4)
+	-- Only apply if J4 calculation succeeded (returns non-zero value)
 	local j4Pct = getJ4NormalizedPercentage(score)
-	if j4Pct < 83 then return 19 end
+	if j4Pct > 0 and j4Pct < 83 then return 19 end
 
 	-- MFC
 	if tns.W1 == maxNotes and hns.Held == maxHolds then return 1 end
@@ -517,8 +518,10 @@ function getDetailedClearType(obj)
 		elseif w2 < 10 then return "SDP"
 		else return "PFC" end
 	end
+	-- Soft Invalid check (< 83% J4)
+	-- Only apply if J4 calculation succeeded (returns non-zero value)
 	local j4Pct = getJ4NormalizedPercentage(obj)
-	if j4Pct < 83 then return "Soft Invalid" end
+	if j4Pct > 0 and j4Pct < 83 then return "Soft Invalid" end
 
 	return "MFC"
 end
