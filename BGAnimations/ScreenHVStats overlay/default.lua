@@ -817,7 +817,8 @@ function buildOverallMsdGradePoints(entries)
 				points[#points + 1] = {
 					x = ssr,
 					y = (score:GetWifeScore() or 0) * 100,
-					color = getGradeColor(score:GetWifeGrade())
+					color = getGradeColor(score:GetWifeGrade()),
+					songName = entry.song and entry.song:GetDisplayMainTitle() or "Unknown"
 				}
 			end
 		end
@@ -2094,10 +2095,51 @@ function overallTimelineHorizontalGridline(i)
 			self:halign(0):valign(0.5):zoomto(timelineGraphWidth, 1):diffuse(color("#FFFFFF")):diffusealpha(0.08):visible(false)
 		end,
 		SetCommand = function(self)
-			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
-			self:visible(active)
-			if not active then return end
-			self:xy(timelineGraphLeft, getOverallTimelineGridY(i, timelineYAxisTickCount))
+			local activeTimeline = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
+			local activeMsd = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
+			self:visible(activeTimeline or activeMsd)
+			if not (activeTimeline or activeMsd) then return end
+			
+			if activeMsd then
+				local yPositions = {
+					timelineGraphTop, -- 100%
+					timelineGraphTop + (timelineGraphHeight / 4), -- 99.955%
+					timelineGraphTop + (2 * timelineGraphHeight / 4), -- 99.7%
+					timelineGraphTop + (3 * timelineGraphHeight / 4), -- 93%
+					timelineGraphTop + timelineGraphHeight -- 80%
+				}
+				
+				local midYPositions = {
+					timelineGraphTop + (timelineGraphHeight / 4) - ((99.9935 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+					timelineGraphTop + (timelineGraphHeight / 4) - ((99.98 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+					timelineGraphTop + (timelineGraphHeight / 4) - ((99.97 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+					timelineGraphTop + (2 * timelineGraphHeight / 4) - ((99.9 - 99.7) / 0.255) * (timelineGraphHeight / 4),
+					timelineGraphTop + (2 * timelineGraphHeight / 4) - ((99.8 - 99.7) / 0.255) * (timelineGraphHeight / 4),
+					timelineGraphTop + (3 * timelineGraphHeight / 4) - ((99 - 93) / 6.7) * (timelineGraphHeight / 4),
+					timelineGraphTop + (3 * timelineGraphHeight / 4) - ((96.5 - 93) / 6.7) * (timelineGraphHeight / 4)
+				}
+				
+				if i <= 5 then
+					self:xy(timelineGraphLeft, yPositions[i])
+					self:diffusealpha(0.12)
+					self:visible(true)
+				elseif i <= 12 then
+					self:xy(timelineGraphLeft, midYPositions[i - 5])
+					self:diffusealpha(0.04)
+					self:visible(true)
+				else
+					self:visible(false)
+				end
+			else
+				-- Normal timeline
+				if i <= timelineYAxisTickCount then
+					self:xy(timelineGraphLeft, getOverallTimelineGridY(i, timelineYAxisTickCount))
+					self:diffusealpha(0.08)
+					self:visible(true)
+				else
+					self:visible(false)
+				end
+			end
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -2207,16 +2249,38 @@ function overallMsdGradeLabel(i)
 			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
 			self:visible(active)
 			if not active then return end
-			local labels = {"AAAA+", "AAAA", "AAA", "AA"}
+			-- Show gridline thresholds instead of section labels
+			local labels = {"100%", "99.955% (AAAA)", "99.7% (AAA)", "93% (AA)", "80%"}
 			local yPositions = {
-				timelineGraphTop + (timelineGraphHeight / 8), -- AAAA+ section top
-				timelineGraphTop + (3 * timelineGraphHeight / 8), -- AAAA section middle
-				timelineGraphTop + (5 * timelineGraphHeight / 8), -- AAA section middle
-				timelineGraphTop + (7 * timelineGraphHeight / 8) -- AA section bottom
+				timelineGraphTop, -- 100%
+				timelineGraphTop + (timelineGraphHeight / 4), -- 99.955%
+				timelineGraphTop + (2 * timelineGraphHeight / 4), -- 99.7%
+				timelineGraphTop + (3 * timelineGraphHeight / 4), -- 93%
+				timelineGraphTop + timelineGraphHeight -- 80%
 			}
-			if i <= 4 then
+			
+			-- Add mid-grade thresholds as smaller, slightly offset labels
+			local midLabels = {"99.9935% (AAAAA)", "99.98% (AAAA:)", "99.97% (AAAA.)", "99.9% (AAA.)", "99.8% (AAA:)", "99% (AA.)", "96.5% (AA:)"}
+			local midYPositions = {
+				timelineGraphTop + (timelineGraphHeight / 4) - ((99.9935 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+				timelineGraphTop + (timelineGraphHeight / 4) - ((99.98 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+				timelineGraphTop + (timelineGraphHeight / 4) - ((99.97 - 99.955) / 0.045) * (timelineGraphHeight / 4),
+				timelineGraphTop + (2 * timelineGraphHeight / 4) - ((99.9 - 99.7) / 0.255) * (timelineGraphHeight / 4),
+				timelineGraphTop + (2 * timelineGraphHeight / 4) - ((99.8 - 99.7) / 0.255) * (timelineGraphHeight / 4),
+				timelineGraphTop + (3 * timelineGraphHeight / 4) - ((99 - 93) / 6.7) * (timelineGraphHeight / 4),
+				timelineGraphTop + (3 * timelineGraphHeight / 4) - ((96.5 - 93) / 6.7) * (timelineGraphHeight / 4)
+			}
+
+			if i <= 5 then
 				self:xy(timelineGraphLeft - 6, yPositions[i])
 				self:settext(labels[i])
+				self:diffuse(color("#DDDDDD"))
+				self:zoom(0.24)
+			elseif i <= 12 then
+				self:xy(timelineGraphLeft - 6, midYPositions[i - 5])
+				self:settext(midLabels[i - 5])
+				self:diffuse(color("#888888"))
+				self:zoom(0.18)
 			else
 				self:visible(false)
 			end
@@ -2234,58 +2298,212 @@ function overallMsdGradeLabel(i)
 end
 
 function overallMsdGradePoint(i)
-return Def.Quad {
-Name = "OverallMsdGradePoint" .. i,
-InitCommand = function(self)
-self:halign(0.5):valign(0.5):zoomto(4, 4):visible(false)
-end,
-SetCommand = function(self)
-local point = overallMsdGradePointsForDisplay[i]
-if not isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) or not point then
-self:visible(false)
-return
+	return Def.Quad {
+		Name = "OverallMsdGradePoint" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0.5):zoomto(4, 4):visible(false)
+		end,
+		SetCommand = function(self)
+			local point = overallMsdGradePointsForDisplay[i]
+			if not isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) or not point then
+				self:visible(false)
+				return
+			end
+			local maxX = 1
+			for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
+				if (candidate.x or 0) > maxX then maxX = candidate.x end
+			end
+			-- Map actual grade thresholds to 4 equal height sections
+			-- Section 1 (bottom 1/4): 80% -> 93% (AA threshold)
+			-- Section 2 (second 1/4): 93% -> 99.7% (AAA threshold)
+			-- Section 3 (third 1/4): 99.7% -> 99.955% (AAAA threshold)
+			-- Section 4 (top 1/4): 99.955% -> 100%
+			local percent = point.y or 0
+			local yPosition
+			if percent < 93 then
+				-- Below AA: maps to bottom 1/4 (80-93%)
+				yPosition = timelineGraphTop + timelineGraphHeight - ((percent - 80) / 13) * (timelineGraphHeight / 4)
+			elseif percent < 99.7 then
+				-- AA to AAA: maps to second 1/4 (93-99.7%)
+				yPosition = timelineGraphTop + (3 * timelineGraphHeight / 4) - ((percent - 93) / 6.7) * (timelineGraphHeight / 4)
+			elseif percent < 99.955 then
+				-- AAA to AAAA: maps to third 1/4 (99.7-99.955%)
+				yPosition = timelineGraphTop + (2 * timelineGraphHeight / 4) - ((percent - 99.7) / 0.255) * (timelineGraphHeight / 4)
+			else
+				-- AAAA and above: maps to top 1/4 (99.955-100%)
+				local cappedPercent = math.min(percent, 100)
+				yPosition = timelineGraphTop + (timelineGraphHeight / 4) - ((cappedPercent - 99.955) / 0.045) * (timelineGraphHeight / 4)
+			end
+			-- Clamp to graph bounds
+			yPosition = math.max(timelineGraphTop, math.min(timelineGraphTop + timelineGraphHeight, yPosition))
+			self:visible(true)
+			self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), yPosition)
+			self:diffuse(point.color or color("#FFFFFF"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
 end
-local maxX = 1
-for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
-if (candidate.x or 0) > maxX then maxX = candidate.x end
+function overallMsdGradeXAxisLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "OverallMsdGradeXAxisLabel" .. i,
+		InitCommand = function(self)
+			self:valign(0):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
+			self:visible(active)
+			if not active then return end
+
+			local maxX = 1
+			for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
+				if (candidate.x or 0) > maxX then maxX = candidate.x end
+			end
+
+			-- Make 5 nice round numbers for the X axis (0 to maxX)
+			-- E.g. if max is 28, show 0, 7, 14, 21, 28
+			if i <= 5 then
+				local fraction = (i - 1) / 4
+				local val = maxX * fraction
+				
+				if fraction == 0 then
+					self:halign(0)
+				elseif fraction == 1 then
+					self:halign(1)
+				else
+					self:halign(0.5)
+				end
+				
+				self:xy(timelineGraphLeft + (fraction * timelineGraphWidth), timelineGraphTop + timelineGraphHeight + 12)
+				self:settext(string.format("%.0f", val))
+				self:visible(true)
+			else
+				self:visible(false)
+			end
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
 end
--- Map actual grade thresholds to 4 equal height sections
--- Section 1 (bottom 1/4): 80% -> 93% (AA threshold)
--- Section 2 (second 1/4): 93% -> 99.7% (AAA threshold)
--- Section 3 (third 1/4): 99.7% -> 99.955% (AAAA threshold)
--- Section 4 (top 1/4): 99.955% -> 100%
-local percent = point.y or 0
-local yPosition
-if percent < 93 then
--- Below AA: maps to bottom 1/4 (80-93%)
-yPosition = timelineGraphTop + timelineGraphHeight - ((percent - 80) / 13) * (timelineGraphHeight / 4)
-elseif percent < 99.7 then
--- AA to AAA: maps to second 1/4 (93-99.7%)
-yPosition = timelineGraphTop + (3 * timelineGraphHeight / 4) - ((percent - 93) / 6.7) * (timelineGraphHeight / 4)
-elseif percent < 99.955 then
--- AAA to AAAA: maps to third 1/4 (99.7-99.955%)
-yPosition = timelineGraphTop + (2 * timelineGraphHeight / 4) - ((percent - 99.7) / 0.255) * (timelineGraphHeight / 4)
-else
--- AAAA and above: maps to top 1/4 (99.955-100%)
-local cappedPercent = math.min(percent, 100)
-yPosition = timelineGraphTop + (timelineGraphHeight / 4) - ((cappedPercent - 99.955) / 0.045) * (timelineGraphHeight / 4)
-end
--- Clamp to graph bounds
-yPosition = math.max(timelineGraphTop, math.min(timelineGraphTop + timelineGraphHeight, yPosition))
-self:visible(true)
-self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), yPosition)
-self:diffuse(point.color or color("#FFFFFF"))
-end,
-StatsOverlayTabChangedMessageCommand = function(self)
-self:playcommand("Set")
-end,
-StatsOverlayOverallSubviewChangedMessageCommand = function(self)
-self:playcommand("Set")
-end,
-StatsOverlayDataChangedMessageCommand = function(self)
-self:playcommand("Set")
-end
-}
+function overallMsdGradeTooltip()
+	return Def.ActorFrame {
+		Name = "OverallMsdGradeTooltip",
+		InitCommand = function(self)
+			self:visible(false)
+			self:z(100)
+			self:SetUpdateFunction(function(self)
+				self:playcommand("HoverUpdate")
+			end)
+		end,
+		HoverUpdateCommand = function(self)
+			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and statsOverlayActive
+			if not active then
+				self:visible(false)
+				return
+			end
+			
+			local mouseX = INPUTFILTER:GetMouseX()
+			local mouseY = INPUTFILTER:GetMouseY()
+			
+			if not pointInRect(mouseX, mouseY, timelineGraphLeft, timelineGraphTop, timelineGraphWidth, timelineGraphHeight) then
+				self:visible(false)
+				return
+			end
+			
+			local maxX = 1
+			for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
+				if (candidate.x or 0) > maxX then maxX = candidate.x end
+			end
+			
+			local minDistance = 15 -- Max hover distance
+			local hoveredPoint = nil
+			
+			for _, point in ipairs(overallMsdGradePointsForDisplay) do
+				local px = timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth)
+				local percent = point.y or 0
+				local py
+				if percent < 93 then
+					py = timelineGraphTop + timelineGraphHeight - ((percent - 80) / 13) * (timelineGraphHeight / 4)
+				elseif percent < 99.7 then
+					py = timelineGraphTop + (3 * timelineGraphHeight / 4) - ((percent - 93) / 6.7) * (timelineGraphHeight / 4)
+				elseif percent < 99.955 then
+					py = timelineGraphTop + (2 * timelineGraphHeight / 4) - ((percent - 99.7) / 0.255) * (timelineGraphHeight / 4)
+				else
+					local cappedPercent = math.min(percent, 100)
+					py = timelineGraphTop + (timelineGraphHeight / 4) - ((cappedPercent - 99.955) / 0.045) * (timelineGraphHeight / 4)
+				end
+				py = math.max(timelineGraphTop, math.min(timelineGraphTop + timelineGraphHeight, py))
+				
+				local dist = math.sqrt((mouseX - px)^2 + (mouseY - py)^2)
+				if dist < minDistance then
+					minDistance = dist
+					hoveredPoint = point
+					hoveredPoint.px = px
+					hoveredPoint.py = py
+				end
+			end
+			
+			if hoveredPoint then
+				self:visible(true)
+				self:xy(hoveredPoint.px, hoveredPoint.py - 24)
+				
+				local songText = hoveredPoint.songName or "Unknown"
+				local scoreText = string.format("%.2f%% (%.2f MSD)", hoveredPoint.y, hoveredPoint.x or 0)
+				
+				self:GetChild("SongName"):settext(songText)
+				self:GetChild("Score"):settext(scoreText)
+				
+				local songWidth = self:GetChild("SongName"):GetZoomedWidth()
+				local scoreWidth = self:GetChild("Score"):GetZoomedWidth()
+				local w = math.max(songWidth, scoreWidth) + 16
+				local h = 32
+				
+				self:GetChild("BG"):zoomto(w, h)
+				
+				local leftBound = hoveredPoint.px - w/2
+				local rightBound = hoveredPoint.px + w/2
+				if rightBound > SCREEN_WIDTH then
+					self:addx(SCREEN_WIDTH - rightBound - 10)
+				elseif leftBound < 0 then
+					self:addx(-leftBound + 10)
+				end
+			else
+				self:visible(false)
+			end
+		end,
+		Def.Quad {
+			Name = "BG",
+			InitCommand = function(self)
+				self:diffuse(color("#111111")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SongName",
+			InitCommand = function(self)
+				self:y(-6):zoom(0.24):diffuse(color("#FFFFFF"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Score",
+			InitCommand = function(self)
+				self:y(6):zoom(0.22):diffuse(getMainColor("highlight"))
+			end
+		}
+	}
 end
 function breakdownJudgeBar(i)
 	return Def.ActorFrame {
@@ -2322,7 +2540,7 @@ function breakdownJudgeBar(i)
 		Def.Quad {
 			Name = "Bar",
 			InitCommand = function(self)
-				self:xy(48, 2):halign(0):valign(0):zoomto(0, 12):diffuse(getMainColor("positive")):diffusealpha(0.6)
+				self:xy(48, 2):halign(0):valign(0):zoomto(0, 12):diffuse(getMainColor("highlight")):diffusealpha(0.6)
 			end
 		},
 		LoadFont("Common Normal") .. {
@@ -2596,7 +2814,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Large") .. {
 		Name = "Title",
 		InitCommand = function(self)
-			self:xy(16, 28):zoom(0.44):halign(0):valign(0.5):diffuse(getMainColor("positive"))
+			self:xy(16, 28):zoom(0.44):halign(0):valign(0.5):diffuse(getMainColor("highlight"))
 		end
 	},
 	statsOverlayTabButton(statsOverlayTabButtons[1]),
@@ -2888,7 +3106,7 @@ local statsOverlay = Def.ActorFrame {
 		LoadFont("Common Large") .. {
 			Name = "OverallRating",
 			InitCommand = function(self)
-				self:xy(16, 164):halign(0):valign(0.5):zoom(0.8):diffuse(getMainColor("positive"))
+				self:xy(16, 164):halign(0):valign(0.5):zoom(0.8):diffuse(getMainColor("highlight"))
 			end
 		},
 		LoadFont("Common Normal") .. {
@@ -3073,7 +3291,7 @@ for i = 1, activityCellCount do
 			if day == selectedDay then
 				border:visible(true):diffuse(getMainColor("highlight")):diffusealpha(0.9)
 			elseif day == hoveredActivityDay then
-				border:visible(true):diffuse(getMainColor("positive")):diffusealpha(0.55)
+				border:visible(true):diffuse(getMainColor("highlight")):diffusealpha(0.55)
 			else
 				border:visible(false)
 			end
@@ -3114,9 +3332,12 @@ end
 -- 	statsOverlay[#statsOverlay + 1] = overallOverviewRow(i)
 -- end
 
-for i = 1, timelineYAxisTickCount do
+for i = 1, math.max(timelineYAxisTickCount, 11) do
 	statsOverlay[#statsOverlay + 1] = overallTimelineHorizontalGridline(i)
 	statsOverlay[#statsOverlay + 1] = overallTimelineYAxisLabel(i)
+end
+
+for i = 1, timelineYAxisTickCount do
 	statsOverlay[#statsOverlay + 1] = overallTimelineVerticalGridline(i)
 end
 
@@ -3138,9 +3359,15 @@ for i = 1, 240 do
 	statsOverlay[#statsOverlay + 1] = overallMsdGradePoint(i)
 end
 
-for i = 1, 4 do
+for i = 1, 12 do
 	statsOverlay[#statsOverlay + 1] = overallMsdGradeLabel(i)
 end
+
+for i = 1, 5 do
+	statsOverlay[#statsOverlay + 1] = overallMsdGradeXAxisLabel(i)
+end
+
+statsOverlay[#statsOverlay + 1] = overallMsdGradeTooltip()
 
 for i = 1, 12 do
 	statsOverlay[#statsOverlay + 1] = breakdownJudgeBar(i)
