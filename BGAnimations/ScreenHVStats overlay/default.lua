@@ -82,6 +82,7 @@ sessionScoreOffset = 0
 overallBestScoreOffset = 0
 overallTimelineHoveredIndex = nil
 overallTimelineMaxValue = 1
+overallTimelineMinValue = 0
 overallLocalScoreEntries = nil
 overallDerivedDataDirty = true
 lastSessionDisplayKey = nil
@@ -109,16 +110,16 @@ overviewRowCount = 10
 timelineGraphLeft = 280 + 40
 timelineGraphTop = 56 + 40
 timelineGraphWidth = SCREEN_WIDTH - 280 - 80
-timelineGraphHeight = 300
+timelineGraphHeight = 240
 timelineYAxisTickCount = 5
 timelineXAxisTickCount = 3
 timelineSkillsetColors = {
-	["Overall"] = HVColor.GetMSDRatingColor(30),
+	["Overall"] = HVColor.GetMSDRatingColor(20),
 	["Stream"] = HVColor.GetMSDRatingColor(28),
 	["Jumpstream"] = HVColor.GetMSDRatingColor(26),
 	["Handstream"] = HVColor.GetMSDRatingColor(24),
 	["Stamina"] = HVColor.GetMSDRatingColor(22),
-	["Jackspeed"] = HVColor.GetMSDRatingColor(20),
+	["Jackspeed"] = color("#FFFFFF"),
 	["Chordjack"] = HVColor.GetMSDRatingColor(18),
 	["Technical"] = HVColor.GetMSDRatingColor(16)
 }
@@ -271,9 +272,13 @@ function setOverallSubviewTab(tab)
 	overallSubviewTab = tab
 	if tab == overallSubviewTabs.WifeTimeline then
 		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
+		overallTimelineMinValue = 0
 		overallTimelineMaxValue = 100
 	elseif tab == overallSubviewTabs.Rating then
 		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+		local minRating, maxRating = getProfileRatingMinMax()
+		overallTimelineMinValue = minRating
+		overallTimelineMaxValue = maxRating
 	end
 	MESSAGEMAN:Broadcast("StatsOverlayOverallSubviewChanged", {tab = tab})
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
@@ -309,10 +314,12 @@ function fitOverallTimelineX(index)
 end
 
 function fitOverallTimelineY(value)
-	if overallTimelineMaxValue <= 0 then
+	local range = overallTimelineMaxValue - overallTimelineMinValue
+	if range <= 0 then
 		return timelineGraphHeight
 	end
-	return timelineGraphHeight - ((value / overallTimelineMaxValue) * timelineGraphHeight)
+	local normalized = (value - overallTimelineMinValue) / range
+	return timelineGraphHeight - (normalized * timelineGraphHeight)
 end
 
 function getOverallTimelineGridFraction(index, count)
@@ -330,7 +337,12 @@ end
 
 function getOverallTimelineYAxisLabel(index)
 	local fraction = getOverallTimelineGridFraction(index, timelineYAxisTickCount)
-	return string.format("%.1f", overallTimelineMaxValue * (1 - fraction))
+	local range = overallTimelineMaxValue - overallTimelineMinValue
+	if range <= 0 then
+		return string.format("%.1f", overallTimelineMaxValue)
+	end
+	local value = overallTimelineMinValue + (range * (1 - fraction))
+	return string.format("%.1f", value)
 end
 
 function getOverallTimelineXAxisDisplay(index)
@@ -373,6 +385,26 @@ function getOverallProfileSummary()
 		end
 	end
 	return summary
+end
+
+function getProfileRatingMinMax()
+	local profile = GetPlayerOrMachineProfile(PLAYER_1)
+	if not profile then return 0, 30 end
+	local minRating = math.huge
+	local maxRating = 0
+	for i = 1, math.min(#ms.SkillSets, 8) do
+		local skillset = ms.SkillSets[i]
+		if skillset then
+			local rating = profile:GetPlayerSkillsetRating(skillset) or 0
+			if rating < minRating then minRating = rating end
+			if rating > maxRating then maxRating = rating end
+		end
+	end
+	if minRating == math.huge then minRating = 0 end
+	if maxRating == 0 then maxRating = 30 end
+	local padding = (maxRating - minRating) * 0.1
+	if padding == 0 then padding = 5 end
+	return math.max(0, minRating - padding), maxRating + padding
 end
 
 function isScoreValidForOverallDerivedData(score)
@@ -840,11 +872,22 @@ function refreshOverallDerivedData()
 	if not overallDerivedDataDirty and overallLocalScoreEntries then return end
 	overallLocalScoreEntries = collectOverallLocalScoreEntries()
 	overallOverviewRowsForDisplay = buildOverallOverviewRows(overallLocalScoreEntries)
-	overallRatingTimelineDaysForDisplay, overallTimelineMaxValue = buildOverallTimelineData(overallLocalScoreEntries)
+	local ratingMaxValue
+	overallRatingTimelineDaysForDisplay, ratingMaxValue = buildOverallTimelineData(overallLocalScoreEntries)
 	overallWifeTimelineDaysForDisplay = buildOverallWifeTimelineData(overallLocalScoreEntries)
 	overallMsdGradePointsForDisplay = buildOverallMsdGradePoints(overallLocalScoreEntries)
 	overallMostPlayedChartsForDisplay, overallMostPlayedFoldersForDisplay = buildOverallMostPlayed(overallLocalScoreEntries)
 	overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+	if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+		overallTimelineMinValue = 0
+		overallTimelineMaxValue = 100
+		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
+	elseif overallSubviewTab == overallSubviewTabs.Rating then
+		local minRating, maxRating = getProfileRatingMinMax()
+		overallTimelineMinValue = minRating
+		overallTimelineMaxValue = maxRating
+		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+	end
 	overallDerivedDataDirty = false
 end
 
@@ -1852,16 +1895,49 @@ function overallTimelineLine(i)
 		end,
 		SetCommand = function(self)
 			local active = isStatsOverlayOverallTimelineSubview()
-			local skillset = ms.SkillSets[i]
-			if not active or not skillset or #overallTimelineDaysForDisplay == 0 then
+			if not active or #overallTimelineDaysForDisplay == 0 then
 				self:visible(false)
 				self:SetVertices({})
 				self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
 				return
 			end
+			local key, lineColor
+			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+				if i == 1 then
+					key = "Overall"
+					lineColor = HVColor.GetMSDRatingColor(20)
+				elseif i == 2 then
+					key = "Average"
+					lineColor = color("#B8B8B8")
+				else
+					self:visible(false)
+					self:SetVertices({})
+					self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+					return
+				end
+			else
+				local skillset = ms.SkillSets[i]
+				if not skillset then
+					self:visible(false)
+					self:SetVertices({})
+					self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+					return
+				end
+				key = skillset
+				if skillset == "Jackspeed" then
+					lineColor = color("#FFFFFF")
+				else
+					lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
+				end
+			end
 			local verts = {}
 			for index, day in ipairs(overallTimelineDaysForDisplay) do
-				verts[#verts + 1] = {{timelineGraphLeft + fitOverallTimelineX(index), timelineGraphTop + fitOverallTimelineY(day.values[skillset] or 0), 0}, timelineSkillsetColors[i] or color("#FFFFFF")}
+				local x = timelineGraphLeft + fitOverallTimelineX(index)
+				local y = timelineGraphTop + fitOverallTimelineY(day.values[key] or 0)
+				-- Clamp y to graph bounds
+				if y < timelineGraphTop then y = timelineGraphTop end
+				if y > timelineGraphTop + timelineGraphHeight then y = timelineGraphTop + timelineGraphHeight end
+				verts[#verts + 1] = {{x, y, 0}, lineColor}
 			end
 			self:visible(#verts > 1)
 			self:SetVertices(verts)
@@ -1886,15 +1962,43 @@ function overallTimelineDot(i)
 			self:halign(0.5):valign(0.5):zoomto(5, 5):visible(false)
 		end,
 		SetCommand = function(self)
-			local skillset = ms.SkillSets[i]
 			local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
-			if not isStatsOverlayOverallTimelineSubview() or not skillset or not day then
+			if not isStatsOverlayOverallTimelineSubview() or not day then
 				self:visible(false)
 				return
 			end
+			local key, lineColor
+			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+				if i == 1 then
+					key = "Overall"
+					lineColor = HVColor.GetMSDRatingColor(20)
+				elseif i == 2 then
+					key = "Average"
+					lineColor = color("#B8B8B8")
+				else
+					self:visible(false)
+					return
+				end
+			else
+				local skillset = ms.SkillSets[i]
+				if not skillset then
+					self:visible(false)
+					return
+				end
+				key = skillset
+				if skillset == "Jackspeed" then
+					lineColor = color("#FFFFFF")
+				else
+					lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
+				end
+			end
+			local x = timelineGraphLeft + fitOverallTimelineX(overallTimelineHoveredIndex)
+			local y = timelineGraphTop + fitOverallTimelineY(day.values[key] or 0)
+			if y < timelineGraphTop then y = timelineGraphTop end
+			if y > timelineGraphTop + timelineGraphHeight then y = timelineGraphTop + timelineGraphHeight end
 			self:visible(true)
-			self:xy(timelineGraphLeft + fitOverallTimelineX(overallTimelineHoveredIndex), timelineGraphTop + fitOverallTimelineY(day.values[skillset] or 0))
-			self:diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
+			self:xy(x, y)
+			self:diffuse(lineColor)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -1918,17 +2022,40 @@ function overallTimelineLegend(i)
 			self:visible(false)
 		end,
 		SetCommand = function(self)
-			local skillset = ms.SkillSets[i]
 			local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
-			if not isStatsOverlayOverallTimelineSubview() or not skillset or not day then
+			if not isStatsOverlayOverallTimelineSubview() or not day then
 				self:visible(false)
 				return
 			end
+			local label, value, lineColor
+			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+				if i == 1 then
+					label = "Overall"
+					value = day.values.Overall or 0
+					lineColor = HVColor.GetMSDRatingColor(20)
+				elseif i == 2 then
+					label = "Average"
+					value = day.values.Average or 0
+					lineColor = color("#B8B8B8")
+				else
+					self:visible(false)
+					return
+				end
+			else
+				local skillset = ms.SkillSets[i]
+				if not skillset then
+					self:visible(false)
+					return
+				end
+				label = skillset
+				value = day.values[skillset] or 0
+				lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
+			end
 			self:visible(true)
-			self:GetChild("Swatch"):diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
-			self:GetChild("Label"):settext(skillset)
-			self:GetChild("Value"):settext(string.format("%.2f", day.values[skillset] or 0))
-			self:GetChild("Value"):diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
+			self:GetChild("Swatch"):diffuse(lineColor)
+			self:GetChild("Label"):settext(label)
+			self:GetChild("Value"):settext(string.format("%.2f", value))
+			self:GetChild("Value"):diffuse(lineColor)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -1948,13 +2075,13 @@ function overallTimelineLegend(i)
 		LoadFont("Common Normal") .. {
 			Name = "Label",
 			InitCommand = function(self)
-				self:xy(16, 0):halign(0):valign(0):zoom(0.22):maxwidth(240)
+				self:xy(16, 0):halign(0):valign(0):zoom(0.30):maxwidth(240)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Value",
 			InitCommand = function(self)
-				self:xy(148, 0):halign(1):valign(0):zoom(0.22)
+				self:xy(148, 0):halign(1):valign(0):zoom(0.30)
 			end
 		}
 	}
@@ -2012,14 +2139,18 @@ function overallTimelineYAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineYAxisLabel" .. i,
 		InitCommand = function(self)
-			self:halign(1):valign(0.5):zoom(0.16):diffuse(color("#9A9A9A")):visible(false)
+			self:halign(1):valign(0.5):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
 			self:visible(active)
 			if not active then return end
 			self:xy(timelineGraphLeft - 6, getOverallTimelineGridY(i, timelineYAxisTickCount))
-			self:settext(getOverallTimelineYAxisLabel(i))
+			local label = getOverallTimelineYAxisLabel(i)
+			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+				label = string.format("%.0f%%", label)
+			end
+			self:settext(label)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -2037,7 +2168,7 @@ function overallTimelineXAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineXAxisLabel" .. i,
 		InitCommand = function(self)
-			self:valign(0):zoom(0.16):diffuse(color("#9A9A9A")):visible(false)
+			self:valign(0):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local x, day, fraction = getOverallTimelineXAxisDisplay(i)
@@ -2053,6 +2184,42 @@ function overallTimelineXAxisLabel(i)
 			end
 			self:xy(x, timelineGraphTop + timelineGraphHeight + 12)
 			self:settext(day.label or os.date("%d %b %y", day.timestamp or os.time()))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function overallMsdGradeLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "OverallMsdGradeLabel" .. i,
+		InitCommand = function(self)
+			self:halign(1):valign(0.5):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
+			self:visible(active)
+			if not active then return end
+			local labels = {"AAAA+", "AAAA", "AAA", "AA"}
+			local yPositions = {
+				timelineGraphTop + (timelineGraphHeight / 8), -- AAAA+ section top
+				timelineGraphTop + (3 * timelineGraphHeight / 8), -- AAAA section middle
+				timelineGraphTop + (5 * timelineGraphHeight / 8), -- AAA section middle
+				timelineGraphTop + (7 * timelineGraphHeight / 8) -- AA section bottom
+			}
+			if i <= 4 then
+				self:xy(timelineGraphLeft - 6, yPositions[i])
+				self:settext(labels[i])
+			else
+				self:visible(false)
+			end
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -2082,8 +2249,31 @@ local maxX = 1
 for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
 if (candidate.x or 0) > maxX then maxX = candidate.x end
 end
+-- Map actual grade thresholds to 4 equal height sections
+-- Section 1 (bottom 1/4): 80% -> 93% (AA threshold)
+-- Section 2 (second 1/4): 93% -> 99.7% (AAA threshold)
+-- Section 3 (third 1/4): 99.7% -> 99.955% (AAAA threshold)
+-- Section 4 (top 1/4): 99.955% -> 100%
+local percent = point.y or 0
+local yPosition
+if percent < 93 then
+-- Below AA: maps to bottom 1/4 (80-93%)
+yPosition = timelineGraphTop + timelineGraphHeight - ((percent - 80) / 13) * (timelineGraphHeight / 4)
+elseif percent < 99.7 then
+-- AA to AAA: maps to second 1/4 (93-99.7%)
+yPosition = timelineGraphTop + (3 * timelineGraphHeight / 4) - ((percent - 93) / 6.7) * (timelineGraphHeight / 4)
+elseif percent < 99.955 then
+-- AAA to AAAA: maps to third 1/4 (99.7-99.955%)
+yPosition = timelineGraphTop + (2 * timelineGraphHeight / 4) - ((percent - 99.7) / 0.255) * (timelineGraphHeight / 4)
+else
+-- AAAA and above: maps to top 1/4 (99.955-100%)
+local cappedPercent = math.min(percent, 100)
+yPosition = timelineGraphTop + (timelineGraphHeight / 4) - ((cappedPercent - 99.955) / 0.045) * (timelineGraphHeight / 4)
+end
+-- Clamp to graph bounds
+yPosition = math.max(timelineGraphTop, math.min(timelineGraphTop + timelineGraphHeight, yPosition))
 self:visible(true)
-self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), timelineGraphTop + timelineGraphHeight - (((point.y or 0) / 100) * timelineGraphHeight))
+self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), yPosition)
 self:diffuse(point.color or color("#FFFFFF"))
 end,
 StatsOverlayTabChangedMessageCommand = function(self)
@@ -2310,8 +2500,12 @@ local statsOverlay = Def.ActorFrame {
 			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
 				overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
 				overallTimelineMaxValue = 100
+				overallTimelineMinValue = 0
 			elseif overallSubviewTab == overallSubviewTabs.Rating then
 				overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+				local minRating, maxRating = getProfileRatingMinMax()
+				overallTimelineMinValue = minRating
+				overallTimelineMaxValue = maxRating
 			end
 			overallBestScoresForDisplay = getOverallBestScores()
 			local rightPaneOverall = self:GetChild("RightPaneOverall")
@@ -2902,7 +3096,7 @@ for i = 1, activityCellCount do
 		LoadFont("Common Normal") .. {
 			Name = "Day",
 			InitCommand = function(self)
-				self:xy(2 + (activityCellSize / 2), 2 + (activityCellSize / 2)):halign(0.5):valign(0.5):zoom(0.23):diffuse(color("#B8B8B8"))
+				self:xy(2 + (activityCellSize / 2), 2 + (activityCellSize / 2)):halign(0.5):valign(0.5):zoom(0.32):diffuse(color("#B8B8B8"))
 			end
 		}
 	}
@@ -2942,6 +3136,10 @@ end
 
 for i = 1, 240 do
 	statsOverlay[#statsOverlay + 1] = overallMsdGradePoint(i)
+end
+
+for i = 1, 4 do
+	statsOverlay[#statsOverlay + 1] = overallMsdGradeLabel(i)
 end
 
 for i = 1, 12 do
