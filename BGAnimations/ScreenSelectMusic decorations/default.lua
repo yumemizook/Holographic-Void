@@ -1480,6 +1480,8 @@ t[#t + 1] = Def.ActorFrame {
 						local pct = getRescoredWife3Judge(3, 4, rst) or 0
 						if pct <= 0 then
 							ct = "Failed"
+						elseif pct < 83 then
+							ct = "SoftInvalid"
 						else
 							local cb = miss + w5 + w4
 							if cb > 0 then
@@ -1699,23 +1701,11 @@ t[#t + 1] = Def.ActorFrame {
 			self:halign(0):valign(0):x(56):y(-4):zoom(0.40):diffuse(mainText)
 		end,
 		SetCommand = function(self)
-			local profile = PROFILEMAN:GetProfile(PLAYER_1)
-			if profile then
-				local name = profile:GetDisplayName()
-				if name == "" then name = "Player" end
-				if DLMAN:IsLoggedIn() then
-					local onlineName = DLMAN:GetUsername()
-					if onlineName ~= "" then name = onlineName end
-				end
-				self:settext(name)
-			else
-				self:settext("No Profile"):diffuse(dimText)
-			end
+			self:settext(HV.GetPlayerName())
 		end,
 		LoginMessageCommand = function(self) self:playcommand("Set") end,
 		LogOutMessageCommand = function(self) self:playcommand("Set") end,
 		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
-		CurrentSongChangedMessageCommand = function(self) self:playcommand("Set") end,
 		OnCommand = function(self) self:playcommand("Set") end
 	},
 

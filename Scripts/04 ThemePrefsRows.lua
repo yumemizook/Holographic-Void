@@ -428,6 +428,12 @@ local HVPrefRows = {
 		Choices = (function() local c = {}; for i=0, 99 do c[#c+1]=tostring(i) end return c end)(),
 		Values = (function() local v = {}; for i=0, 99 do v[#v+1]=i end return v end)(),
 	},
+	-- Emulate Ridiculous Judgement
+	HV_EmulateRidiculous = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -481,7 +487,7 @@ function HVThemeOptionsLines()
 		"HV_ShowMSD", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
 		
 		-- Gameplay HUD
-		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_DisplayLowerJudgementOffset", "HV_OffsetDisplayJudgement", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
+		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_EmulateRidiculous", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_DisplayLowerJudgementOffset", "HV_OffsetDisplayJudgement", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
 			"HV_ShowJudgeCounter", "HV_JudgeCounterMode", "HV_ShowNGIndicator",
 		"HV_ShowPlayerInfo", "HV_ProgressBarPosition", "HV_ShowInGameLeaderboard",
 		
@@ -676,6 +682,10 @@ function OptionRowShowJudgment()
 		end
 	end
 	return row
+end
+
+function OptionRowEmulateRidiculous()
+	return HVThemePrefRow("HV_EmulateRidiculous", "Emulate Ridiculous")
 end
 
 function OptionRowShowCombo()

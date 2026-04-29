@@ -28,7 +28,7 @@ local playerData = {}
 for i, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
 	playerData[pn] = {
 		index = i,
-		name = PROFILEMAN:GetPlayerName(pn),
+		name = HV.GetPlayerName(pn),
 		score = 0,
 		accuracy = 0,
 		combo = 0,

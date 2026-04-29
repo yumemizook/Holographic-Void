@@ -1,5 +1,9 @@
 hoverAlpha = 0.6
 statsOverlayActive = false
+
+firstPlayedYear = 2010
+firstPlayedMonth = 1
+
 statsOverlayInputRedirect = false
 settingsOverlayActive = false
 settingsOverlayInputRedirect = false
@@ -28,31 +32,31 @@ musicWheelSettingsButtonHeight = 24
 quickMenuItemWidth = 262 - 36
 quickMenuItemHeight = 38
 quickMenuItemGap = 14
-sessionRowCount = 7
-overallBestScoreRowCount = 8
-leaderboardRowCount = 8
-sessionPanelX = 342
-sessionPanelY = 86
-sessionPanelWidth = SCREEN_WIDTH - 342 - 24
-sessionPanelHeight = SCREEN_HEIGHT - 86 - 28
-sessionCardWidth = SCREEN_WIDTH - 342 - 24 - 24
-overlayCloseButtonX = SCREEN_WIDTH - 38
-overlayCloseButtonY = 61
+sessionRowCount = 12
+overallBestScoreRowCount = 16
+leaderboardRowCount = 16
+sessionPanelX = 280
+sessionPanelY = 56
+sessionPanelWidth = SCREEN_WIDTH - 280
+sessionPanelHeight = SCREEN_HEIGHT - 56
+sessionCardWidth = SCREEN_WIDTH - 280 - 32
+overlayCloseButtonX = SCREEN_WIDTH - 24
+overlayCloseButtonY = 28
 overlayCloseButtonHalfWidth = 14
-overlayCloseButtonHalfHeight = 12
+overlayCloseButtonHalfHeight = 14
 activityColumnCount = 7
-activityCellCount = 35
-activityCellSize = 18
-activityCellStepX = 26
-activityCellStepY = 24
-activityGridX = 102
-activityGridY = 160
-activityPrevButtonX = 104
-activityPrevButtonY = 133
-activityNextButtonX = 286
-activityNextButtonY = 133
-activityButtonWidth = 16
-activityButtonHeight = 16
+activityCellCount = 42
+activityCellSize = 20
+activityCellStepX = 28
+activityCellStepY = 26
+activityGridX = 32
+activityGridY = 210
+activityPrevButtonX = 34
+activityPrevButtonY = 188
+activityNextButtonX = 214
+activityNextButtonY = 188
+activityButtonWidth = 20
+activityButtonHeight = 20
 selectedYear = tonumber(os.date("%Y"))
 selectedMonth = tonumber(os.date("%m"))
 selectedDay = tonumber(os.date("%d"))
@@ -94,18 +98,18 @@ overallSubviewTabs = {
 }
 statsOverlayTab = statsOverlayTabs.Sessions
 overallSubviewTab = overallSubviewTabs.WifeTimeline
-statsOverlayTabTop = 44
-statsOverlayTabHeight = 34
+statsOverlayTabTop = 0
+statsOverlayTabHeight = 56
 statsOverlayTabButtons = {
-	{tab = statsOverlayTabs.Sessions, left = 80, width = 70, label = "Sessions"},
-	{tab = statsOverlayTabs.Overall, left = 150, width = 60, label = "Overall"},
-	{tab = statsOverlayTabs.Leaderboards, left = 210, width = 90, label = "Leaderboards"}
+	{tab = statsOverlayTabs.Sessions, left = 280, width = 140, label = "SESSIONS"},
+	{tab = statsOverlayTabs.Overall, left = 420, width = 140, label = "GRAPHS"},
+	{tab = statsOverlayTabs.Leaderboards, left = 560, width = 160, label = "BREAKDOWN"}
 }
-overviewRowCount = 6
-timelineGraphLeft = 342 + 18
-timelineGraphTop = 86 + 84
-timelineGraphWidth = SCREEN_WIDTH - 342 - 24 - 36
-timelineGraphHeight = 126
+overviewRowCount = 10
+timelineGraphLeft = 280 + 40
+timelineGraphTop = 56 + 40
+timelineGraphWidth = SCREEN_WIDTH - 280 - 80
+timelineGraphHeight = 300
 timelineYAxisTickCount = 5
 timelineXAxisTickCount = 3
 timelineSkillsetColors = {
@@ -119,10 +123,10 @@ timelineSkillsetColors = {
 	["Technical"] = HVColor.GetMSDRatingColor(16)
 }
 overallSubviewButtons = {
-	{tab = overallSubviewTabs.WifeTimeline, left = 102, top = 150, width = 180, label = "Wife% over time"},
-	{tab = overallSubviewTabs.Rating, left = 102, top = 184, width = 180, label = "Rating"},
-	{tab = overallSubviewTabs.MsdGrade, left = 102, top = 218, width = 180, label = "MSD/Grade distribution"},
-	{tab = overallSubviewTabs.MostPlayed, left = 102, top = 252, width = 180, label = "Most played charts/folders"}
+	{tab = overallSubviewTabs.WifeTimeline, left = 16, top = SCREEN_CENTER_Y + 10, width = 240, label = "Wife% over time"},
+	{tab = overallSubviewTabs.Rating, left = 16, top = SCREEN_CENTER_Y + 38, width = 240, label = "Rating"},
+	{tab = overallSubviewTabs.MsdGrade, left = 16, top = SCREEN_CENTER_Y + 66, width = 240, label = "MSD/Grade distribution"},
+	{tab = overallSubviewTabs.MostPlayed, left = 16, top = SCREEN_CENTER_Y + 94, width = 240, label = "Most played charts/folders"}
 }
 musicWheelDisplayOptions = {
 	{key = "OnlyShowGrades", label = "Only show grades:"},
@@ -352,7 +356,7 @@ function getOverallProfileSummary()
 	local profile = GetPlayerOrMachineProfile(PLAYER_1)
 	if not profile then return nil end
 	local summary = {
-		name = profile:GetDisplayName() or "Player",
+		name = HV.GetPlayerName(),
 		rating = profile:GetPlayerRating() or 0,
 		playTimeSeconds = profile:GetTotalSessionSeconds() or 0,
 		songsPlayed = SCOREMAN:GetTotalNumberOfScores() or 0,
@@ -987,10 +991,39 @@ function daysInMonth(year, month)
 end
 
 function shiftSelectedMonth(offset)
+	local nextMonth = selectedMonth + offset
+	local nextYear = selectedYear
+	while nextMonth < 1 do nextMonth = nextMonth + 12 nextYear = nextYear - 1 end
+	while nextMonth > 12 do nextMonth = nextMonth - 12 nextYear = nextYear + 1 end
+	
+	local firstTime = os.time({year = firstPlayedYear, month = firstPlayedMonth, day = 1, hour = 0, min = 0, sec = 0})
+	local currentTime = os.time({year = tonumber(os.date("%Y")), month = tonumber(os.date("%m")), day = 1, hour = 0, min = 0, sec = 0})
+	local targetTime = os.time({year = nextYear, month = nextMonth, day = 1, hour = 0, min = 0, sec = 0})
+	
+	if targetTime < firstTime or targetTime > currentTime then
+		return
+	end
+
 	local shifted = os.time({year = selectedYear, month = selectedMonth + offset, day = 1, hour = 0, min = 0, sec = 0})
 	selectedYear = tonumber(os.date("%Y", shifted))
 	selectedMonth = tonumber(os.date("%m", shifted))
 	selectedDay = math.min(selectedDay, daysInMonth(selectedYear, selectedMonth))
+end
+
+function shiftSelectedDay(offset)
+	local t = os.time({year = selectedYear, month = selectedMonth, day = selectedDay, hour = 0, min = 0, sec = 0})
+	local shifted = t + (offset * 24 * 3600)
+	
+	local firstTime = os.time({year = firstPlayedYear, month = firstPlayedMonth, day = 1, hour = 0, min = 0, sec = 0})
+	local currentTime = os.time({year = tonumber(os.date("%Y")), month = tonumber(os.date("%m")), day = 31, hour = 23, min = 59, sec = 59})
+	
+	if shifted < firstTime or shifted > os.time() then
+		return
+	end
+	
+	selectedYear = tonumber(os.date("%Y", shifted))
+	selectedMonth = tonumber(os.date("%m", shifted))
+	selectedDay = tonumber(os.date("%d", shifted))
 end
 
 parseScoreTime = function(score)
@@ -1113,9 +1146,17 @@ formatChartMeter = function(steps)
 	return table.concat(parts, " ")
 end
 
+function getMonthStartWeekday(year, month)
+	local t = os.time({year = year, month = month, day = 1, hour = 0, min = 0, sec = 0})
+	local wday = tonumber(os.date("%w", t)) -- 0=Sunday, 1=Monday...
+	if wday == 0 then wday = 7 end
+	return wday -- 1=Monday, 7=Sunday
+end
+
 function getActivityDayAtPosition(mouseX, mouseY)
+	local offset = getMonthStartWeekday(selectedYear, selectedMonth) - 1
 	for day = 1, activityMonthDayCount do
-		local index = day - 1
+		local index = day - 1 + offset
 		local col = index % activityColumnCount
 		local row = math.floor(index / activityColumnCount)
 		local cellX = activityGridX + (col * activityCellStepX)
@@ -1206,6 +1247,19 @@ function setStatsOverlayActive(active)
 		if settingsOverlayActive then
 			setSettingsOverlayActive(false)
 		end
+
+		local profile = PROFILEMAN:GetProfile(PLAYER_1)
+		if profile and profile.GetFirstPlayedDate then
+			local firstDate = profile:GetFirstPlayedDate()
+			if firstDate and firstDate ~= "" then
+				firstPlayedYear = tonumber(firstDate:sub(1, 4))
+				firstPlayedMonth = tonumber(firstDate:sub(6, 7))
+			end
+		else
+			firstPlayedYear = 2017
+			firstPlayedMonth = 1
+		end
+
 		selectedYear, selectedMonth, selectedDay = getTodayDateParts()
 		hoveredActivityDay = nil
 		sessionScoreOffset = 0
@@ -1366,6 +1420,14 @@ function input(event)
 		elseif deviceButton == "DeviceButton_mousewheel down" then
 			MESSAGEMAN:Broadcast("StatsOverlayMouseWheel", {direction = "down"})
 			return true
+		elseif event.button == "MenuLeft" or event.button == "MenuRight" then
+			if isStatsOverlaySessionTab() then
+				shiftSelectedDay(event.button == "MenuLeft" and -1 or 1)
+				sessionScoreOffset = 0
+				lastSessionDisplayKey = nil
+				MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+				return true
+			end
 		end
 	end
 	if statsOverlayActive and deviceButton == "DeviceButton_left mouse button" then
@@ -1437,7 +1499,7 @@ function sessionRow(i)
 	return Def.ActorFrame {
 		Name = "Row" .. i,
 		InitCommand = function(self)
-			self:xy(sessionPanelX + 12, sessionPanelY + 44 + ((i - 1) * 50))
+			self:xy(sessionPanelX + 16, sessionPanelY + 64 + ((i - 1) * 54))
 			self:visible(false)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
@@ -1481,53 +1543,53 @@ function sessionRow(i)
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:xy(0, 0):halign(0):valign(0):zoomto(sessionCardWidth, 34):diffuse(color("#111111")):diffusealpha(0.8)
+				self:xy(-8, 0):halign(0):valign(0):zoomto(sessionCardWidth + 16, 42):diffuse(color("#000000")):diffusealpha(0.3)
 			end
 		},
 		LoadFont("Common Large") .. {
 			Name = "Title",
 			InitCommand = function(self)
-				self:xy(8, 2):halign(0):valign(0):zoom(0.23):maxwidth(760)
+				self:xy(0, 4):halign(0):valign(0):zoom(0.38):maxwidth(1200)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Meta",
 			InitCommand = function(self)
-				self:xy(8, 13):halign(0):valign(0):zoom(0.16):diffuse(color("#BBBBBB")):maxwidth(760)
+				self:xy(0, 22):halign(0):valign(0):zoom(0.28):diffuse(color("#888888")):maxwidth(1200)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Chart",
 			InitCommand = function(self)
-				self:xy(8, 23):halign(0):valign(0):zoom(0.16):diffuse(color("#D6D6D6")):maxwidth(760)
+				self:xy(0, 36):halign(0):valign(0):zoom(0.24):diffuse(color("#666666")):maxwidth(1200)
 			end
 		},
 		LoadFont("Common Large") .. {
 			Name = "Percent",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 242 + 107, 4):halign(1):valign(0):zoom(0.21)
-			end
-		},
-		LoadFont("Common Large") .. {
-			Name = "ClearType",
-			InitCommand = function(self)
-				self:xy(sessionCardWidth - 186 +107	, 4):halign(0.5):valign(0):zoom(0.21)
-			end
-		},
-		LoadFont("Common Large") .. {
-			Name = "SSR",
-			InitCommand = function(self)
-				self:xy(sessionCardWidth - 116 + 107, 4):halign(1):valign(0):zoom(0.21)
+				self:xy(sessionCardWidth, 4):halign(1):valign(0):zoom(0.38)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Rate",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 242 +107, 20):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD"))
+				self:xy(sessionCardWidth, 26):halign(1):valign(0):zoom(0.3):diffuse(color("#AAAAAA"))
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "ClearType",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 300, 4):halign(1):valign(0):zoom(0.34)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "SSR",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 300, 26):halign(1):valign(0):zoom(0.34)
 			end
 		}
 	}
- end
+end
 
 function statsOverlayTabButton(button)
 	return Def.ActorFrame {
@@ -1558,7 +1620,7 @@ function statsOverlayTabButton(button)
 		Def.Quad {
 			Name = "ActiveLine",
 			InitCommand = function(self)
-				self:xy(0, statsOverlayTabHeight - 1):halign(0):valign(1):zoomto(button.width, 2):diffuse(color("#FFFFFF")):visible(false)
+				self:xy(0, statsOverlayTabHeight - 6):halign(0):valign(1):zoomto(button.width, 2):diffuse(color("#FFFFFF")):visible(false)
 			end
 		}
 	}
@@ -1606,7 +1668,7 @@ function overallSkillsetRow(i)
 	return Def.ActorFrame {
 		Name = "OverallSkillset" .. i,
 		InitCommand = function(self)
-			self:xy(102, 284 + ((i - 1) * 15))
+			self:xy(16, 284 + ((i - 1) * 18))
 		end,
 		SetCommand = function(self)
 			local entry = overallProfileSummary and overallProfileSummary.skillsets and overallProfileSummary.skillsets[i] or nil
@@ -1621,19 +1683,19 @@ function overallSkillsetRow(i)
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(196, 14):diffuse(color("#101010")):diffusealpha(0.8)
+				self:halign(0):valign(0):zoomto(272, 16):diffuse(color("#000000")):diffusealpha(0.4)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Name",
 			InitCommand = function(self)
-				self:xy(4, 7):halign(0):valign(0.5):zoom(0.22):maxwidth(340)
+				self:xy(8, 8):halign(0):valign(0.5):zoom(0.24):maxwidth(400)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Rating",
 			InitCommand = function(self)
-				self:xy(192, 7):halign(1):valign(0.5):zoom(0.22)
+				self:xy(264, 8):halign(1):valign(0.5):zoom(0.24)
 			end
 		}
 	}
@@ -1643,11 +1705,11 @@ function overallBestScoreRow(i)
 	return Def.ActorFrame {
 		Name = "OverallBestScoreRow" .. i,
 		InitCommand = function(self)
-			self:xy(sessionPanelX + 12, sessionPanelY + 78 + ((i - 1) * 34))
+			self:xy(sessionPanelX + 16, sessionPanelY + 80 + ((i - 1) * 38))
 			self:visible(false)
 		end,
 		SetCommand = function(self)
-			local entry = i <= 4 and overallMostPlayedChartsForDisplay[i] or overallMostPlayedFoldersForDisplay[i - 4]
+			local entry = i <= 7 and overallMostPlayedChartsForDisplay[i] or overallMostPlayedFoldersForDisplay[i - 7]
 			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed)
 			self:visible(active and entry ~= nil)
 			if not entry then return end
@@ -1720,12 +1782,12 @@ function overallOverviewRow(i)
 	return Def.ActorFrame {
 		Name = "OverallOverviewRow" .. i,
 		InitCommand = function(self)
-			self:xy(sessionPanelX + 12, sessionPanelY + 96 + ((i - 1) * 26))
+			self:xy(sessionPanelX + 16, sessionPanelY + 96 + ((i - 1) * 32))
 			self:visible(false)
 		end,
 		SetCommand = function(self)
 			local entry = overallOverviewRowsForDisplay[i]
-			local active = false
+			local active = isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline) -- Show on overview subview
 			self:visible(active and entry ~= nil)
 			if not entry then return end
 			self:GetChild("Label"):settext(entry.label)
@@ -1746,37 +1808,37 @@ function overallOverviewRow(i)
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(sessionCardWidth, 20):diffuse(color("#111111")):diffusealpha(0.78)
+				self:halign(0):valign(0):zoomto(sessionCardWidth, 26):diffuse(color("#000000")):diffusealpha(0.3)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Label",
 			InitCommand = function(self)
-				self:xy(6, 6):halign(0):valign(0):zoom(0.18):maxwidth(400)
+				self:xy(12, 13):halign(0):valign(0.5):zoom(0.26):maxwidth(600)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Scores",
 			InitCommand = function(self)
-				self:xy(250, 6):halign(1):valign(0):zoom(0.18)
+				self:xy(350, 13):halign(1):valign(0.5):zoom(0.26)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Charts",
 			InitCommand = function(self)
-				self:xy(308, 6):halign(1):valign(0):zoom(0.18)
+				self:xy(450, 13):halign(1):valign(0.5):zoom(0.26)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Average",
 			InitCommand = function(self)
-				self:xy(366, 6):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD"))
+				self:xy(550, 13):halign(1):valign(0.5):zoom(0.26):diffuse(color("#DDDDDD"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Best",
 			InitCommand = function(self)
-				self:xy(420, 6):halign(1):valign(0):zoom(0.18)
+				self:xy(sessionCardWidth - 12, 13):halign(1):valign(0.5):zoom(0.26)
 			end
 		}
 	}
@@ -2036,62 +2098,62 @@ end
 }
 end
 function breakdownJudgeBar(i)
-return Def.ActorFrame {
-Name = "BreakdownJudgeBar" .. i,
-InitCommand = function(self)
-self:xy(102, 150 + ((i - 1) * 20)):visible(false)
-end,
-SetCommand = function(self)
-local entry = breakdownJudgeRowsForDisplay[i]
-local active = isStatsOverlayLeaderboardsTab() and entry ~= nil
-self:visible(active)
-if not entry then return end
-local maxCount = 1
-for _, row in ipairs(breakdownJudgeRowsForDisplay) do
-if (row.count or 0) > maxCount then maxCount = row.count end
-end
-self:GetChild("Label"):settext(entry.judge)
-self:GetChild("Bar"):zoomto(120 * ((entry.count or 0) / maxCount), 10)
-self:GetChild("Count"):settext(string.format("%d", entry.count or 0))
-self:GetChild("Average"):settext(string.format("%.2f%%", entry.average or 0))
-end,
-StatsOverlayTabChangedMessageCommand = function(self)
-self:playcommand("Set")
-end,
-StatsOverlayDataChangedMessageCommand = function(self)
-self:playcommand("Set")
-end,
-LoadFont("Common Normal") .. {
-Name = "Label",
-InitCommand = function(self)
-self:xy(0, 0):halign(0):zoom(0.2):diffuse(color("#DDDDDD"))
-end
-},
-Def.Quad {
-Name = "Bar",
-InitCommand = function(self)
-self:xy(28, 2):halign(0):valign(0):zoomto(0, 10):diffuse(getMainColor("positive")):diffusealpha(0.72)
-end
-},
-LoadFont("Common Normal") .. {
-Name = "Count",
-InitCommand = function(self)
-self:xy(158, 0):halign(1):zoom(0.19):diffuse(color("#FFFFFF"))
-end
-},
-LoadFont("Common Normal") .. {
-Name = "Average",
-InitCommand = function(self)
-self:xy(210, 0):halign(1):zoom(0.18):diffuse(color("#AFAFAF"))
-end
-}
-}
+	return Def.ActorFrame {
+		Name = "BreakdownJudgeBar" .. i,
+		InitCommand = function(self)
+			self:xy(16, 280 + ((i - 1) * 24)):visible(false)
+		end,
+		SetCommand = function(self)
+			local entry = breakdownJudgeRowsForDisplay[i]
+			local active = isStatsOverlayLeaderboardsTab() and entry ~= nil
+			self:visible(active)
+			if not entry then return end
+			local maxCount = 1
+			for _, row in ipairs(breakdownJudgeRowsForDisplay) do
+				if (row.count or 0) > maxCount then maxCount = row.count end
+			end
+			self:GetChild("Label"):settext(entry.judge)
+			self:GetChild("Bar"):zoomto(180 * ((entry.count or 0) / maxCount), 12)
+			self:GetChild("Count"):settext(string.format("%d", entry.count or 0))
+			self:GetChild("Average"):settext(string.format("%.2f%%", entry.average or 0))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(0, 0):halign(0):zoom(0.24):diffuse(color("#DDDDDD"))
+			end
+		},
+		Def.Quad {
+			Name = "Bar",
+			InitCommand = function(self)
+				self:xy(48, 2):halign(0):valign(0):zoomto(0, 12):diffuse(getMainColor("positive")):diffusealpha(0.6)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Count",
+			InitCommand = function(self)
+				self:xy(240, 0):halign(1):zoom(0.24):diffuse(color("#FFFFFF"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Average",
+			InitCommand = function(self)
+				self:xy(272, 0):halign(1):zoom(0.22):diffuse(color("#AFAFAF"))
+			end
+		}
+	}
 end
 function leaderboardRow(i)
 	return Def.ActorFrame {
 		Name = "LeaderboardRow" .. i,
 		InitCommand = function(self)
-			self:xy(sessionPanelX + 12, sessionPanelY + 88 + ((i - 1) * 34))
+			self:xy(sessionPanelX + 16, sessionPanelY + 80 + ((i - 1) * 38))
 			self:visible(false)
 		end,
 		SetCommand = function(self)
@@ -2113,31 +2175,31 @@ function leaderboardRow(i)
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(sessionCardWidth, 28):diffuse(color("#111111")):diffusealpha(0.82)
+				self:halign(0):valign(0):zoomto(sessionCardWidth, 32):diffuse(color("#000000")):diffusealpha(0.3)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Rank",
 			InitCommand = function(self)
-				self:xy(6, 8):halign(0):valign(0):zoom(0.2):diffuse(color("#BBBBBB"))
+				self:xy(12, 16):halign(0):valign(0.5):zoom(0.28):diffuse(color("#BBBBBB"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Name",
 			InitCommand = function(self)
-				self:xy(40, 8):halign(0):valign(0):zoom(0.2):maxwidth(920)
+				self:xy(60, 16):halign(0):valign(0.5):zoom(0.32):maxwidth(1200)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Metric",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 134, 8):halign(1):valign(0):zoom(0.2)
+				self:xy(sessionCardWidth - 240, 16):halign(1):valign(0.5):zoom(0.32)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Activity",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 8, 8):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD")):maxwidth(460)
+				self:xy(sessionCardWidth - 12, 16):halign(1):valign(0.5):zoom(0.26):diffuse(color("#DDDDDD")):maxwidth(700)
 			end
 		}
 	}
@@ -2259,9 +2321,9 @@ local statsOverlay = Def.ActorFrame {
 			rightPaneOverall:GetChild("OverallTimelineHoverLine"):playcommand("Set")
 			rightPaneOverall:GetChild("OverallTimelineHoverDate"):playcommand("Set")
 			rightPaneOverall:GetChild("OverallTimelineEmpty"):playcommand("Set")
-			for i = 1, overviewRowCount do
-				self:GetChild("OverallOverviewRow" .. i):playcommand("Set")
-			end
+-- for i = 1, overviewRowCount do
+-- 	self:GetChild("OverallOverviewRow" .. i):playcommand("Set")
+-- end
 			for i = 1, getOverallTimelineSkillsetCount() do
 				self:GetChild("OverallTimelineLine" .. i):playcommand("Set")
 				self:GetChild("OverallTimelineDot" .. i):playcommand("Set")
@@ -2316,23 +2378,31 @@ local statsOverlay = Def.ActorFrame {
 	end,
 	UIElements.QuadButton(1, 1) .. {
 		InitCommand = function(self)
-			self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("#000000")):diffusealpha(0.7)
+			self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("#050505")):diffusealpha(0.98)
 		end
 	},
+	-- Sidebar background
 	Def.Quad {
 		InitCommand = function(self)
-			self:xy(20, 44):halign(0):valign(0):zoomto(SCREEN_WIDTH - 40, SCREEN_HEIGHT - 68):diffuse(color("#0E0E0E")):diffusealpha(0.92)
+			self:xy(0, 0):halign(0):valign(0):zoomto(280, SCREEN_HEIGHT):diffuse(color("#0A0A0A")):diffusealpha(1)
 		end
 	},
+	-- Header bar background
 	Def.Quad {
 		InitCommand = function(self)
-			self:xy(20, 44):halign(0):valign(0):zoomto(SCREEN_WIDTH - 40, 34):diffuse(color("#1A1A1A")):diffusealpha(0.95)
+			self:xy(280, 0):halign(0):valign(0):zoomto(SCREEN_WIDTH - 280, 56):diffuse(color("#0E0E0E")):diffusealpha(1)
+		end
+	},
+	-- Sidebar border
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(280, 0):halign(1):valign(0):zoomto(1, SCREEN_HEIGHT):diffuse(color("#1A1A1A")):diffusealpha(1)
 		end
 	},
 	LoadFont("Common Large") .. {
 		Name = "Title",
 		InitCommand = function(self)
-			self:xy(430, 61):zoom(0.56):halign(0):valign(0.5)
+			self:xy(16, 28):zoom(0.44):halign(0):valign(0.5):diffuse(getMainColor("positive"))
 		end
 	},
 	statsOverlayTabButton(statsOverlayTabButtons[1]),
@@ -2340,13 +2410,13 @@ local statsOverlay = Def.ActorFrame {
 	statsOverlayTabButton(statsOverlayTabButtons[3]),
 	UIElements.TextToolTip(1, 1, "Common Large") .. {
 		InitCommand = function(self)
-			self:xy(overlayCloseButtonX, overlayCloseButtonY):zoom(0.38):halign(0.5):valign(0.5):settext("X")
+			self:xy(overlayCloseButtonX, overlayCloseButtonY):zoom(0.42):halign(0.5):valign(0.5):settext("X"):diffuse(color("#666666"))
 		end,
 		MouseOverCommand = function(self)
-			self:diffusealpha(hoverAlpha)
+			self:diffuse(color("#FFFFFF"))
 		end,
 		MouseOutCommand = function(self)
-			self:diffusealpha(1)
+			self:diffuse(color("#666666"))
 		end,
 		MouseDownCommand = function(self, params)
 			if params.event == "DeviceButton_left mouse button" then
@@ -2364,13 +2434,61 @@ local statsOverlay = Def.ActorFrame {
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#151515")):diffusealpha(0.95)
+				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#050505")):diffusealpha(0)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(sessionPanelX + 12, sessionPanelY + 14):halign(0):zoom(0.34):settext("Selected day scores")
+				self:xy(sessionPanelX + 16, sessionPanelY + 28):halign(0):zoom(0.5):settext("SESSION RECENT SCORES"):diffusealpha(0.8)
 			end
+		},
+		-- Day Prev Button
+		Def.ActorFrame {
+			InitCommand = function(self)
+				self:xy(sessionPanelX + sessionPanelWidth - 80, sessionPanelY + 28)
+			end,
+			Def.Quad {
+				InitCommand = function(self)
+					self:zoomto(40, 40):diffusealpha(0)
+				end,
+				MouseDownCommand = function(self, params)
+					if params.event == "DeviceButton_left mouse button" then
+						shiftSelectedDay(-1)
+						sessionScoreOffset = 0
+						lastSessionDisplayKey = nil
+						MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+					end
+				end
+			},
+			LoadFont("Common Large") .. {
+				InitCommand = function(self)
+					self:zoom(0.5):settext("<"):diffusealpha(0.8)
+				end
+			}
+		},
+		-- Day Next Button
+		Def.ActorFrame {
+			InitCommand = function(self)
+				self:xy(sessionPanelX + sessionPanelWidth - 40, sessionPanelY + 28)
+			end,
+			Def.Quad {
+				InitCommand = function(self)
+					self:zoomto(40, 40):diffusealpha(0)
+				end,
+				MouseDownCommand = function(self, params)
+					if params.event == "DeviceButton_left mouse button" then
+						shiftSelectedDay(1)
+						sessionScoreOffset = 0
+						lastSessionDisplayKey = nil
+						MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+					end
+				end
+			},
+			LoadFont("Common Large") .. {
+				InitCommand = function(self)
+					self:zoom(0.5):settext(">"):diffusealpha(0.8)
+				end
+			}
 		}
 	},
 	Def.ActorFrame {
@@ -2384,11 +2502,6 @@ local statsOverlay = Def.ActorFrame {
 		Def.Quad {
 			InitCommand = function(self)
 				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#151515")):diffusealpha(0.95)
-			end
-		},
-		LoadFont("Common Large") .. {
-			InitCommand = function(self)
-				self:xy(sessionPanelX + 16, sessionPanelY + 18):halign(0):zoom(0.34):settext("Summary")
 			end
 		},
 		overallSubviewButton(overallSubviewButtons[1]),
@@ -2490,7 +2603,7 @@ local statsOverlay = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			Name = "OverallTimelineEmpty",
 			InitCommand = function(self)
-				self:xy(sessionPanelX + 16, sessionPanelY + 116):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+				self:xy(sessionPanelX + 16, sessionPanelY + 116):halign(0):zoom(0.34):diffuse(color("#DDDDDD"))
 			end,
 			SetCommand = function(self)
 				self:visible(isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay == 0)
@@ -2567,80 +2680,44 @@ local statsOverlay = Def.ActorFrame {
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlayOverallTab())
 		end,
-		Def.Quad {
-			InitCommand = function(self)
-				self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
-			end
-		},
 		LoadFont("Common Large") .. {
 			InitCommand = function(self)
-				self:xy(102, 114):halign(0):zoom(0.36):settext("Stats views")
+				self:xy(16, 88):halign(0):zoom(0.36):settext("PROFILE SUMMARY"):diffusealpha(0.6)
 			end
 		},
 		LoadFont("Common Large") .. {
 			Name = "OverallName",
 			InitCommand = function(self)
-				self:xy(102, 146):halign(0):zoom(0.3):maxwidth(520):visible(false)
+				self:xy(16, 126):halign(0):zoom(0.42):maxwidth(640)
 			end
 		},
 		LoadFont("Common Large") .. {
 			Name = "OverallRating",
 			InitCommand = function(self)
-				self:xy(102, 174):halign(0):valign(0.5):zoom(0.5):diffuse(getMainColor("positive")):visible(false)
+				self:xy(16, 164):halign(0):valign(0.5):zoom(0.8):diffuse(getMainColor("positive"))
 			end
-		},
-		-- Asset Settings button (same row as rating)
-		Def.ActorFrame {
-			Name = "AssetSettingsButton",
-			InitCommand = function(self)
-				self:xy(225, 174):visible(false)
-			end,
-			UIElements.QuadButton(1, 1) .. {
-				Name = "AssetSettingsBG",
-				InitCommand = function(self)
-					self:halign(0):valign(0.5):zoomto(80, 24)
-					self:diffuse(getMainColor("positive")):diffusealpha(0.18)
-				end,
-				MouseOverCommand = function(self)
-					self:finishtweening():smooth(0.08):diffusealpha(0.38)
-				end,
-				MouseOutCommand = function(self)
-					self:finishtweening():smooth(0.12):diffusealpha(0.18)
-				end,
-				MouseDownCommand = function(self, params)
-					if params.event == "DeviceButton_left mouse button" then
-						SCREENMAN:SetNewScreen("ScreenAssetSettings")
-					end
-				end
-			},
-			LoadFont("Common Normal") .. {
-				InitCommand = function(self)
-					self:xy(40, 0):halign(0.5):valign(0.5):zoom(0.22)
-					self:diffuse(getMainColor("positive")):settext("Asset Settings")
-				end
-			}
 		},
 		LoadFont("Common Normal") .. {
 			Name = "OverallPlayTime",
 			InitCommand = function(self)
-				self:xy(102, 208):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+				self:xy(16, 210):halign(0):zoom(0.32):diffuse(color("#DDDDDD"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "OverallSongsPlayed",
 			InitCommand = function(self)
-				self:xy(102, 226):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+				self:xy(16, 232):halign(0):zoom(0.32):diffuse(color("#DDDDDD"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "OverallNotesHit",
 			InitCommand = function(self)
-				self:xy(102, 244):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+				self:xy(16, 254):halign(0):zoom(0.32):diffuse(color("#DDDDDD"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(102, 268):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):settext("Skillsets"):visible(false)
+				self:xy(16, SCREEN_CENTER_Y - 20):halign(0):zoom(0.32):settext("OVERVIEW MODES"):diffusealpha(0.6)
 			end
 		}
 	},
@@ -2660,46 +2737,38 @@ local statsOverlay = Def.ActorFrame {
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlayLeaderboardsTab())
 		end,
-		Def.Quad {
-			InitCommand = function(self)
-				self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
-			end
-		},
 		LoadFont("Common Large") .. {
 			InitCommand = function(self)
-				self:xy(102, 114):halign(0):zoom(0.36):settext("Leaderboard status")
+				self:xy(16, 88):halign(0):zoom(0.36):settext("LEADERBOARD STATUS"):diffusealpha(0.6)
 			end
 		},
 		LoadFont("Common Large") .. {
 			Name = "LeaderboardUser",
 			InitCommand = function(self)
-				self:xy(102, 148):halign(0):zoom(0.3):maxwidth(520)
+				self:xy(16, 126):halign(0):zoom(0.42):maxwidth(640)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "LeaderboardRating",
 			InitCommand = function(self)
-				self:xy(102, 176):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+				self:xy(16, 164):halign(0):zoom(0.34):diffuse(color("#DDDDDD"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "LeaderboardHint",
 			InitCommand = function(self)
-				self:xy(102, 210):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):maxwidth(700)
+				self:xy(16, 210):halign(0):zoom(0.28):diffuse(color("#AFAFAF")):maxwidth(700)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(16, 254):halign(0):zoom(0.3):settext("JUDGE BREAKDOWN"):diffusealpha(0.6)
 			end
 		}
 	},
-	Def.Quad {
-		InitCommand = function(self)
-			self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
-		end,
-		StatsOverlayTabChangedMessageCommand = function(self)
-			self:visible(isStatsOverlaySessionTab())
-		end
-	},
 	LoadFont("Common Large") .. {
 		InitCommand = function(self)
-			self:xy(102, 114):halign(0):zoom(0.36):settext("Activity")
+			self:xy(16, 88):halign(0):zoom(0.36):settext("ACTIVITY HEATMAP"):diffusealpha(0.6)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2708,7 +2777,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Large") .. {
 		Name = "PrevMonth",
 		InitCommand = function(self)
-			self:xy(activityPrevButtonX + 8, activityPrevButtonY + 8):halign(0.5):valign(0.5):zoom(0.26):settext("<"):diffuse(color("#DDDDDD"))
+			self:xy(activityPrevButtonX + 10, activityPrevButtonY + 10):halign(0.5):valign(0.5):zoom(0.3):settext("<"):diffuse(color("#FFFFFF"))
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2717,7 +2786,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "MonthLabel",
 		InitCommand = function(self)
-			self:xy(193, 141):halign(0.5):valign(0.5):zoom(0.28):diffuse(color("#DDDDDD"))
+			self:xy(124, 198):halign(0.5):valign(0.5):zoom(0.32):diffuse(color("#FFFFFF"))
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2726,7 +2795,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Large") .. {
 		Name = "NextMonth",
 		InitCommand = function(self)
-			self:xy(activityNextButtonX + 8, activityNextButtonY + 8):halign(0.5):valign(0.5):zoom(0.26):settext(">"):diffuse(color("#DDDDDD"))
+			self:xy(activityNextButtonX + 10, activityNextButtonY + 10):halign(0.5):valign(0.5):zoom(0.34):settext(">"):diffuse(color("#FFFFFF"))
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2735,7 +2804,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "SessionTime",
 		InitCommand = function(self)
-			self:xy(102, 322):halign(0):zoom(0.34)
+			self:xy(16, 460):halign(0):zoom(0.4)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2744,7 +2813,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "SongsPlayed",
 		InitCommand = function(self)
-			self:xy(102, 342):halign(0):zoom(0.34)
+			self:xy(16, 484):halign(0):zoom(0.4)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2753,7 +2822,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "SelectedDateLabel",
 		InitCommand = function(self)
-			self:xy(102, 360):halign(0):zoom(0.28):diffuse(color("#DDDDDD")):maxwidth(620)
+			self:xy(16, 508):halign(0):zoom(0.32):diffuse(color("#DDDDDD")):maxwidth(720)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2762,7 +2831,7 @@ local statsOverlay = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "ActivityHint",
 		InitCommand = function(self)
-			self:xy(102, 381):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):settext("Select a date to view that day's session")
+			self:xy(16, 532):halign(0):zoom(0.28):diffuse(color("#AFAFAF")):settext("Select a date to view that day's session")
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlaySessionTab())
@@ -2792,28 +2861,31 @@ for i = 1, activityCellCount do
 				self:visible(false)
 				return
 			end
-			local active = i <= activityMonthDayCount
+			local offset = getMonthStartWeekday(selectedYear, selectedMonth) - 1
+			local day = i - offset
+			local active = day >= 1 and day <= activityMonthDayCount
 			self:visible(active)
 			if not active then return end
-			local count = activityMonthCounts[i] or 0
+			local count = activityMonthCounts[day] or 0
 			local fill = self:GetChild("Fill")
 			local border = self:GetChild("Border")
 			local dayText = self:GetChild("Day")
 			if count > 0 and activityMonthMaxCount > 0 then
 				local ratio = count / activityMonthMaxCount
-				fill:diffuse(Brightness(getMainColor("positive"), 0.35 + (ratio * 0.85))):diffusealpha(0.4 + (ratio * 0.6))
+				fill:diffuse(Brightness(getMainColor("highlight"), 0.35 + (ratio * 0.85))):diffusealpha(0.4 + (ratio * 0.6))
 			else
 				fill:diffuse(color("#242424")):diffusealpha(1)
 			end
-			if i == selectedDay then
+			if day == selectedDay then
 				border:visible(true):diffuse(getMainColor("highlight")):diffusealpha(0.9)
-			elseif i == hoveredActivityDay then
+			elseif day == hoveredActivityDay then
 				border:visible(true):diffuse(getMainColor("positive")):diffusealpha(0.55)
 			else
 				border:visible(false)
 			end
-			dayText:settext(tostring(i))
-			dayText:diffuse(i == selectedDay and color("#FFFFFF") or color("#B8B8B8"))
+			dayText:settext(tostring(day))
+			dayText:diffuse(day == selectedDay and color("#FFFFFF") or color("#B8B8B8"))
+			dayText:diffusealpha(count > 0 and 0.8 or 0.3)
 		end,
 		Def.Quad {
 			Name = "Border",
@@ -2844,9 +2916,9 @@ for i = 1, 8 do
 	statsOverlay[#statsOverlay + 1] = overallSkillsetRow(i)
 end
 
-for i = 1, overviewRowCount do
-	statsOverlay[#statsOverlay + 1] = overallOverviewRow(i)
-end
+-- for i = 1, overviewRowCount do
+-- 	statsOverlay[#statsOverlay + 1] = overallOverviewRow(i)
+-- end
 
 for i = 1, timelineYAxisTickCount do
 	statsOverlay[#statsOverlay + 1] = overallTimelineHorizontalGridline(i)

@@ -84,12 +84,37 @@ local t = Def.ActorFrame {
 			end
 		end
 
+		-- Ridiculous Emulation Logic
+		local isRidiculous = false
+		if (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true") and tns == "W1" and params.TapNoteOffset then
+			-- Ridiculous window = 22.5 / 2 = 11.25ms (0.01125s)
+			if math.abs(params.TapNoteOffset) <= 0.01125 then
+				isRidiculous = true
+			end
+		end
+
+		local emulateRidiculous = (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true")
 		local numStates = sprite:GetNumStates()
 		local state
-		if numStates == 12 then
-			-- 2x6 sprite: states are read L-R, T-B in a 2-column grid.
-			local offset = params.TapNoteOffset
-			local isLate = (offset and offset >= 0) and 1 or 0
+		local offset = params.TapNoteOffset
+		local isLate = (offset and offset >= 0) and 1 or 0
+
+		if numStates == 14 then
+			-- 2x7 sprite: Row 0 is Ridiculous only if emulation is enabled
+			local baseIdx = jdgIdx
+			if emulateRidiculous then
+				baseIdx = isRidiculous and 0 or (jdgIdx + 1)
+			end
+			state = baseIdx * 2 + isLate
+		elseif numStates == 7 then
+			-- 1x7 sprite
+			local baseIdx = jdgIdx
+			if emulateRidiculous then
+				baseIdx = isRidiculous and 0 or (jdgIdx + 1)
+			end
+			state = baseIdx
+		elseif numStates == 12 then
+			-- 2x6 sprite: Standard mapping
 			state = jdgIdx * 2 + isLate
 		else
 			-- Standard 1x6 sprite
@@ -138,6 +163,20 @@ local t = Def.ActorFrame {
 		judgment:visible(true)
 		container:stoptweening():visible(true):diffusealpha(1)
 		sprite:setstate(state)
+
+		local ridiculousIndicator = container:GetChild("RidiculousIndicator")
+		if ridiculousIndicator then
+			-- Only show text indicator for 6-row sprites
+			if isRidiculous and numStates ~= 7 and numStates ~= 14 then
+				ridiculousIndicator:stoptweening():visible(true):diffusealpha(1)
+				if HV.JudgmentAnimation and HV.JudgmentAnimation() then
+					ridiculousIndicator:glow(color("1,1,1,0.5")):linear(0.05):glow(color("1,1,1,0"))
+				end
+			else
+				ridiculousIndicator:visible(false)
+			end
+		end
+
 		if offsetText then
 			if shouldShowLowerJudgementOffset(tns) and params.TapNoteOffset ~= nil then
 				offsetText:settext(string.format("%+.2fms", params.TapNoteOffset * 1000))
@@ -188,6 +227,15 @@ local t = Def.ActorFrame {
 				Name = "OffsetText",
 				InitCommand = function(self)
 					self:y(18):zoom(0.455):visible(false):diffusealpha(0):maxwidth(180)
+				end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "RidiculousIndicator",
+				InitCommand = function(self)
+					self:y(-22):zoom(0.4):visible(false):maxwidth(200)
+					self:settext("RIDICULOUS")
+					self:diffuse(color("#E6FFFF")) -- Very light cyan
+					self:strokecolor(color("#1A2B2B"))
 				end
 			}
 		},

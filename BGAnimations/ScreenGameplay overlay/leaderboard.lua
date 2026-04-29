@@ -31,13 +31,8 @@ local startY = 40
 local maxEntries = 5
 local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
--- Get player profile name
-local profileName = "Player"
-local profile = PROFILEMAN:GetProfile(PLAYER_1)
-if profile then
-	local name = profile:GetDisplayName()
-	if name and name ~= "" then profileName = name end
-end
+-- Get player name (prefer online)
+local profileName = HV.GetPlayerName()
 
 -- Grade helper
 local function GetGradeStr(wife)
@@ -128,7 +123,7 @@ local function UpdateScores()
 					wife = wife,
 					combo = s:GetMaxCombo(),
 					gradeStr = GetGradeStr(wife),
-					name = profileName,
+					name = HV.GetPlayerName(),
 					rate = s:GetMusicRate(),
 					ssr = ssr,
 				}

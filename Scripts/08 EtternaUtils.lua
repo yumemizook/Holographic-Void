@@ -267,9 +267,15 @@ function GetInvalidatingMods(pn)
 	
 	-- Remove mods (note-reduction)
 	local checks = {
-		["no mines"] = "NoMines", ["no holds"] = "NoHolds", ["no rolls"] = "NoRolls",
-		["no hands"] = "NoHands", ["no jumps"] = "NoJumps", ["no lifts"] = "NoLifts",
-		["no quads"] = "NoQuads", ["no stretch"] = "NoStretch", ["no fakes"] = "NoFakes",
+		["no mines"] = "NoMines", ["nomines"] = "NoMines",
+		["no holds"] = "NoHolds", ["noholds"] = "NoHolds",
+		["no rolls"] = "NoRolls", ["norolls"] = "NoRolls",
+		["no hands"] = "NoHands", ["nohands"] = "NoHands",
+		["no jumps"] = "NoJumps", ["nojumps"] = "NoJumps",
+		["no lifts"] = "NoLifts", ["nolifts"] = "NoLifts",
+		["no quads"] = "NoQuads", ["noquads"] = "NoQuads",
+		["no stretch"] = "NoStretch", ["nostretch"] = "NoStretch",
+		["no fakes"] = "NoFakes", ["nofakes"] = "NoFakes",
 		["little"] = "Little",
 		-- Insert mods (note-addition)
 		["wide"] = "Wide", ["big"] = "Big", ["quick"] = "Quick",
@@ -278,8 +284,10 @@ function GetInvalidatingMods(pn)
 		["echo"] = "Echo", ["stomp"] = "Stomp", ["jackjs"] = "JackJS",
 		["anchorjs"] = "AnchorJS", ["icyworld"] = "IcyWorld",
 		-- Turn mods (multi-word first to avoid partial matches)
-		["soft shuffle"] = "SoftShuffle", ["super shuffle"] = "SuperShuffle",
-		["hran shuffle"] = "HRanShuffle", ["shuffle"] = "Shuffle",
+		["soft shuffle"] = "SoftShuffle", ["softshuffle"] = "SoftShuffle",
+		["super shuffle"] = "SuperShuffle", ["supershuffle"] = "SuperShuffle",
+		["hran shuffle"] = "HRanShuffle", ["hranshuffle"] = "HRanShuffle",
+		["shuffle"] = "Shuffle",
 		["backwards"] = "Backwards",
 		-- Hold Transform mods
 		["planted"] = "Planted", ["floored"] = "Floored",
@@ -335,13 +343,16 @@ function IsScoreInvalid(score)
 		"planted", "floored", "twister", "holdrolls",
 	}
 	for _, m in ipairs(invalidating) do
-		if mods:find(m) then return true end
+		if mods:find(m) or mods:find(m:gsub("%s+", "")) then return true end
 	end
 	-- Left/Right turns (word boundary)
 	if mods:find("%f[%a]left%f[%A]") then return true end
 	if mods:find("%f[%a]right%f[%A]") then return true end
-	-- Additive mines
-	if mods:find("mines") and not mods:find("no mines") then return true end
+	
+	-- Additive mines/holds/rolls
+	if mods:find("mines") and not mods:find("no mines") and not mods:find("nomines") then return true end
+	if mods:find("holds") and not mods:find("no holds") and not mods:find("noholds") then return true end
+	if mods:find("rolls") and not mods:find("no rolls") and not mods:find("norolls") then return true end
 	
 	-- 2. J4 Check (Legacy/Fallback)
 	-- If the score is somehow flagged by engine, we can check here
@@ -409,11 +420,6 @@ function getClearLevel(pn, steps, score)
 	local totalTaps = tns.W1 + tns.W2 + tns.W3 + tns.W4 + tns.W5 + tns.Miss
 	if totalTaps ~= maxNotes then return 16 end -- note count mismatch
 
-	-- Soft Invalid check (< 83% J4)
-	-- Only apply if J4 calculation succeeded (returns non-zero value)
-	local j4Pct = getJ4NormalizedPercentage(score)
-	if j4Pct > 0 and j4Pct < 83 then return 19 end
-
 	-- MFC
 	if tns.W1 == maxNotes and hns.Held == maxHolds then return 1 end
 
@@ -433,6 +439,12 @@ function getClearLevel(pn, steps, score)
 	elseif missCount == 1 then return 8   -- MF
 	elseif missCount < 10 then return 9   -- SDCB
 	end
+
+	-- Soft Invalid check (< 83% J4)
+	-- This is checked last among successful clears to avoid overwriting 
+	-- combo-based status (FC/SDCB) and to prevent it appearing at 0% score during gameplay.
+	local j4Pct = getJ4NormalizedPercentage(score)
+	if j4Pct < 83 then return 19 end
 
 	return 12 -- Clear
 end
@@ -498,7 +510,7 @@ function getDetailedClearType(obj)
 
 	-- Check invalid mods FIRST: a failed invalid score should still be Invalid
 	if IsScoreInvalid(obj) then return "Invalid" end
-	if grade == "Grade_Failed" or grade == "Grade_None" or wifeScore <= 0 then
+	if grade == "Grade_Failed" or grade == "Grade_None" then
 		return "Failed"
 	end
 
@@ -506,24 +518,28 @@ function getDetailedClearType(obj)
 	if cb > 0 then
 		if cb == 1 then return "MF"
 		elseif cb < 10 then return "SDCB"
-		else return "Clear" end
+		end
+	else
+		if w3 > 0 then
+			if w3 == 1 then return "BF"
+			elseif w3 < 10 then return "SDG"
+			else return "FC" end
+		end
+		if w2 > 0 then
+			if w2 == 1 then return "WF"
+			elseif w2 < 10 then return "SDP"
+			else return "PFC" end
+		end
+		return "MFC"
 	end
-	if w3 > 0 then
-		if w3 == 1 then return "BF"
-		elseif w3 < 10 then return "SDG"
-		else return "FC" end
-	end
-	if w2 > 0 then
-		if w2 == 1 then return "WF"
-		elseif w2 < 10 then return "SDP"
-		else return "PFC" end
-	end
-	-- Soft Invalid check (< 83% J4)
-	-- Only apply if J4 calculation succeeded (returns non-zero value)
-	local j4Pct = getJ4NormalizedPercentage(obj)
-	if j4Pct > 0 and j4Pct < 83 then return "Soft Invalid" end
 
-	return "MFC"
+	-- Soft Invalid check (< 83% J4)
+	-- Priority: Failed > Invalid > MF/SDCB/FC > Soft Invalid > Clear
+	-- This is only reached if cb >= 10.
+	local j4Pct = getJ4NormalizedPercentage(obj)
+	if j4Pct < 83 then return "SoftInvalid" end
+
+	return "Clear"
 end
 
 ------------------------------------------------------------
@@ -1088,15 +1104,18 @@ function getJ4NormalizedPercentage(score)
 	if type(score.GetRescoredWifeScore) == "function" then
 		local ok, value = pcall(score.GetRescoredWifeScore, score, 4)
 		value = ok and tonumber(value) or nil
-		if value then
+		-- Only return if we actually got a non-zero rescored value.
+		-- Online scores often return 0 here because they lack replay data for rescoring.
+		if value and value ~= 0 then
 			return value * 100
 		end
 	end
 	
 	-- 2. Manual rescore if replay exists
 	local rst = getRescoreElementsFromScore(score)
-	if rst and rst.dvt then
-		return getRescoredWife3Judge(3, 4, rst)
+	if rst and rst.dvt and #rst.dvt > 0 then
+		local p = getRescoredWife3Judge(3, 4, rst)
+		if p and p ~= 0 then return p end
 	end
 	
 	-- 3. Fallback to raw wife score (If used on J4 or no replay available)
@@ -1357,5 +1376,19 @@ end
 
 HV.LastTotalXP = 0
 HV.GameplaySessionValid = false
+
+function HV.GetPlayerName(pn)
+	pn = pn or PLAYER_1
+	local onlineName = (pn == PLAYER_1) and DLMAN:GetUsername() or ""
+	if onlineName and onlineName ~= "" then
+		return onlineName
+	end
+	local profile = PROFILEMAN:GetProfile(pn)
+	if profile then
+		local name = profile:GetDisplayName()
+		if name and name ~= "" then return name end
+	end
+	return "Player " .. (pn == PLAYER_1 and "1" or "2")
+end
 
 Trace("Holographic Void: 08 EtternaUtils.lua loaded (expanded).")

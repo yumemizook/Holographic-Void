@@ -700,7 +700,7 @@ t[#t + 1] = Def.ActorFrame {
 							local cRating = row:GetChild("CRating")
 							local cAvatar = row:GetChild("CAvatar")
 							local cBg = row:GetChild("CBg")
-							if cName and p then cName:settext(p:GetDisplayName()) end
+							if cName and p then cName:settext(p:GetDisplayName()) end -- Compact rows still show local profile name
 							if cRating and p then
 								local r = p:GetPlayerRating()
 								local showStats = HV.ShowProfileStats()

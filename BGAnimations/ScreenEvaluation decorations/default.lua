@@ -581,9 +581,7 @@ local function scoreBoard(pn)
 						self:xy(65, 8):zoom(0.45):halign(0):maxwidth(((frameW - pad * 3) * 0.5 - 65) / 0.45) 
 					end,
 					OnCommand = function(self)
-						if profile then
-							self:settext(profile:GetDisplayName())
-						end
+						self:settext(HV.GetPlayerName())
 					end
 				},
 

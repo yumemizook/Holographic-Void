@@ -11,13 +11,14 @@ local translated_info = {
 
 local t = Def.ActorFrame {}
 
--- Black fade overlay
-t[#t + 1] = Def.Quad {
+-- Circular expanding transition
+t[#t + 1] = Def.Sprite {
+	Texture = THEME:GetPathG("", "_thick circle"),
 	InitCommand = function(self)
-		self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
+		self:Center():diffuse(color("0,0,0,1")):zoom(0)
 	end,
 	OnCommand = function(self)
-		self:diffuse(color("0,0,0,0")):sleep(0.1):linear(0.15):diffusealpha(1)
+		self:sleep(0.1):accelerate(0.25):zoom(24)
 	end
 }
 

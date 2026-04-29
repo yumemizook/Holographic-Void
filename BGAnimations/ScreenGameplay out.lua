@@ -10,9 +10,13 @@ local t = Def.ActorFrame{
 	end
 }
 
-t[#t+1] = Def.Quad{
+t[#t+1] = Def.Sprite {
+	Texture = THEME:GetPathG("", "_thick circle"),
 	InitCommand = function(self)
-		self:FullScreen():diffuse(HVColor.Background or color("#000000")):diffusealpha(1)
+		self:Center():diffuse(color("0,0,0,1")):zoom(0)
+	end,
+	OffCommand = function(self)
+		self:sleep(3):accelerate(0.5):zoom(24)
 	end
 }
 

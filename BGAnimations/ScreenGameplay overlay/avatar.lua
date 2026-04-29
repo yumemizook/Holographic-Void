@@ -101,9 +101,8 @@ local t = Def.ActorFrame {
 	-- Profile name
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			local name = profile:GetDisplayName()
 			self:xy(avatarSize + 6, 5):zoom(fontZoom):halign(0):maxwidth(130 / fontZoom)
-			self:settext(name)
+			self:settext(HV.GetPlayerName())
 			self:diffuse(color("1,1,1,1"))
 		end
 	},

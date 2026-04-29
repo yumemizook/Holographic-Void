@@ -678,6 +678,12 @@ local HVPrefs = {
 		Choices = (function() local c = {}; for i=0, 99 do c[#c+1]=tostring(i) end return c end)(),
 		Values = (function() local v = {}; for i=0, 99 do v[#v+1]=i end return v end)(),
 	},
+	-- Gameplay: Emulate Ridiculous Judgement (W0 = W1/2)
+	HV_EmulateRidiculous = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.

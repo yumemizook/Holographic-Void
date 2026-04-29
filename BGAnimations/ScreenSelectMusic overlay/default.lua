@@ -881,8 +881,7 @@ local profileOverlay = Def.ActorFrame {
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:y(40):zoom(0.4):diffuse(brightText) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
-					local name = DLMAN:GetUsername() ~= "" and DLMAN:GetUsername() or (PROFILEMAN:GetProfile(PLAYER_1) and PROFILEMAN:GetProfile(PLAYER_1):GetDisplayName() or "LOCAL PLAYER")
-					self:settext(name)
+					self:settext(HV.GetPlayerName())
 				end
 			},
 			Def.ActorFrame {
@@ -1339,7 +1338,19 @@ local profileOverlay = Def.ActorFrame {
 					date = score.date or "N/A"
 					wife = score.wife or 0
 					ssr = score.ssr or 0
-					metadata = "ONLINE"
+					
+					-- For online tables, we can still determine Soft Invalid from the percentage
+					local ct = "Clear"
+					if wife * 100 < 83 then
+						ct = "SoftInvalid"
+					end
+					
+					-- If judgments are available in the table, show them
+					if score.w1 then
+						metadata = string.format("%s  |  %d/%d/%d/%d/%d/%d", THEME:GetString("ClearTypes", ct), score.w1, score.w2, score.w3, score.w4, score.w5, score.miss or 0)
+					else
+						metadata = string.format("%s  |  ONLINE", THEME:GetString("ClearTypes", ct))
+					end
 				else
 					local ck = score:GetChartKey()
 					local thssong = SONGMAN:GetSongByChartKey(ck)
