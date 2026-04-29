@@ -79,6 +79,20 @@ local main_af = Def.ActorFrame {
 		
 		-- Always default Practice Mode to Off when entering song select
 		GAMESTATE:SetPracticeMode(false)
+
+		self:sleep(0.01):queuecommand("OpenPendingStatsScore")
+	end,
+	OpenPendingStatsScoreCommand = function(self)
+		local pending = getenv("HVPendingScoreFromStats")
+		if not pending then return end
+		setenv("HVPendingScoreFromStats", nil)
+		local screen = SCREENMAN:GetTopScreen()
+		if screen and screen.ShowEvalScreenForScore then
+			screen:ShowEvalScreenForScore(pending)
+		elseif STATSMAN:GetCurStageStats() then
+			STATSMAN:GetCurStageStats():GetPlayerStageStats():SetHighScore(pending)
+			SCREENMAN:SetNewScreen("ScreenEvaluation")
+		end
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
@@ -359,17 +373,25 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 				-- --- PROFILE TAB SPECIFIC CLICKS ---
 				if HV.ActiveTab == "PROFILE" then
+					local gradeSidebarCX = SCREEN_CENTER_X - overlayW/2 + gradeSidebarW/2
+					local gradeSidebarTop = SCREEN_CENTER_Y - overlayH/2
 					local profileSidebarX = (SCREEN_CENTER_X - overlayW/2) + gradeSidebarW
 					local scoreAreaX = profileSidebarX + profileSidebarW
 					local headerY = SCREEN_CENTER_Y - overlayH/2 + 35
 
-					-- 1. Mode Toggle (TOP / RECENT)
+					-- 1. Dedicated profile stats screen
+					if IsMouseOverCentered(gradeSidebarCX, gradeSidebarTop + 25, gradeSidebarW - 12, 22) then
+						SCREENMAN:SetNewScreen("ScreenHVStats")
+						return true
+					end
+
+					-- 2. Mode Toggle (TOP / RECENT)
 					if IsMouseOverCentered(scoreAreaX + mainPartW - 250, headerY, 100, 24) then
 						profileOverlayActor.isRecentMode = not profileOverlayActor.isRecentMode
 						profileOverlayActor.topPage = 1; profileOverlayActor.recentPage = 1
 						MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
 					end
-					-- 2. Source Toggle (ONLINE / LOCAL)
+					-- 3. Source Toggle (ONLINE / LOCAL)
 					if IsMouseOverCentered(scoreAreaX + mainPartW - 140, headerY, 100, 24) then
 						if not profileOverlayActor.isRecentMode then
 							profileOverlayActor.isOnlineMode = not profileOverlayActor.isOnlineMode
@@ -378,16 +400,16 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						end
 						return true
 					end
-					-- 3. Upload Button
+					-- 4. Upload Button
 					if IsMouseOverCentered(scoreAreaX + mainPartW - 40, headerY, 80, 24) then
 						if DLMAN:IsLoggedIn() then DLMAN:UploadAllScores() else ms.ok("Log in to upload scores.") end
 						return true
 					end
-					-- 4. Avatar
+					-- 5. Avatar
 					if IsMouseOverCentered(profileSidebarX + profileSidebarW/2, SCREEN_CENTER_Y - overlayH/2 + 50, 60, 60) then
 						SCREENMAN:SetNewScreen("ScreenAssetSettings"); return true
 					end
-					-- 5. Skillset Tabs
+					-- 6. Skillset Tabs
 					local tabsYStart = SCREEN_CENTER_Y - overlayH/2 + 140
 					for i, ss in ipairs(skillsets) do
 						if IsMouseOver(profileSidebarX + 10, tabsYStart + (i-1)*skillsetTabH - skillsetTabH/2, profileSidebarW - 20, skillsetTabH) then
@@ -397,7 +419,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
 						end
 					end
-					-- 6. Score Rows
+					-- 7. Score Rows
 					local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
 					for i = 1, scorePageSize do
 						if IsMouseOver(scoreAreaX + 10, absRowsYStart + (i-1)*rowH - rowH/2, mainPartW - 20, rowH) then
@@ -767,6 +789,21 @@ local profileOverlay = Def.ActorFrame {
 			local g = Def.ActorFrame { InitCommand = function(self) self:y(-overlayH/2 + 60) end }
 			local grades = {"AAAAA", "AAAA", "AAA", "AA", "A"}
 			local tiers = {"Grade_Tier01", "Grade_Tier04", "Grade_Tier07", "Grade_Tier10", "Grade_Tier13"}
+
+			g[#g+1] = Def.ActorFrame {
+				InitCommand = function(self) self:y(-35) end,
+				Def.Quad {
+					InitCommand = function(self)
+						self:zoomto(gradeSidebarW - 12, 20):diffuse(accentColor):diffusealpha(0.22)
+					end
+				},
+				LoadFont("Common Normal") .. {
+					Text = "STATS",
+					InitCommand = function(self)
+						self:zoom(0.28):diffuse(brightText)
+					end
+				}
+			}
 			
 			for i, grade in ipairs(grades) do
 				local gy = (i-1) * 32
@@ -1272,20 +1309,20 @@ local profileOverlay = Def.ActorFrame {
 		local foundAnyOnPage = false
 		for i = 1, scorePageSize do
 			local row = rows:GetChild("Row_" .. i)
-			local idx = start + i - 1 -- Adjust to 0-based for internal APIs
+			local pageIndex = start + i
 			local score = nil
 			
 			if self.isRecentMode then
-				-- Recent scores are 0-indexed
-				local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(idx) end)
+				-- Local score APIs are 1-indexed; using pageIndex keeps row 1 aligned to slot 1.
+				local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(pageIndex) end)
 				score = (ok and res ~= nil) and res or nil
 			else
 				if self.isOnlineMode and DLMAN:IsLoggedIn() then
 					-- Online scores are 1-indexed
-					local ok, res = pcall(function() return DLMAN:GetTopSkillsetScore(idx + 1, self.currentSkillset) end)
+					local ok, res = pcall(function() return DLMAN:GetTopSkillsetScore(pageIndex, self.currentSkillset) end)
 					score = (ok and res ~= nil) and res or nil
 				else
-					local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(idx, self.currentSkillset) end)
+					local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(pageIndex, self.currentSkillset) end)
 					score = (ok and res ~= nil) and res or nil
 				end
 			end

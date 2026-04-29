@@ -1,14 +1,12 @@
 local defaultGameplayCoordinates = {
 	JudgeX = 0,
-	JudgeY = 40,
+	JudgeY = 0,
 	ComboX = 0,
 	ComboY = -55,
 	ErrorBarX = SCREEN_CENTER_X,
 	ErrorBarY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15 - 40,
 	TargetTrackerX = SCREEN_CENTER_X,
 	TargetTrackerY = SCREEN_CENTER_Y - 115,
-	MiniProgressBarX = SCREEN_CENTER_X + 44,
-	MiniProgressBarY = SCREEN_CENTER_Y + 34,
 	FullProgressBarX = SCREEN_CENTER_X,
 	FullProgressBarY = 12,
 	JudgeCounterX = SCREEN_CENTER_X + 160,
@@ -21,8 +19,6 @@ local defaultGameplayCoordinates = {
 	NPSDisplayY = SCREEN_CENTER_Y + 95,
 	NPSGraphX = 10,
 	NPSGraphY = SCREEN_CENTER_Y + 100,
-	NotefieldX = 0,
-	NotefieldY = 0,
 	ProgressBarPos = 1,
 	LeaderboardX = 10,
 	LeaderboardY = 40,
@@ -38,39 +34,22 @@ local defaultGameplayCoordinates = {
 	RecentJudgmentDisplayX = -160,
 	RecentJudgmentDisplayY = 50,
 	DPDisplayX = 60,
-	DPDisplayY = -12,
-	MusicRateX = SCREEN_CENTER_X,
-	MusicRateY = SCREEN_BOTTOM - 10
+	DPDisplayY = -12
 }
 
 local defaultGameplaySizes = {
 	JudgeZoom = 1.0,
 	ComboZoom = 1.0,
-	ErrorBarWidth = 240,
-	ErrorBarHeight = 10,
 	TargetTrackerZoom = 1.0,
-	FullProgressBarWidth = 1.0,
-	FullProgressBarHeight = 1.0,
 	DisplayPercentZoom = 1,
 	DisplayMeanZoom = 1,
 	NPSDisplayZoom = 0.65,
 	NPSGraphWidth = 1.0,
 	NPSGraphHeight = 1.0,
-	NotefieldWidth = 1.0,
-	NotefieldHeight = 1.0,
-	NotefieldSpacing = 0.0,
 	LeaderboardWidth = 1.0,
 	LeaderboardHeight = 1.0,
-	LeaderboardSpacing = 0.0,
-	ReplayButtonsZoom = 1.0,
-	ReplayButtonsSpacing = 0.0,
-	LifeP1Width = 1.0,
-	LifeP1Height = 1.0,
-	PracticeCDGraphWidth = 0.8,
-	PracticeCDGraphHeight = 1,
 	RecentJudgmentDisplayZoom = 1.0,
 	DPDisplayZoom = 1.0,
-	MusicRateZoom = 1.0,
 	BPMTextZoom = 1.0
 }
 
@@ -186,7 +165,11 @@ playerConfig.load = function(self, slot)
 		defaultConfig.GameplayXYCoordinates["16K"] = coords
 	end
 	force_table_elements_to_match_type = tmp
-	return tmp2(self, slot)
+	local loaded = tmp2(self, slot)
+	if loaded then
+		loaded.CustomizeGameplay = false
+	end
+	return loaded
 end
 playerConfig:load()
 

@@ -44,6 +44,8 @@ function PONextScreen(currentKey)
 						local allowGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 						if allowGameplay then
 							GAMESTATE:SetAutoplay(true)
+						else
+							GAMESTATE:SetAutoplay(false)
 						end
 						SCREENMAN:GetTopScreen():SetNextScreenName(ToGameplay())
 					else

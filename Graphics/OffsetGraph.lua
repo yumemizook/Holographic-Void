@@ -32,6 +32,7 @@ local function setPlotScaleToWorstHit()
 	local worst = 0
 	for i = 1, #dvt do
 		local offset = math.abs(dvt[i] or 0)
+		-- Ignore misses (offset >= 1000ms) when scaling to worst hit
 		if offset < 1000 and offset > worst then worst = offset end
 	end
 	if worst > 0 then

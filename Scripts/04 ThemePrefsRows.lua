@@ -322,6 +322,20 @@ local HVPrefRows = {
 		Values = {false, true},
 	},
 
+	-- Display Lower Judgement Offset
+	HV_DisplayLowerJudgementOffset = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
+	-- Offset Display Judgement
+	HV_OffsetDisplayJudgement = {
+		Default = "W3",
+		Choices = {"Marvelous", "Perfect", "Great", "Good", "Bad"},
+		Values = {"W1", "W2", "W3", "W4", "W5"},
+	},
+
 	-- Judgment Animation
 	HV_JudgmentAnimation = {
 		Default = false,
@@ -467,7 +481,7 @@ function HVThemeOptionsLines()
 		"HV_ShowMSD", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
 		
 		-- Gameplay HUD
-		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
+		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_DisplayLowerJudgementOffset", "HV_OffsetDisplayJudgement", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
 			"HV_ShowJudgeCounter", "HV_JudgeCounterMode", "HV_ShowNGIndicator",
 		"HV_ShowPlayerInfo", "HV_ProgressBarPosition", "HV_ShowInGameLeaderboard",
 		
@@ -776,6 +790,14 @@ function OptionRowPrioritizeLowerJudgements()
 	return HVThemePrefRow("HV_PrioritizeLowerJudgements", "Prioritize Lower Judgements")
 end
 
+function OptionRowDisplayLowerJudgementOffset()
+	return HVThemePrefRow("HV_DisplayLowerJudgementOffset", "Display Lower Judgement Offset")
+end
+
+function OptionRowOffsetDisplayJudgement()
+	return HVThemePrefRow("HV_OffsetDisplayJudgement", "Offset Display Judgement")
+end
+
 function OptionRowJudgmentAnimation()
 	return HVThemePrefRow("HV_JudgmentAnimation", "Judgment Animation")
 end
@@ -814,9 +836,8 @@ function OptionRowCustomizeGameplay()
 				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = true
 			else
 				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = false
+				GAMESTATE:SetAutoplay(false)
 			end
-			playerConfig:set_dirty(pn_to_profile_slot(PLAYER_1))
-			playerConfig:save(pn_to_profile_slot(PLAYER_1))
 		end
 	}
 end

@@ -122,7 +122,7 @@ local t = Def.ActorFrame {
 t[#t + 1] = Def.ActorFrame {
 	Name = "NPSTextContainer",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.NPSDisplayX or graphX) or graphX, isCustomizeGameplay and (MovableValues.NPSDisplayY or (graphY - 5)) or (graphY - 5)):zoom(isCustomizeGameplay and (MovableValues.NPSDisplayZoom or fontZoom) or fontZoom)
+		self:xy((MovableValues and MovableValues.NPSDisplayX) or getDefaultGameplayCoordinate("NPSDisplayX") or graphX, (MovableValues and MovableValues.NPSDisplayY) or getDefaultGameplayCoordinate("NPSDisplayY") or (graphY - 5)):zoom((MovableValues and MovableValues.NPSDisplayZoom) or getDefaultGameplaySize("NPSDisplayZoom") or fontZoom)
 	end,
 	LoadFont("Common Normal") .. {
 		Name = "Text",
@@ -143,7 +143,7 @@ local graphPeakNPS = initialPeak
 local graphVerts = Def.ActorFrame {
 	Name = "NPSGraph",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.NPSGraphX or graphX) or graphX, isCustomizeGameplay and (MovableValues.NPSGraphY or graphY) or graphY):zoomtowidth(isCustomizeGameplay and (MovableValues.NPSGraphWidth or 1) or 1):zoomtoheight(isCustomizeGameplay and (MovableValues.NPSGraphHeight or 1) or 1)
+		self:xy((MovableValues and MovableValues.NPSGraphX) or getDefaultGameplayCoordinate("NPSGraphX") or graphX, (MovableValues and MovableValues.NPSGraphY) or getDefaultGameplayCoordinate("NPSGraphY") or graphY):zoomtowidth((MovableValues and MovableValues.NPSGraphWidth) or getDefaultGameplaySize("NPSGraphWidth") or 1):zoomtoheight((MovableValues and MovableValues.NPSGraphHeight) or getDefaultGameplaySize("NPSGraphHeight") or 1)
 	end,
 	
 	-- Background Quad

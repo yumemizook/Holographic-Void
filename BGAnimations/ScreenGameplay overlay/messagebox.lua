@@ -35,6 +35,7 @@ return Def.ActorFrame {
 		if allowedCustomization then
 			-- save CustomizeGameplay changes when leaving the screen
 			playerConfig:save(pn_to_profile_slot(PLAYER_1))
+			GAMESTATE:SetAutoplay(false)
 		end
 	end,
 	Def.BitmapText {
@@ -64,16 +65,11 @@ return Def.ActorFrame {
 				"3: "..transStr("ComboPosition"),
 				"4: "..transStr("ComboSize"),
 				"5: "..transStr("ErrorBarPosition"),
-				"6: "..transStr("ErrorBarSize"),
 				"7: "..transStr("TargetTrackerPosition"),
 				"8: "..transStr("TargetTrackerSize"),
 				"9: "..transStr("FullProgressBarPosition"),
-				"0: "..transStr("FullProgressBarSize"),
-				"q: "..transStr("MiniProgressBarPosition"),
 				"w: "..transStr("DisplayPercentPosition"),
 				"e: "..transStr("DisplayPercentSize"),
-				"r: "..transStr("NotefieldPosition"),
-				"t: "..transStr("NotefieldSize"),
 				"y: "..transStr("NPSDisplayPosition"),
 				"u: "..transStr("NPSDisplaySize"),
 				"i: "..transStr("NPSGraphPosition"),
@@ -81,15 +77,12 @@ return Def.ActorFrame {
 				"p: "..transStr("JudgeCounterPosition"),
 				"a: "..transStr("LeaderboardPosition"),
 				"s: "..transStr("LeaderboardSize"),
-				"d: "..transStr("LeaderboardSpacing"),
 				"f: "..transStr("ReplayButtonPosition"),
 				--"g: Replay Buttons Size",
-				"h: "..transStr("ReplayButtonSpacing"),
 				"x: "..transStr("BPMPosition"),
 				"c: "..transStr("BPMSize"),
 				"v: "..transStr("RatePosition"),
 				"b: "..transStr("RateSize"),
-				"n: "..transStr("NotefieldSpacing"),
 				"m: "..transStr("MeanPosition"),
 				",: "..transStr("MeanSize"),
 				".: "..transStr("DPDisplayPosition"),

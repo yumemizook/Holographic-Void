@@ -1,15 +1,22 @@
 local DOT_COUNT = 20
 local dotHistory = {}
+local judgmentThresholds = {W1=0, W2=1, W3=2, W4=3, W5=4}
+
+local function shouldShowLowerJudgementOffset(tns)
+	if not (HV.DisplayLowerJudgementOffset and HV.DisplayLowerJudgementOffset()) then return false end
+	if tns == "Miss" then return false end
+
+	local threshold = HV.GetOffsetDisplayJudgement and HV.GetOffsetDisplayJudgement() or "W3"
+	local currentIndex = judgmentThresholds[tns]
+	local thresholdIndex = judgmentThresholds[threshold] or judgmentThresholds.W3
+	return currentIndex ~= nil and currentIndex >= thresholdIndex
+end
 
 -- Create the Recent Judgment display dots statically first
 local recentJudgmentDisplay = Def.ActorFrame {
 	Name = "RecentJudgmentDisplay",
 	InitCommand = function(self)
-		if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay then
-			self:xy(MovableValues.RecentJudgmentDisplayX or -160, MovableValues.RecentJudgmentDisplayY or 50):zoom(MovableValues.RecentJudgmentDisplayZoom or 1)
-		else
-			self:xy(-160, 50):zoom(1)
-		end
+		self:xy((MovableValues and MovableValues.RecentJudgmentDisplayX) or getDefaultGameplayCoordinate("RecentJudgmentDisplayX") or -160, (MovableValues and MovableValues.RecentJudgmentDisplayY) or getDefaultGameplayCoordinate("RecentJudgmentDisplayY") or 50):zoom((MovableValues and MovableValues.RecentJudgmentDisplayZoom) or getDefaultGameplaySize("RecentJudgmentDisplayZoom") or 1)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_v", "DeviceButton_b"}, self, self:GetChild("Border"))
@@ -41,6 +48,7 @@ local t = Def.ActorFrame {
 		local tns = ToEnumShortString(params.TapNoteScore)
 		local container = judgment:GetChild("JudgmentContainer")
 		local sprite = container:GetChild("JudgmentSprite")
+		local offsetText = container:GetChild("OffsetText")
 		if not sprite then return end
 		
 		-- Judgment index: W1=0, W2=1, W3=2, W4=3, W5=4, Miss=5
@@ -130,6 +138,15 @@ local t = Def.ActorFrame {
 		judgment:visible(true)
 		container:stoptweening():visible(true):diffusealpha(1)
 		sprite:setstate(state)
+		if offsetText then
+			if shouldShowLowerJudgementOffset(tns) and params.TapNoteOffset ~= nil then
+				offsetText:settext(string.format("%+.2fms", params.TapNoteOffset * 1000))
+				offsetText:diffuse(HVColor.GetJudgmentColor(tns))
+				offsetText:visible(true):diffusealpha(1)
+			else
+				offsetText:visible(false)
+			end
+		end
 		
 		-- Apply Animation if enabled (only to the judgment container)
 		if HV.JudgmentAnimation and HV.JudgmentAnimation() then
@@ -145,9 +162,7 @@ local t = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "PlayerJudgment",
 		InitCommand = function(self)
-			if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay then
-				self:xy(MovableValues.JudgeX or 0, MovableValues.JudgeY or 0):zoom(MovableValues.JudgeZoom or 1)
-			end
+			self:addx((MovableValues and MovableValues.JudgeX) or getDefaultGameplayCoordinate("JudgeX") or 0):addy((MovableValues and MovableValues.JudgeY) or getDefaultGameplayCoordinate("JudgeY") or 0):zoom((MovableValues and MovableValues.JudgeZoom) or getDefaultGameplaySize("JudgeZoom") or 1)
 			self:visible(false)
 			self.lockedUntil = 0
 			self.lockedIndex = -1
@@ -167,6 +182,12 @@ local t = Def.ActorFrame {
 						if self.pause then self:pause() end
 						self:setstate(0)
 					end
+				end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "OffsetText",
+				InitCommand = function(self)
+					self:y(18):zoom(0.455):visible(false):diffusealpha(0):maxwidth(180)
 				end
 			}
 		},

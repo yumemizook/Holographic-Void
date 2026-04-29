@@ -1,0 +1,2918 @@
+local hoverAlpha = 0.6
+local statsOverlayActive = false
+local statsOverlayInputRedirect = false
+local settingsOverlayActive = false
+local settingsOverlayInputRedirect = false
+local quickMenuActive = false
+local quickMenuInputRedirect = false
+local pendingMenuMusicRestore = false
+local settingsOverlayPanelX = SCREEN_WIDTH - 430
+local settingsOverlayPanelY = 52
+local settingsOverlayPanelWidth = 360
+local settingsOverlayPanelHeight = 208
+local settingsOverlayItemX = settingsOverlayPanelX + 18
+local settingsOverlayItemY = settingsOverlayPanelY + 58
+local settingsOverlayItemWidth = settingsOverlayPanelWidth - 36
+local settingsOverlayItemHeight = 32
+local settingsOverlayItemGap = 12
+local quickMenuPanelX = 34
+local quickMenuPanelY = 50
+local quickMenuPanelWidth = 262
+local quickMenuPanelHeight = 214
+local quickMenuItemX = quickMenuPanelX + 18
+local quickMenuItemY = quickMenuPanelY + 58
+local musicWheelSettingsButtonX = SCREEN_WIDTH - 34
+local musicWheelSettingsButtonY = 100
+local musicWheelSettingsButtonWidth = 24
+local musicWheelSettingsButtonHeight = 24
+local quickMenuItemWidth = quickMenuPanelWidth - 36
+local quickMenuItemHeight = 38
+local quickMenuItemGap = 14
+local sessionRowCount = 7
+local overallBestScoreRowCount = 8
+local leaderboardRowCount = 8
+local sessionPanelX = 342
+local sessionPanelY = 86
+local sessionPanelWidth = SCREEN_WIDTH - sessionPanelX - 24
+local sessionPanelHeight = SCREEN_HEIGHT - sessionPanelY - 28
+local sessionCardWidth = sessionPanelWidth - 24
+local overlayCloseButtonX = SCREEN_WIDTH - 38
+local overlayCloseButtonY = 61
+local overlayCloseButtonHalfWidth = 14
+local overlayCloseButtonHalfHeight = 12
+local activityColumnCount = 7
+local activityCellCount = 35
+local activityCellSize = 18
+local activityCellStepX = 26
+local activityCellStepY = 24
+local activityGridX = 102
+local activityGridY = 160
+local activityPrevButtonX = 104
+local activityPrevButtonY = 133
+local activityNextButtonX = 286
+local activityNextButtonY = 133
+local activityButtonWidth = 16
+local activityButtonHeight = 16
+local selectedYear = tonumber(os.date("%Y"))
+local selectedMonth = tonumber(os.date("%m"))
+local selectedDay = tonumber(os.date("%d"))
+local hoveredActivityDay = nil
+local activityMonthCounts = {}
+local activityMonthMaxCount = 0
+local activityMonthDayCount = 31
+local selectedScoresForDisplay = {}
+local overallBestScoresForDisplay = {}
+local leaderboardEntriesForDisplay = {}
+local overallOverviewRowsForDisplay = {}
+local overallTimelineDaysForDisplay = {}
+overallRatingTimelineDaysForDisplay = {}
+overallWifeTimelineDaysForDisplay = {}
+overallMsdGradePointsForDisplay = {}
+overallMostPlayedChartsForDisplay = {}
+overallMostPlayedFoldersForDisplay = {}
+breakdownJudgeRowsForDisplay = {}
+breakdownSelectedJudge = "J4"
+local overallProfileSummary = nil
+local leaderboardStatus = {state = "loading", title = "", detail = ""}
+local sessionScoreOffset = 0
+local overallBestScoreOffset = 0
+local overallTimelineHoveredIndex = nil
+local overallTimelineMaxValue = 1
+local overallLocalScoreEntries = nil
+local overallDerivedDataDirty = true
+local lastSessionDisplayKey = nil
+local statsOverlayTabs = {
+	Sessions = 1,
+	Overall = 2,
+	Leaderboards = 3
+}
+local overallSubviewTabs = {
+	WifeTimeline = 1,
+	Rating = 2,
+	MsdGrade = 3,
+	MostPlayed = 4
+}
+local statsOverlayTab = statsOverlayTabs.Sessions
+local overallSubviewTab = overallSubviewTabs.WifeTimeline
+local statsOverlayTabTop = 44
+local statsOverlayTabHeight = 34
+local statsOverlayTabButtons = {
+	{tab = statsOverlayTabs.Sessions, left = 80, width = 70, label = "Sessions"},
+	{tab = statsOverlayTabs.Overall, left = 152, width = 64, label = "Stats"},
+	{tab = statsOverlayTabs.Leaderboards, left = 218, width = 104, label = "Breakdown"}
+}
+local overviewRowCount = 6
+local timelineGraphLeft = sessionPanelX + 18
+local timelineGraphTop = sessionPanelY + 84
+local timelineGraphWidth = sessionPanelWidth - 36
+local timelineGraphHeight = 126
+local timelineYAxisTickCount = 5
+local timelineXAxisTickCount = 3
+local timelineSkillsetColors = {
+	color("#FFFFFF"),
+	color("#00C2A8"),
+	color("#FFB020"),
+	color("#FF6B6B"),
+	color("#B084FF"),
+	color("#4DD2FF"),
+	color("#8BD450"),
+	color("#5B8CFF")
+}
+local overallSubviewButtons = {
+	{tab = overallSubviewTabs.WifeTimeline, left = 102, top = 150, width = 180, label = "Wife% over time"},
+	{tab = overallSubviewTabs.Rating, left = 102, top = 184, width = 180, label = "Rating"},
+	{tab = overallSubviewTabs.MsdGrade, left = 102, top = 218, width = 180, label = "MSD/Grade distribution"},
+	{tab = overallSubviewTabs.MostPlayed, left = 102, top = 252, width = 180, label = "Most played charts/folders"}
+}
+local musicWheelDisplayOptions = {
+	{key = "OnlyShowGrades", label = "Only show grades:"},
+	{key = "ShowPBTimestamps", label = "Show PB timestamps:"},
+	{key = "ShowNativeMetadata", label = "Show native metadata:"}
+}
+local formatPercent
+local formatRate
+local formatJudge
+local formatChartMeter
+local formatDateKey
+local parseScoreTime
+local getScoreDateParts
+local setSettingsOverlayActive
+local setQuickMenuActive
+local getGradeColor = getGradeColor or function(grade)
+	if HVColor and HVColor.GetGradeColor then
+		return HVColor.GetGradeColor(grade)
+	end
+	return color("#FFFFFF")
+end
+local getClearTypeFromScore = function(player, score, mode)
+	local clearType = "NoPlay"
+	if score then
+		local chartKey = score:GetChartKey()
+		local steps = chartKey and SONGMAN:GetStepsByChartKey(chartKey) or nil
+		if getClearType and steps then
+			clearType = getClearType(player, steps, score) or clearType
+		end
+	end
+	if mode == 2 then
+		return getClearTypeColor and getClearTypeColor(clearType) or color("#FFFFFF")
+	end
+	return getClearTypeText and getClearTypeText(clearType) or THEME:GetString("ClearTypes", clearType)
+end
+
+local function pointInBox(x, y, centerX, centerY, halfWidth, halfHeight)
+	return x >= centerX - halfWidth and x <= centerX + halfWidth and y >= centerY - halfHeight and y <= centerY + halfHeight
+end
+
+local function pointInRect(x, y, left, top, width, height)
+	return x >= left and x <= left + width and y >= top and y <= top + height
+end
+
+local function isStatsOverlaySessionTab()
+	return statsOverlayTab == statsOverlayTabs.Sessions
+end
+
+local function getStatsOverlayTitle()
+	if statsOverlayTab == statsOverlayTabs.Overall then
+		return "Stats"
+	elseif statsOverlayTab == statsOverlayTabs.Leaderboards then
+		return "Breakdown"
+	end
+	return "Sessions"
+end
+
+local function getStatsOverlayTabAtPosition(mouseX, mouseY)
+	if mouseY < statsOverlayTabTop or mouseY > statsOverlayTabTop + statsOverlayTabHeight then return nil end
+	for _, button in ipairs(statsOverlayTabButtons) do
+		if pointInRect(mouseX, mouseY, button.left, statsOverlayTabTop, button.width, statsOverlayTabHeight) then
+			return button.tab
+		end
+	end
+	return nil
+end
+
+local function isStatsOverlayOverallTab()
+	return statsOverlayTab == statsOverlayTabs.Overall
+end
+
+local function isStatsOverlayLeaderboardsTab()
+	return statsOverlayTab == statsOverlayTabs.Leaderboards
+end
+
+local function isStatsOverlayOverallSubview(tab)
+	return statsOverlayTab == statsOverlayTabs.Overall and overallSubviewTab == tab
+end
+
+local function isStatsOverlayOverallTimelineSubview()
+	return isStatsOverlayOverallSubview(overallSubviewTabs.Rating) or isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline)
+end
+
+local function getOverallSubviewTabAtPosition(mouseX, mouseY)
+	if not isStatsOverlayOverallTab() then return nil end
+	for _, button in ipairs(overallSubviewButtons) do
+		if pointInRect(mouseX, mouseY, button.left, button.top, button.width, 24) then
+			return button.tab
+		end
+	end
+	return nil
+end
+
+local function getSettingsOverlayItemTop(index)
+	return settingsOverlayItemY + ((index - 1) * (settingsOverlayItemHeight + settingsOverlayItemGap))
+end
+
+local function pointInSettingsOverlayItem(mouseX, mouseY, index)
+	return pointInRect(mouseX, mouseY, settingsOverlayItemX, getSettingsOverlayItemTop(index), settingsOverlayItemWidth, settingsOverlayItemHeight)
+end
+
+local function pointInMusicWheelSettingsButton(mouseX, mouseY)
+	return pointInRect(
+		mouseX,
+		mouseY,
+		musicWheelSettingsButtonX - (musicWheelSettingsButtonWidth / 2),
+		musicWheelSettingsButtonY - (musicWheelSettingsButtonHeight / 2),
+		musicWheelSettingsButtonWidth,
+		musicWheelSettingsButtonHeight
+	)
+end
+
+local function getMusicWheelDisplayOptionValue(key)
+	if getMusicWheelDisplaySetting then
+		return getMusicWheelDisplaySetting(key)
+	end
+	return false
+end
+
+local function refreshMusicWheelDisplay()
+	local top = SCREENMAN:GetTopScreen()
+	if top and top.GetMusicWheel then
+		local wheel = top:GetMusicWheel()
+		if wheel and wheel.RebuildWheelItems then
+			wheel:RebuildWheelItems()
+		end
+	end
+	MESSAGEMAN:Broadcast("MusicWheelDisplayRefresh")
+end
+
+local function toggleMusicWheelDisplayOption(key)
+	local nextValue = not getMusicWheelDisplayOptionValue(key)
+	if setMusicWheelDisplaySetting then
+		setMusicWheelDisplaySetting(key, nextValue)
+	end
+	refreshMusicWheelDisplay()
+end
+
+local function setOverallSubviewTab(tab)
+	if not tab then return end
+	if overallSubviewTab == tab then return end
+	overallSubviewTab = tab
+	if tab == overallSubviewTabs.WifeTimeline then
+		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
+		overallTimelineMaxValue = 100
+	elseif tab == overallSubviewTabs.Rating then
+		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+	end
+	MESSAGEMAN:Broadcast("StatsOverlayOverallSubviewChanged", {tab = tab})
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+local function formatInteger(value)
+	value = math.floor(tonumber(value) or 0)
+	local formatted = tostring(value)
+	while true do
+		formatted, count = formatted:gsub("^(%-?%d+)(%d%d%d)", "%1,%2")
+		if count == 0 then break end
+	end
+	return formatted
+end
+
+local function formatStepsTypeLabel(stepsType)
+	if not stepsType or stepsType == "" then return "Unknown" end
+	local label = tostring(stepsType):gsub("^StepsType_", ""):gsub("_", " ")
+	return label:gsub("(%a)([%w']*)", function(first, rest)
+		return string.upper(first) .. string.lower(rest)
+	end)
+end
+
+local function getOverallTimelineSkillsetCount()
+	return math.min(#ms.SkillSets, 8)
+end
+
+local function fitOverallTimelineX(index)
+	if #overallTimelineDaysForDisplay <= 1 then
+		return timelineGraphWidth / 2
+	end
+	return ((index - 1) / (#overallTimelineDaysForDisplay - 1)) * timelineGraphWidth
+end
+
+local function fitOverallTimelineY(value)
+	if overallTimelineMaxValue <= 0 then
+		return timelineGraphHeight
+	end
+	return timelineGraphHeight - ((value / overallTimelineMaxValue) * timelineGraphHeight)
+end
+
+local function getOverallTimelineGridFraction(index, count)
+	if count <= 1 then return 0 end
+	return (index - 1) / (count - 1)
+end
+
+local function getOverallTimelineGridX(index, count)
+	return timelineGraphLeft + (timelineGraphWidth * getOverallTimelineGridFraction(index, count))
+end
+
+local function getOverallTimelineGridY(index, count)
+	return timelineGraphTop + (timelineGraphHeight * getOverallTimelineGridFraction(index, count))
+end
+
+local function getOverallTimelineYAxisLabel(index)
+	local fraction = getOverallTimelineGridFraction(index, timelineYAxisTickCount)
+	return string.format("%.1f", overallTimelineMaxValue * (1 - fraction))
+end
+
+local function getOverallTimelineXAxisDisplay(index)
+	local dayCount = #overallTimelineDaysForDisplay
+	if dayCount == 0 then return nil, nil, nil end
+	if dayCount == 1 then
+		if index ~= 2 then return nil, nil, nil end
+		local day = overallTimelineDaysForDisplay[1]
+		return timelineGraphLeft + (timelineGraphWidth / 2), day, 0.5
+	end
+	local dayIndex = 1
+	if index == timelineXAxisTickCount then
+		dayIndex = dayCount
+	elseif index == 2 then
+		dayIndex = math.max(1, math.floor((dayCount + 1) / 2))
+	end
+	local day = overallTimelineDaysForDisplay[dayIndex]
+	if not day then return nil, nil, nil end
+	return getOverallTimelineGridX(index, timelineXAxisTickCount), day, getOverallTimelineGridFraction(index, timelineXAxisTickCount)
+end
+
+local function getOverallProfileSummary()
+	local profile = GetPlayerOrMachineProfile(PLAYER_1)
+	if not profile then return nil end
+	local summary = {
+		name = profile:GetDisplayName() or "Player",
+		rating = profile:GetPlayerRating() or 0,
+		playTimeSeconds = profile:GetTotalSessionSeconds() or 0,
+		songsPlayed = SCOREMAN:GetTotalNumberOfScores() or 0,
+		notesHit = profile:GetTotalTapsAndHolds() or 0,
+		skillsets = {}
+	}
+	for i = 1, math.min(#ms.SkillSets, 8) do
+		local skillset = ms.SkillSets[i]
+		if skillset then
+			summary.skillsets[#summary.skillsets + 1] = {
+				name = skillset,
+				rating = profile:GetPlayerSkillsetRating(skillset) or 0
+			}
+		end
+	end
+	return summary
+end
+
+local function isScoreValidForOverallDerivedData(score)
+	if not score then return false end
+	local okValid, valid = pcall(function() return score:GetEtternaValid() end)
+	if okValid and not valid then
+		return false
+	end
+	local okChord, chordCohesion = pcall(function() return score:GetChordCohesion() end)
+	if okChord and chordCohesion then
+		return false
+	end
+	local okTopScore, topScore = pcall(function() return score:GetTopScore() end)
+	if okTopScore and tonumber(topScore or 0) == 0 then
+		return false
+	end
+	return true
+end
+
+local function collectOverallLocalScoreEntries()
+	local entries = {}
+	local songs = SONGMAN:GetAllSongs() or {}
+	for _, song in ipairs(songs) do
+		local allSteps = song:GetAllSteps()
+		if allSteps then
+			for _, steps in ipairs(allSteps) do
+				local okChartKey, chartKey = pcall(function() return steps:GetChartKey() end)
+				if okChartKey and chartKey and chartKey ~= "" then
+					local scoresByRate = SCOREMAN:GetScoresByKey(chartKey)
+					if scoresByRate then
+						for _, highScoreList in pairs(scoresByRate) do
+							local okScores, scores = pcall(function() return highScoreList:GetScores() end)
+							if okScores and scores then
+								for _, score in ipairs(scores) do
+									if isScoreValidForOverallDerivedData(score) then
+										entries[#entries + 1] = {
+											score = score,
+											song = song,
+											steps = steps,
+											chartKey = chartKey
+										}
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return entries
+end
+
+local function buildOverallOverviewRows(entries)
+	local buckets = {}
+	for _, entry in ipairs(entries) do
+		local stepsType = entry.steps and entry.steps:GetStepsType() or nil
+		local key = stepsType or "Unknown"
+		if not buckets[key] then
+			buckets[key] = {
+				label = formatStepsTypeLabel(stepsType),
+				scoreCount = 0,
+				totalWife = 0,
+				bestSSR = 0,
+				chartSet = {}
+			}
+		end
+		local bucket = buckets[key]
+		bucket.scoreCount = bucket.scoreCount + 1
+		bucket.totalWife = bucket.totalWife + (entry.score:GetWifeScore() or 0)
+		bucket.bestSSR = math.max(bucket.bestSSR, entry.score:GetSkillsetSSR("Overall") or 0)
+		bucket.chartSet[entry.chartKey] = true
+	end
+	local rows = {}
+	for _, bucket in pairs(buckets) do
+		local chartCount = 0
+		for _ in pairs(bucket.chartSet) do
+			chartCount = chartCount + 1
+		end
+		rows[#rows + 1] = {
+			label = bucket.label,
+			scoreCount = bucket.scoreCount,
+			chartCount = chartCount,
+			averagePercent = string.format("%.2f%%", ((bucket.totalWife / math.max(1, bucket.scoreCount)) * 100)),
+			bestSSR = bucket.bestSSR
+		}
+	end
+	table.sort(rows, function(a, b)
+		if a.scoreCount == b.scoreCount then
+			return a.bestSSR > b.bestSSR
+		end
+		return a.scoreCount > b.scoreCount
+	end)
+	return rows
+end
+
+local function erfcApprox(value)
+	local sign = value < 0 and -1 or 1
+	local x = math.abs(value)
+	local t = 1 / (1 + (0.3275911 * x))
+	local polynomial = (((((1.061405429 * t) - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592
+	local erf = 1 - (polynomial * t * math.exp(-x * x))
+	if sign < 0 then
+		erf = -erf
+	end
+	return 1 - erf
+end
+
+local function calculateAggregateRating(values, finalMultiplier, deltaMultiplier)
+	if not values or #values == 0 then return 0 end
+	local rating = 0
+	local resolution = 10.24
+	for iteration = 1, 11 do
+		local sum = 0
+		repeat
+			rating = rating + resolution
+			sum = 0
+			for _, currentValue in ipairs(values) do
+				local erfcValue = erfcApprox(deltaMultiplier * (currentValue - rating))
+				if erfcValue < 1e-12 then
+					erfcValue = 1e-12
+				end
+				local contribution = (2 / erfcValue) - 2
+				if contribution > 0 then
+					sum = sum + contribution
+				end
+			end
+		until math.pow(2, rating * 0.1) >= sum
+		if iteration == 11 then
+			return rating * finalMultiplier
+		end
+		rating = rating - resolution
+		resolution = resolution / 2
+	end
+	return rating * finalMultiplier
+end
+
+local function calculatePlayerSkillsetRatingFromScores(values)
+	return calculateAggregateRating(values, 1.05, 0.1)
+end
+
+local function calculatePlayerOverallFromSkillsets(values)
+	return calculateAggregateRating(values, 1.125, 0.1)
+end
+
+local function getOverallTimelineRateKey(score)
+	local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
+	return string.format("%.3f", tonumber(rate) or 1)
+end
+
+local function getOverallTimelinePBMetric(score)
+	if not score then return 0 end
+	local okNorm, normPercent = pcall(function() return score:GetSSRNormPercent() end)
+	if okNorm and normPercent then
+		return tonumber(normPercent) or 0
+	end
+	return tonumber(score:GetWifeScore() or 0) or 0
+end
+
+local function isOverallTimelineRatingEntry(entry)
+	if not entry or not entry.score or not entry.steps then return false end
+	local okStepsType, stepsType = pcall(function() return entry.steps:GetStepsType() end)
+	if not okStepsType or not stepsType then
+		return false
+	end
+	local stepsTypeLabel = tostring(stepsType)
+	if stepsTypeLabel ~= "StepsType_dance_single" and stepsTypeLabel ~= "dance_single" then
+		return false
+	end
+	return isScoreValidForOverallDerivedData(entry.score)
+end
+
+local function applyOverallTimelineRatings(day, pbByBucket, skillsetCount)
+	local specificSkillsetRatings = {}
+	for i = 1, skillsetCount do
+		local skillset = ms.SkillSets[i]
+		if skillset ~= "Overall" then
+			local values = {}
+			for _, pbEntry in pairs(pbByBucket) do
+				values[#values + 1] = pbEntry.score:GetSkillsetSSR(skillset) or 0
+			end
+			local rating = calculatePlayerSkillsetRatingFromScores(values)
+			day.values[skillset] = rating
+			specificSkillsetRatings[#specificSkillsetRatings + 1] = rating
+		end
+	end
+	for i = 1, skillsetCount do
+		local skillset = ms.SkillSets[i]
+		if skillset == "Overall" then
+			day.values[skillset] = calculatePlayerOverallFromSkillsets(specificSkillsetRatings)
+		end
+	end
+end
+
+local function updateOverallTimelineMaxValue(day, skillsetCount, currentMax)
+	local maxValue = currentMax
+	for i = 1, skillsetCount do
+		local skillset = ms.SkillSets[i]
+		local value = day.values[skillset] or 0
+		if value > maxValue then
+			maxValue = value
+		end
+	end
+	return maxValue
+end
+
+-- Weekly grouping helpers for the Overall timeline graph
+local function getWeekStartTime(year, month, day)
+	local t = os.time({year = year, month = month, day = day, hour = 0, min = 0, sec = 0})
+	local weekday = tonumber(os.date("%w", t)) -- 0=Sun, 1=Mon, ..., 6=Sat
+	local daysToMonday = (weekday + 6) % 7
+	return t - daysToMonday * 86400
+end
+
+local function formatWeekKey(weekStartT)
+	-- Zero-padded ISO week: "YYYY-WNN" (sorts correctly within a year)
+	return os.date("%Y-W", weekStartT) .. string.format("%02d", tonumber(os.date("%V", weekStartT)))
+end
+
+local function formatWeekLabel(weekStartT)
+	local weekEndT = weekStartT + 6 * 86400
+	local sd = os.date("%d", weekStartT)
+	local sm = os.date("%b", weekStartT)
+	local ed = os.date("%d", weekEndT)
+	local em = os.date("%b", weekEndT)
+	local ey = os.date("%Y", weekEndT)
+	if sm == em then
+		return string.format("%s\xe2\x80\x93%s %s %s", sd, ed, em, ey)
+	else
+		return string.format("%s %s \xe2\x80\x93 %s %s %s", sd, sm, ed, em, ey)
+	end
+end
+
+local function buildOverallTimelineDataFallback(entries)
+	local datedEntries = {}
+	local maxValue = 1
+	local skillsetCount = getOverallTimelineSkillsetCount()
+	for _, entry in ipairs(entries) do
+		if entry and entry.score and isScoreValidForOverallDerivedData(entry.score) then
+			local year, month, day = getScoreDateParts(entry.score)
+			if year and month and day then
+				local scoreTime = parseScoreTime(entry.score) or os.time({year = year, month = month, day = day, hour = 0, min = 0, sec = 0})
+				local weekStartT = getWeekStartTime(year, month, day)
+				datedEntries[#datedEntries + 1] = {
+					score = entry.score,
+					key = formatWeekKey(weekStartT),
+					dayTimestamp = weekStartT,
+					scoreTimestamp = scoreTime,
+					label = formatWeekLabel(weekStartT)
+				}
+			end
+		end
+	end
+	table.sort(datedEntries, function(a, b)
+		if a.scoreTimestamp == b.scoreTimestamp then
+			return a.key < b.key
+		end
+		return a.scoreTimestamp < b.scoreTimestamp
+	end)
+	local days = {}
+	local accumulatedValues = {}
+	local currentDay = nil
+	for i = 1, skillsetCount do
+		local skillset = ms.SkillSets[i]
+		accumulatedValues[skillset] = {}
+	end
+	for _, entry in ipairs(datedEntries) do
+		for i = 1, skillsetCount do
+			local skillset = ms.SkillSets[i]
+			if skillset ~= "Overall" then
+				accumulatedValues[skillset][#accumulatedValues[skillset] + 1] = entry.score:GetSkillsetSSR(skillset) or 0
+			end
+		end
+		if not currentDay or currentDay.key ~= entry.key then
+			currentDay = {
+				key = entry.key,
+				timestamp = entry.dayTimestamp,
+				label = entry.label,
+				values = {}
+			}
+			days[#days + 1] = currentDay
+		end
+		local specificSkillsetRatings = {}
+		for i = 1, skillsetCount do
+			local skillset = ms.SkillSets[i]
+			if skillset ~= "Overall" then
+				local rating = calculatePlayerSkillsetRatingFromScores(accumulatedValues[skillset])
+				currentDay.values[skillset] = rating
+				specificSkillsetRatings[#specificSkillsetRatings + 1] = rating
+			end
+		end
+		for i = 1, skillsetCount do
+			local skillset = ms.SkillSets[i]
+			if skillset == "Overall" then
+				currentDay.values[skillset] = calculatePlayerOverallFromSkillsets(specificSkillsetRatings)
+			end
+		end
+		maxValue = updateOverallTimelineMaxValue(currentDay, skillsetCount, maxValue)
+	end
+	return days, maxValue
+end
+
+local function buildOverallTimelineData(entries)
+	local datedEntries = {}
+	local maxValue = 1
+	local skillsetCount = getOverallTimelineSkillsetCount()
+	for _, entry in ipairs(entries) do
+		if isOverallTimelineRatingEntry(entry) then
+			local score = entry.score
+			local year, month, day = getScoreDateParts(score)
+			if year and month and day then
+				local scoreTime = parseScoreTime(score) or os.time({year = year, month = month, day = day, hour = 0, min = 0, sec = 0})
+				local weekStartT = getWeekStartTime(year, month, day)
+				datedEntries[#datedEntries + 1] = {
+					score = score,
+					chartKey = entry.chartKey,
+					key = formatWeekKey(weekStartT),
+					dayTimestamp = weekStartT,
+					scoreTimestamp = scoreTime,
+					label = formatWeekLabel(weekStartT)
+				}
+			end
+		end
+	end
+	table.sort(datedEntries, function(a, b)
+		if a.scoreTimestamp == b.scoreTimestamp then
+			return a.key < b.key
+		end
+		return a.scoreTimestamp < b.scoreTimestamp
+	end)
+	local days = {}
+	local pbByBucket = {}
+	local currentDay = nil
+	for _, entry in ipairs(datedEntries) do
+		if not currentDay or currentDay.key ~= entry.key then
+			local previousDay = days[#days]
+			currentDay = {
+				key = entry.key,
+				timestamp = entry.dayTimestamp,
+				label = entry.label,
+				values = {}
+			}
+			if previousDay and previousDay.values then
+				for i = 1, skillsetCount do
+					local skillset = ms.SkillSets[i]
+					currentDay.values[skillset] = previousDay.values[skillset] or 0
+				end
+			end
+			days[#days + 1] = currentDay
+		end
+		local bucketKey = string.format("%s@%s", entry.chartKey or "", getOverallTimelineRateKey(entry.score))
+		local metric = getOverallTimelinePBMetric(entry.score)
+		local previousPB = pbByBucket[bucketKey]
+		if not previousPB or metric > previousPB.metric then
+			pbByBucket[bucketKey] = {score = entry.score, metric = metric}
+			applyOverallTimelineRatings(currentDay, pbByBucket, skillsetCount)
+			maxValue = updateOverallTimelineMaxValue(currentDay, skillsetCount, maxValue)
+		end
+	end
+	if #days == 0 and #entries > 0 then
+		return buildOverallTimelineDataFallback(entries)
+	end
+	return days, maxValue
+end
+
+function buildOverallWifeTimelineData(entries)
+	local buckets = {}
+	local totalWife = 0
+	local totalCount = 0
+	for _, entry in ipairs(entries) do
+		local score = entry.score
+		if score and isScoreValidForOverallDerivedData(score) and score:GetWifeGrade() ~= "Grade_Failed" then
+			local year, month, day = getScoreDateParts(score)
+			if year and month and day then
+				local weekStartT = getWeekStartTime(year, month, day)
+				local key = formatWeekKey(weekStartT)
+				if not buckets[key] then
+					buckets[key] = {key = key, timestamp = weekStartT, label = formatWeekLabel(weekStartT), total = 0, count = 0}
+				end
+				buckets[key].total = buckets[key].total + ((score:GetWifeScore() or 0) * 100)
+				buckets[key].count = buckets[key].count + 1
+				totalWife = totalWife + ((score:GetWifeScore() or 0) * 100)
+				totalCount = totalCount + 1
+			end
+		end
+	end
+	local days = {}
+	for _, bucket in pairs(buckets) do
+		days[#days + 1] = {
+			key = bucket.key,
+			timestamp = bucket.timestamp,
+			label = bucket.label,
+			values = {
+				Overall = bucket.total / math.max(1, bucket.count),
+				Average = totalWife / math.max(1, totalCount)
+			}
+		}
+	end
+	table.sort(days, function(a, b) return (a.timestamp or 0) < (b.timestamp or 0) end)
+	return days, 100
+end
+
+function buildOverallMsdGradePoints(entries)
+	local points = {}
+	for _, entry in ipairs(entries) do
+		local score = entry.score
+		if score and isScoreValidForOverallDerivedData(score) then
+			local ssr = score:GetSkillsetSSR("Overall") or 0
+			if ssr > 0 then
+				points[#points + 1] = {
+					x = ssr,
+					y = (score:GetWifeScore() or 0) * 100,
+					color = getGradeColor(score:GetWifeGrade())
+				}
+			end
+		end
+	end
+	table.sort(points, function(a, b)
+		if a.x == b.x then return a.y > b.y end
+		return a.x < b.x
+	end)
+	return points
+end
+
+function buildOverallMostPlayed(entries)
+	local chartBuckets = {}
+	local folderBuckets = {}
+	for _, entry in ipairs(entries) do
+		local song = entry.song
+		local chartKey = entry.chartKey or ""
+		if chartKey ~= "" then
+			if not chartBuckets[chartKey] then
+				chartBuckets[chartKey] = {
+					title = song and song:GetDisplayMainTitle() or chartKey,
+					meta = song and song:GetDisplayArtist() or "Unknown Artist",
+					count = 0
+				}
+			end
+			chartBuckets[chartKey].count = chartBuckets[chartKey].count + 1
+		end
+		if song and song.GetGroupName then
+			local group = song:GetGroupName() or "Unknown Folder"
+			if not folderBuckets[group] then
+				folderBuckets[group] = {title = group, meta = "Folder", count = 0}
+			end
+			folderBuckets[group].count = folderBuckets[group].count + 1
+		end
+	end
+	local charts = {}
+	for _, bucket in pairs(chartBuckets) do charts[#charts + 1] = bucket end
+	local folders = {}
+	for _, bucket in pairs(folderBuckets) do folders[#folders + 1] = bucket end
+	table.sort(charts, function(a, b)
+		if a.count == b.count then return a.title < b.title end
+		return a.count > b.count
+	end)
+	table.sort(folders, function(a, b)
+		if a.count == b.count then return a.title < b.title end
+		return a.count > b.count
+	end)
+	return charts, folders
+end
+
+local function refreshOverallDerivedData()
+	if not overallDerivedDataDirty and overallLocalScoreEntries then return end
+	overallLocalScoreEntries = collectOverallLocalScoreEntries()
+	overallOverviewRowsForDisplay = buildOverallOverviewRows(overallLocalScoreEntries)
+	overallRatingTimelineDaysForDisplay, overallTimelineMaxValue = buildOverallTimelineData(overallLocalScoreEntries)
+	overallWifeTimelineDaysForDisplay = buildOverallWifeTimelineData(overallLocalScoreEntries)
+	overallMsdGradePointsForDisplay = buildOverallMsdGradePoints(overallLocalScoreEntries)
+	overallMostPlayedChartsForDisplay, overallMostPlayedFoldersForDisplay = buildOverallMostPlayed(overallLocalScoreEntries)
+	overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+	overallDerivedDataDirty = false
+end
+
+local function getOverallBestScores()
+	local scores = {}
+	SCOREMAN:SortSSRsForGame("Overall")
+	for i = 1, overallBestScoreRowCount do
+		local rank = overallBestScoreOffset + i
+		local score = SCOREMAN:GetTopSSRHighScoreForGame(rank, "Overall")
+		if not score then break end
+		local chartKey = score:GetChartKey()
+		local song = SONGMAN:GetSongByChartKey(chartKey)
+		local steps = SONGMAN:GetStepsByChartKey(chartKey)
+		scores[#scores + 1] = {
+			rank = rank,
+			score = score,
+			title = song and song:GetDisplayMainTitle() or chartKey,
+			artist = song and song:GetDisplayArtist() or "Unknown Artist",
+			chart = formatChartMeter(steps),
+			ssr = score:GetSkillsetSSR("Overall") or 0,
+			percent = formatPercent(score),
+			rate = formatRate(score),
+			clearType = getClearTypeFromScore(PLAYER_1, score, 0),
+			clearColor = getClearTypeFromScore(PLAYER_1, score, 2),
+			gradeColor = getGradeColor(score:GetWifeGrade())
+		}
+	end
+	return scores
+end
+
+local function refreshLeaderboardData()
+	leaderboardEntriesForDisplay = {}
+	refreshOverallDerivedData()
+	local buckets = {}
+	for _, entry in ipairs(overallLocalScoreEntries or {}) do
+		local score = entry.score
+		local judge = formatJudge(score)
+		if score and judge ~= "" then
+			if not buckets[judge] then
+				buckets[judge] = {judge = judge, scores = {}, total = 0}
+			end
+			buckets[judge].scores[#buckets[judge].scores + 1] = entry
+			buckets[judge].total = buckets[judge].total + ((score:GetWifeScore() or 0) * 100)
+		end
+	end
+	breakdownJudgeRowsForDisplay = {}
+	for _, bucket in pairs(buckets) do
+		breakdownJudgeRowsForDisplay[#breakdownJudgeRowsForDisplay + 1] = {
+			judge = bucket.judge,
+			count = #bucket.scores,
+			average = bucket.total / math.max(1, #bucket.scores)
+		}
+	end
+	table.sort(breakdownJudgeRowsForDisplay, function(a, b)
+		return a.judge < b.judge
+	end)
+	if not buckets[breakdownSelectedJudge] and breakdownJudgeRowsForDisplay[1] then
+		breakdownSelectedJudge = breakdownJudgeRowsForDisplay[1].judge
+	end
+	local selected = buckets[breakdownSelectedJudge]
+	if not selected then
+		leaderboardStatus = {
+			state = "empty",
+			title = "No local scores found",
+			detail = "Play history is required to build judge difficulty breakdowns."
+		}
+		return
+	end
+	table.sort(selected.scores, function(a, b)
+		local aw = a.score and a.score:GetWifeScore() or 0
+		local bw = b.score and b.score:GetWifeScore() or 0
+		if aw == bw then
+			return (a.song and a.song:GetDisplayMainTitle() or "") < (b.song and b.song:GetDisplayMainTitle() or "")
+		end
+		return aw > bw
+	end)
+	for i = 1, math.min(#selected.scores, leaderboardRowCount) do
+		local entry = selected.scores[i]
+		local score = entry.score
+		local song = entry.song
+		local steps = entry.steps
+		leaderboardEntriesForDisplay[#leaderboardEntriesForDisplay + 1] = {
+			rank = i,
+			name = song and song:GetDisplayMainTitle() or score:GetChartKey(),
+			metric = formatPercent(score),
+			activity = string.format("%s • %s • %.2f", formatChartMeter(steps), formatRate(score), score:GetSkillsetSSR("Overall") or 0),
+			gradeColor = getGradeColor(score:GetWifeGrade())
+		}
+	end
+	leaderboardStatus = {
+		state = "ready",
+		title = string.format("%s scores", breakdownSelectedJudge),
+		detail = string.format("%d scores • %.2f%% average", #selected.scores, selected.total / math.max(1, #selected.scores))
+	}
+end
+
+local function setStatsOverlayTab(tab)
+	if not tab then return end
+	if statsOverlayTab == tab then return end
+	statsOverlayTab = tab
+	hoveredActivityDay = nil
+	if tab == statsOverlayTabs.Overall then
+		overallBestScoreOffset = 0
+	end
+	MESSAGEMAN:Broadcast("StatsOverlayTabChanged", {tab = tab})
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+formatPercent = function(score)
+	if not score then return "" end
+	local percent = score:GetWifeScore() * 100
+	return string.format(percent >= 99.7 and "%.4f%%" or "%.2f%%", percent)
+end
+
+formatRate = function(score)
+	if not score then return "" end
+	return string.format("%.2f", score:GetMusicRate()):gsub("%.?0+$", "") .. "x"
+end
+
+local function getRecentScoreCount()
+	local count = 0
+	for i = 1, 64 do
+		if SCOREMAN:GetRecentScoreForGame(i) then
+			count = count + 1
+		else
+			break
+		end
+	end
+	return count
+end
+
+formatDateKey = function(year, month, day)
+	return string.format("%04d-%02d-%02d", year, month, day)
+end
+
+local function getTodayDateParts()
+	local now = os.time()
+	return tonumber(os.date("%Y", now)), tonumber(os.date("%m", now)), tonumber(os.date("%d", now))
+end
+
+local function daysInMonth(year, month)
+	local nextMonth = os.time({year = year, month = month + 1, day = 1, hour = 0, min = 0, sec = 0})
+	return tonumber(os.date("%d", nextMonth - 86400))
+end
+
+local function shiftSelectedMonth(offset)
+	local shifted = os.time({year = selectedYear, month = selectedMonth + offset, day = 1, hour = 0, min = 0, sec = 0})
+	selectedYear = tonumber(os.date("%Y", shifted))
+	selectedMonth = tonumber(os.date("%m", shifted))
+	selectedDay = math.min(selectedDay, daysInMonth(selectedYear, selectedMonth))
+end
+
+parseScoreTime = function(score)
+	if not score then return nil end
+	local d = score:GetDate()
+	if not d or d == "" then return nil end
+	d = tostring(d):gsub("T", " "):gsub("/", "-")
+	local year, month, day, hour, min, sec = d:match("^(%d+)%-(%d+)%-(%d+)%s+(%d+):(%d+):(%d+)")
+	if not year then
+		year, month, day, hour, min = d:match("^(%d+)%-(%d+)%-(%d+)%s+(%d+):(%d+)")
+		sec = 0
+	end
+	if not year then
+		year, month, day = d:match("^(%d+)%-(%d+)%-(%d+)")
+		hour, min, sec = 0, 0, 0
+	end
+	if not year then return nil end
+	return os.time({year = tonumber(year), month = tonumber(month), day = tonumber(day), hour = tonumber(hour), min = tonumber(min), sec = tonumber(sec)})
+end
+
+getScoreDateParts = function(score)
+	local t = parseScoreTime(score)
+	if t then
+		return tonumber(os.date("%Y", t)), tonumber(os.date("%m", t)), tonumber(os.date("%d", t))
+	end
+	if not score then return nil end
+	local d = score:GetDate()
+	if not d or d == "" then return nil end
+	d = tostring(d):gsub("/", "-")
+	local year, month, day = d:match("^(%d+)%-(%d+)%-(%d+)")
+	if not year then return nil end
+	year, month, day = tonumber(year), tonumber(month), tonumber(day)
+	if not year or not month or not day then return nil end
+	return year, month, day
+end
+
+local function getScoreDateKey(score)
+	local year, month, day = getScoreDateParts(score)
+	if not year then return nil end
+	return formatDateKey(year, month, day)
+end
+
+local function getScoresForSelectedDate()
+	local selectedKey = formatDateKey(selectedYear, selectedMonth, selectedDay)
+	local scores = {}
+	for i = 1, 512 do
+		local score = SCOREMAN:GetRecentScoreForGame(i)
+		if not score then break end
+		if getScoreDateKey(score) == selectedKey then
+			scores[#scores + 1] = score
+		end
+	end
+	return scores
+end
+
+local function getSelectedMonthActivity()
+	local counts = {}
+	local monthDays = daysInMonth(selectedYear, selectedMonth)
+	for day = 1, monthDays do
+		counts[day] = 0
+	end
+	local maxCount = 0
+	for i = 1, 512 do
+		local score = SCOREMAN:GetRecentScoreForGame(i)
+		if not score then break end
+		local year, month, day = getScoreDateParts(score)
+		if year == selectedYear and month == selectedMonth and day and day >= 1 and day <= monthDays then
+			counts[day] = counts[day] + 1
+			if counts[day] > maxCount then
+				maxCount = counts[day]
+			end
+		end
+	end
+	return counts, maxCount, monthDays
+end
+
+local function getSelectedSessionSeconds(scores)
+	local displayDay = hoveredActivityDay or selectedDay
+	local todayYear, todayMonth, todayDay = getTodayDateParts()
+	if selectedYear == todayYear and selectedMonth == todayMonth and displayDay == todayDay then
+		return GAMESTATE:GetSessionTime()
+	end
+	local earliest = nil
+	local latest = nil
+	for _, score in ipairs(scores) do
+		local scoreTime = parseScoreTime(score)
+		if scoreTime then
+			if not earliest or scoreTime < earliest then earliest = scoreTime end
+			if not latest or scoreTime > latest then latest = scoreTime end
+		end
+	end
+	if earliest and latest and latest > earliest then
+		return latest - earliest
+	end
+	return 0
+end
+
+formatJudge = function(score)
+	if not score then return "" end
+	local j = table.find(ms.JudgeScalers, notShit.round(score:GetJudgeScale(), 2))
+	if not j then j = 4 end
+	if j < 4 then j = 4 end
+	return "J" .. j
+end
+
+formatChartMeter = function(steps)
+	if not steps then return "" end
+	local parts = {}
+	local style = GAMESTATE:GetCurrentStyle()
+	local keymode = nil
+	if style then
+		local ok, columns = pcall(function() return style:ColumnsPerPlayer() end)
+		if ok and columns then
+			keymode = tostring(columns) .. "K"
+		end
+	end
+	if keymode then parts[#parts + 1] = keymode end
+	parts[#parts + 1] = getShortDifficulty(steps:GetDifficulty())
+	parts[#parts + 1] = tostring(steps:GetMeter())
+	return table.concat(parts, " ")
+end
+
+local function getActivityDayAtPosition(mouseX, mouseY)
+	for day = 1, activityMonthDayCount do
+		local index = day - 1
+		local col = index % activityColumnCount
+		local row = math.floor(index / activityColumnCount)
+		local cellX = activityGridX + (col * activityCellStepX)
+		local cellY = activityGridY + (row * activityCellStepY)
+		if pointInRect(mouseX, mouseY, cellX, cellY, activityCellSize, activityCellSize) then
+			return day
+		end
+	end
+	return nil
+end
+
+local function isOverSessionPanel(mouseX, mouseY)
+	if not isStatsOverlaySessionTab() then return false end
+	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY, sessionPanelWidth, sessionPanelHeight)
+end
+
+local function getOverallTimelineHoverIndex(mouseX, mouseY)
+	if not isStatsOverlayOverallSubview(overallSubviewTabs.Rating) and not isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline) then return nil end
+	if not pointInRect(mouseX, mouseY, timelineGraphLeft, timelineGraphTop, timelineGraphWidth, timelineGraphHeight) then return nil end
+	if #overallTimelineDaysForDisplay == 0 then return nil end
+	if #overallTimelineDaysForDisplay == 1 then return 1 end
+	local relative = (mouseX - timelineGraphLeft) / timelineGraphWidth
+	local index = math.floor((relative * (#overallTimelineDaysForDisplay - 1)) + 0.5) + 1
+	if index < 1 then index = 1 end
+	if index > #overallTimelineDaysForDisplay then index = #overallTimelineDaysForDisplay end
+	return index
+end
+
+local function isOverOverallBestScoresPanel(mouseX, mouseY)
+	if not isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed) then return false end
+	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY + 72, sessionPanelWidth, sessionPanelHeight - 90)
+end
+
+local function clampSessionScoreOffset()
+	local maxOffset = math.max(0, #selectedScoresForDisplay - sessionRowCount)
+	if sessionScoreOffset < 0 then
+		sessionScoreOffset = 0
+	elseif sessionScoreOffset > maxOffset then
+		sessionScoreOffset = maxOffset
+	end
+end
+
+local function pageSessionScores(direction)
+	sessionScoreOffset = sessionScoreOffset + (direction * sessionRowCount)
+	clampSessionScoreOffset()
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+local function clampOverallBestScoreOffset()
+	if overallBestScoreOffset < 0 then
+		overallBestScoreOffset = 0
+	end
+end
+
+local function pageOverallBestScores(direction)
+	local nextOffset = overallBestScoreOffset + (direction * overallBestScoreRowCount)
+	if nextOffset < 0 then
+		nextOffset = 0
+	end
+	if direction > 0 then
+		local nextScore = SCOREMAN:GetTopSSRHighScoreForGame(nextOffset + 1, "Overall")
+		if not nextScore then
+			return
+		end
+		local pageStartScore = SCOREMAN:GetTopSSRHighScoreForGame(nextOffset, "Overall")
+		if nextOffset > 0 and not pageStartScore then
+			return
+		end
+	end
+	overallBestScoreOffset = nextOffset
+	clampOverallBestScoreOffset()
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+local function getQuickMenuItemTop(index)
+	return quickMenuItemY + ((index - 1) * (quickMenuItemHeight + quickMenuItemGap))
+end
+
+local function pointInQuickMenuItem(mouseX, mouseY, index)
+	return pointInRect(mouseX, mouseY, quickMenuItemX, getQuickMenuItemTop(index), quickMenuItemWidth, quickMenuItemHeight)
+end
+
+local function setStatsOverlayActive(active)
+	if statsOverlayActive == active then return end
+	statsOverlayActive = active
+	setenv("StatsOverlayActive", active)
+	if active then
+		if settingsOverlayActive then
+			setSettingsOverlayActive(false)
+		end
+		selectedYear, selectedMonth, selectedDay = getTodayDateParts()
+		hoveredActivityDay = nil
+		sessionScoreOffset = 0
+		overallBestScoreOffset = 0
+		overallTimelineHoveredIndex = nil
+		overallLocalScoreEntries = nil
+		overallOverviewRowsForDisplay = {}
+		overallTimelineDaysForDisplay = {}
+		overallDerivedDataDirty = true
+		lastSessionDisplayKey = nil
+		statsOverlayTab = statsOverlayTabs.Sessions
+		overallSubviewTab = overallSubviewTabs.WifeTimeline
+		statsOverlayInputRedirect = SCREENMAN:get_input_redirected(PLAYER_1)
+		SCREENMAN:set_input_redirected(PLAYER_1, true)
+	else
+		hoveredActivityDay = nil
+		sessionScoreOffset = 0
+		overallBestScoreOffset = 0
+		overallTimelineHoveredIndex = nil
+		overallLocalScoreEntries = nil
+		overallOverviewRowsForDisplay = {}
+		overallTimelineDaysForDisplay = {}
+		overallDerivedDataDirty = true
+		lastSessionDisplayKey = nil
+		SCREENMAN:set_input_redirected(PLAYER_1, statsOverlayInputRedirect)
+	end
+	MESSAGEMAN:Broadcast("StatsOverlayStateChanged", {active = active})
+end
+
+setSettingsOverlayActive = function(active)
+	if settingsOverlayActive == active then return end
+	settingsOverlayActive = active
+	setenv("MusicWheelSettingsOverlayActive", active)
+	if active then
+		if statsOverlayActive then
+			setStatsOverlayActive(false)
+		end
+		if quickMenuActive then
+			setQuickMenuActive(false)
+		end
+		settingsOverlayInputRedirect = SCREENMAN:get_input_redirected(PLAYER_1)
+		SCREENMAN:set_input_redirected(PLAYER_1, true)
+	else
+		SCREENMAN:set_input_redirected(PLAYER_1, settingsOverlayInputRedirect)
+	end
+	MESSAGEMAN:Broadcast("MusicWheelSettingsOverlayStateChanged", {active = active})
+end
+
+setQuickMenuActive = function(active)
+	if quickMenuActive == active then return end
+	quickMenuActive = active
+	setenv("QuickMenuActive", active)
+	if active then
+		if settingsOverlayActive then
+			setSettingsOverlayActive(false)
+		end
+		if statsOverlayActive then
+			setStatsOverlayActive(false)
+		end
+		quickMenuInputRedirect = SCREENMAN:get_input_redirected(PLAYER_1)
+		SCREENMAN:set_input_redirected(PLAYER_1, true)
+	else
+		SCREENMAN:set_input_redirected(PLAYER_1, quickMenuInputRedirect)
+	end
+	MESSAGEMAN:Broadcast("QuickMenuStateChanged", {active = active})
+end
+
+local function openServiceMenu()
+	setQuickMenuActive(false)
+	SCREENMAN:SetNewScreen("ScreenOptionsService")
+end
+
+local function openNoteskinOptions()
+	setQuickMenuActive(false)
+	setenv("NewOptions", "Main")
+	local top = SCREENMAN:GetTopScreen()
+	if top and top.OpenOptions then
+		top:OpenOptions()
+	end
+end
+
+local function openKeyConfig()
+	setQuickMenuActive(false)
+	SCREENMAN:SetNewScreen("ScreenMapControllers")
+end
+
+local function input(event)
+	local deviceButton = event.DeviceInput and event.DeviceInput.button or nil
+	if deviceButton == "DeviceButton_left mouse button" then
+		local mouseX = INPUTFILTER:GetMouseX()
+		local mouseY = INPUTFILTER:GetMouseY()
+		if pointInMusicWheelSettingsButton(mouseX, mouseY) then
+			if event.type == "InputEventType_FirstPress" then
+				MESSAGEMAN:Broadcast("ToggleMusicWheelSettingsOverlay")
+			end
+			return true
+		end
+	end
+	if settingsOverlayActive and event.type == "InputEventType_FirstPress" then
+		if event.button == "Back" or deviceButton == "DeviceButton_right mouse button" then
+			setSettingsOverlayActive(false)
+			return true
+		end
+	end
+	if settingsOverlayActive and deviceButton == "DeviceButton_left mouse button" then
+		if event.type == "InputEventType_FirstPress" then
+			local mouseX = INPUTFILTER:GetMouseX()
+			local mouseY = INPUTFILTER:GetMouseY()
+			local handled = false
+			for index, option in ipairs(musicWheelDisplayOptions) do
+				if pointInSettingsOverlayItem(mouseX, mouseY, index) then
+					toggleMusicWheelDisplayOption(option.key)
+					handled = true
+					break
+				end
+			end
+			if not handled and not pointInRect(mouseX, mouseY, settingsOverlayPanelX, settingsOverlayPanelY, settingsOverlayPanelWidth, settingsOverlayPanelHeight) then
+				setSettingsOverlayActive(false)
+			end
+		end
+		return true
+	end
+	if settingsOverlayActive and deviceButton == "DeviceButton_right mouse button" then
+		return true
+	end
+	if quickMenuActive and event.type == "InputEventType_FirstPress" then
+		if event.button == "Back" or deviceButton == "DeviceButton_right mouse button" then
+			setQuickMenuActive(false)
+			return true
+		end
+	end
+	if quickMenuActive and deviceButton == "DeviceButton_left mouse button" then
+		if event.type == "InputEventType_FirstPress" then
+			local mouseX = INPUTFILTER:GetMouseX()
+			local mouseY = INPUTFILTER:GetMouseY()
+			if pointInQuickMenuItem(mouseX, mouseY, 1) then
+				openServiceMenu()
+			elseif pointInQuickMenuItem(mouseX, mouseY, 2) then
+				openNoteskinOptions()
+			elseif pointInQuickMenuItem(mouseX, mouseY, 3) then
+				openKeyConfig()
+			elseif not pointInRect(mouseX, mouseY, quickMenuPanelX, quickMenuPanelY, quickMenuPanelWidth, quickMenuPanelHeight) then
+				setQuickMenuActive(false)
+			end
+		end
+		return true
+	end
+	if quickMenuActive and deviceButton == "DeviceButton_right mouse button" then
+		return true
+	end
+	if statsOverlayActive and event.type == "InputEventType_FirstPress" then
+		if event.button == "Back" or deviceButton == "DeviceButton_right mouse button" then
+			setStatsOverlayActive(false)
+			return true
+		elseif deviceButton == "DeviceButton_mousewheel up" then
+			MESSAGEMAN:Broadcast("StatsOverlayMouseWheel", {direction = "up"})
+			return true
+		elseif deviceButton == "DeviceButton_mousewheel down" then
+			MESSAGEMAN:Broadcast("StatsOverlayMouseWheel", {direction = "down"})
+			return true
+		end
+	end
+	if statsOverlayActive and deviceButton == "DeviceButton_left mouse button" then
+		if event.type == "InputEventType_FirstPress" then
+			MESSAGEMAN:Broadcast("MouseDown", {event = event})
+			local mouseX = INPUTFILTER:GetMouseX()
+			local mouseY = INPUTFILTER:GetMouseY()
+			if pointInBox(mouseX, mouseY, overlayCloseButtonX, overlayCloseButtonY, overlayCloseButtonHalfWidth, overlayCloseButtonHalfHeight) then
+				setStatsOverlayActive(false)
+			else
+				local selectedTab = getStatsOverlayTabAtPosition(mouseX, mouseY)
+				if selectedTab then
+					setStatsOverlayTab(selectedTab)
+				elseif isStatsOverlayOverallTab() then
+					local subviewTab = getOverallSubviewTabAtPosition(mouseX, mouseY)
+					if subviewTab then
+						setOverallSubviewTab(subviewTab)
+					elseif pointInRect(mouseX, mouseY, 225, 162, 80, 24) then
+						SCREENMAN:SetNewScreen("ScreenAssetSettings")
+					end
+				elseif isStatsOverlaySessionTab() and pointInRect(mouseX, mouseY, activityPrevButtonX, activityPrevButtonY, activityButtonWidth, activityButtonHeight) then
+					shiftSelectedMonth(-1)
+					sessionScoreOffset = 0
+					lastSessionDisplayKey = nil
+					MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+				elseif isStatsOverlaySessionTab() and pointInRect(mouseX, mouseY, activityNextButtonX, activityNextButtonY, activityButtonWidth, activityButtonHeight) then
+					shiftSelectedMonth(1)
+					sessionScoreOffset = 0
+					lastSessionDisplayKey = nil
+					MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+				elseif isStatsOverlaySessionTab() then
+					local day = getActivityDayAtPosition(mouseX, mouseY)
+					if day then
+						selectedDay = day
+						sessionScoreOffset = 0
+						lastSessionDisplayKey = nil
+						MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+					end
+				end
+			end
+		elseif event.type == "InputEventType_Release" then
+			MESSAGEMAN:Broadcast("MouseLeftClick")
+			MESSAGEMAN:Broadcast("MouseUp", {event = event})
+		end
+		return true
+	end
+	if statsOverlayActive and deviceButton == "DeviceButton_right mouse button" then
+		return true
+	end
+	if deviceButton == "DeviceButton_left mouse button" then 
+		if event.type == "InputEventType_Release" then
+			MESSAGEMAN:Broadcast("MouseLeftClick")
+			MESSAGEMAN:Broadcast("MouseUp", {event = event})
+		elseif event.type == "InputEventType_FirstPress" then
+			MESSAGEMAN:Broadcast("MouseDown", {event = event})
+		end
+	elseif deviceButton == "DeviceButton_right mouse button" then
+		if event.type == "InputEventType_Release" then
+			MESSAGEMAN:Broadcast("MouseRightClick")
+			MESSAGEMAN:Broadcast("MouseUp", {event = event})
+		elseif event.type == "InputEventType_FirstPress" then
+			MESSAGEMAN:Broadcast("MouseDown", {event = event})
+		end
+	end
+	return false
+end
+
+local function sessionRow(i)
+	return Def.ActorFrame {
+		Name = "Row" .. i,
+		InitCommand = function(self)
+			self:xy(sessionPanelX + 12, sessionPanelY + 44 + ((i - 1) * 50))
+			self:visible(false)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Update")
+		end,
+		UpdateCommand = function(self)
+			if not isStatsOverlaySessionTab() then
+				self:visible(false)
+				return
+			end
+			local score = selectedScoresForDisplay[sessionScoreOffset + i]
+			if not score then
+				self:visible(false)
+				return
+			end
+			local chartKey = score:GetChartKey()
+			local song = SONGMAN:GetSongByChartKey(chartKey)
+			local steps = SONGMAN:GetStepsByChartKey(chartKey)
+			local ssr = score:GetSkillsetSSR("Overall")
+			local meta = song and song:GetDisplayArtist() or "Unknown Artist"
+			local subtitle = song and song:GetDisplaySubTitle() or ""
+			if subtitle ~= "" then
+				meta = meta .. " • " .. subtitle
+			end
+			self:visible(true)
+			self:GetChild("Title"):settext(song and song:GetDisplayMainTitle() or chartKey)
+			self:GetChild("Meta"):settext(meta)
+			self:GetChild("Chart"):settext(formatChartMeter(steps))
+			self:GetChild("Rate"):settext(formatRate(score))
+			self:GetChild("Percent"):settext(string.format("%s [%s]", formatPercent(score), formatJudge(score)))
+			self:GetChild("Percent"):diffuse(getGradeColor(score:GetWifeGrade()))
+			self:GetChild("ClearType"):settext(getClearTypeFromScore(PLAYER_1, score, 0))
+			self:GetChild("ClearType"):diffuse(getClearTypeFromScore(PLAYER_1, score, 2))
+			if ssr and ssr > 0 then
+				self:GetChild("SSR"):settext(string.format("%.2f", ssr))
+				self:GetChild("SSR"):diffuse(HVColor.GetMSDRatingColor(ssr))
+			else
+				self:GetChild("SSR"):settext("--")
+				self:GetChild("SSR"):diffuse(color("#888888"))
+			end
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(0, 0):halign(0):valign(0):zoomto(sessionCardWidth, 34):diffuse(color("#111111")):diffusealpha(0.8)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "Title",
+			InitCommand = function(self)
+				self:xy(8, 2):halign(0):valign(0):zoom(0.23):maxwidth(760)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Meta",
+			InitCommand = function(self)
+				self:xy(8, 13):halign(0):valign(0):zoom(0.16):diffuse(color("#BBBBBB")):maxwidth(760)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Chart",
+			InitCommand = function(self)
+				self:xy(8, 23):halign(0):valign(0):zoom(0.16):diffuse(color("#D6D6D6")):maxwidth(760)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "Percent",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 242 + 107, 4):halign(1):valign(0):zoom(0.21)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "ClearType",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 186 +107	, 4):halign(0.5):valign(0):zoom(0.21)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "SSR",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 116 + 107, 4):halign(1):valign(0):zoom(0.21)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rate",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 242 +107, 20):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD"))
+			end
+		}
+	}
+ end
+
+local function statsOverlayTabButton(button)
+	return Def.ActorFrame {
+		Name = "TabButton" .. tostring(button.tab),
+		InitCommand = function(self)
+			self:xy(button.left, statsOverlayTabTop)
+			self:queuecommand("Set")
+		end,
+		SetCommand = function(self)
+			local active = statsOverlayTab == button.tab
+			self:GetChild("Label"):diffuse(active and color("#FFFFFF") or color("#BBBBBB"))
+			self:GetChild("ActiveLine"):visible(active)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(button.width, statsOverlayTabHeight):diffusealpha(0)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(12, 17):halign(0):valign(0.5):zoom(0.42):settext(button.label)
+			end
+		},
+		Def.Quad {
+			Name = "ActiveLine",
+			InitCommand = function(self)
+				self:xy(0, statsOverlayTabHeight - 1):halign(0):valign(1):zoomto(button.width, 2):diffuse(color("#FFFFFF")):visible(false)
+			end
+		}
+	}
+end
+
+local function overallSubviewButton(button)
+	return Def.ActorFrame {
+		Name = "OverallSubviewButton" .. tostring(button.tab),
+		InitCommand = function(self)
+			self:xy(button.left, button.top):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallSubview(button.tab)
+			self:visible(isStatsOverlayOverallTab())
+			self:GetChild("Label"):diffuse(active and color("#FFFFFF") or color("#AFAFAF"))
+			self:GetChild("Underline"):visible(active)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(button.width, 24):diffusealpha(0)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(0, 12):halign(0):valign(0.5):zoom(0.28):settext(button.label)
+			end
+		},
+		Def.Quad {
+			Name = "Underline",
+			InitCommand = function(self)
+				self:xy(0, 24):halign(0):valign(1):zoomto(button.width, 2):diffuse(color("#FFFFFF")):visible(false)
+			end
+		}
+	}
+end
+
+local function overallSkillsetRow(i)
+	return Def.ActorFrame {
+		Name = "OverallSkillset" .. i,
+		InitCommand = function(self)
+			self:xy(102, 284 + ((i - 1) * 15))
+		end,
+		SetCommand = function(self)
+			local entry = overallProfileSummary and overallProfileSummary.skillsets and overallProfileSummary.skillsets[i] or nil
+			self:visible(entry ~= nil and isStatsOverlayOverallTab())
+			if not entry then return end
+			self:GetChild("Name"):settext(entry.name)
+			self:GetChild("Rating"):settext(string.format("%05.2f", entry.rating or 0))
+			self:GetChild("Rating"):diffuse(HVColor.GetMSDRatingColor(entry.rating or 0))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(196, 14):diffuse(color("#101010")):diffusealpha(0.8)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Name",
+			InitCommand = function(self)
+				self:xy(4, 7):halign(0):valign(0.5):zoom(0.22):maxwidth(340)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rating",
+			InitCommand = function(self)
+				self:xy(192, 7):halign(1):valign(0.5):zoom(0.22)
+			end
+		}
+	}
+end
+
+local function overallBestScoreRow(i)
+	return Def.ActorFrame {
+		Name = "OverallBestScoreRow" .. i,
+		InitCommand = function(self)
+			self:xy(sessionPanelX + 12, sessionPanelY + 78 + ((i - 1) * 34))
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local entry = i <= 4 and overallMostPlayedChartsForDisplay[i] or overallMostPlayedFoldersForDisplay[i - 4]
+			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed)
+			self:visible(active and entry ~= nil)
+			if not entry then return end
+			self:GetChild("Rank"):settext(i <= 4 and string.format("C%d", i) or string.format("F%d", i - 4))
+			self:GetChild("Title"):settext(entry.title)
+			self:GetChild("Meta"):settext(entry.meta or "")
+			self:GetChild("Percent"):settext(formatInteger(entry.count or 0))
+			self:GetChild("Percent"):diffuse(color("#FFFFFF"))
+			self:GetChild("Rate"):settext("plays")
+			self:GetChild("SSR"):settext("")
+			self:GetChild("Clear"):settext("")
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(sessionCardWidth, 28):diffuse(color("#111111")):diffusealpha(0.82)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rank",
+			InitCommand = function(self)
+				self:xy(6, 6):halign(0):valign(0):zoom(0.24):diffuse(color("#BBBBBB"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Title",
+			InitCommand = function(self)
+				self:xy(40, 3):halign(0):valign(0):zoom(0.24):maxwidth(700)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Meta",
+			InitCommand = function(self)
+				self:xy(40, 17):halign(0):valign(0):zoom(0.18):diffuse(color("#AFAFAF")):maxwidth(860)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Percent",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 160, 6):halign(1):valign(0):zoom(0.22)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rate",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 118, 6):halign(1):valign(0):zoom(0.2):diffuse(color("#DDDDDD"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SSR",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 66, 6):halign(1):valign(0):zoom(0.22)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Clear",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 6, 6):halign(1):valign(0):zoom(0.2)
+			end
+		}
+	}
+end
+
+local function overallOverviewRow(i)
+	return Def.ActorFrame {
+		Name = "OverallOverviewRow" .. i,
+		InitCommand = function(self)
+			self:xy(sessionPanelX + 12, sessionPanelY + 96 + ((i - 1) * 26))
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local entry = overallOverviewRowsForDisplay[i]
+			local active = false
+			self:visible(active and entry ~= nil)
+			if not entry then return end
+			self:GetChild("Label"):settext(entry.label)
+			self:GetChild("Scores"):settext(formatInteger(entry.scoreCount))
+			self:GetChild("Charts"):settext(formatInteger(entry.chartCount))
+			self:GetChild("Average"):settext(entry.averagePercent)
+			self:GetChild("Best"):settext(string.format("%.2f", entry.bestSSR or 0))
+			self:GetChild("Best"):diffuse(HVColor.GetMSDRatingColor(entry.bestSSR or 0))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(sessionCardWidth, 20):diffuse(color("#111111")):diffusealpha(0.78)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(6, 6):halign(0):valign(0):zoom(0.18):maxwidth(400)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Scores",
+			InitCommand = function(self)
+				self:xy(250, 6):halign(1):valign(0):zoom(0.18)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Charts",
+			InitCommand = function(self)
+				self:xy(308, 6):halign(1):valign(0):zoom(0.18)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Average",
+			InitCommand = function(self)
+				self:xy(366, 6):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Best",
+			InitCommand = function(self)
+				self:xy(420, 6):halign(1):valign(0):zoom(0.18)
+			end
+		}
+	}
+end
+
+local function overallTimelineLine(i)
+	return Def.ActorMultiVertex {
+		Name = "OverallTimelineLine" .. i,
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallTimelineSubview()
+			local skillset = ms.SkillSets[i]
+			if not active or not skillset or #overallTimelineDaysForDisplay == 0 then
+				self:visible(false)
+				self:SetVertices({})
+				self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+				return
+			end
+			local verts = {}
+			for index, day in ipairs(overallTimelineDaysForDisplay) do
+				verts[#verts + 1] = {{timelineGraphLeft + fitOverallTimelineX(index), timelineGraphTop + fitOverallTimelineY(day.values[skillset] or 0), 0}, timelineSkillsetColors[i] or color("#FFFFFF")}
+			end
+			self:visible(#verts > 1)
+			self:SetVertices(verts)
+			self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = #verts}
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+local function overallTimelineDot(i)
+	return Def.Quad {
+		Name = "OverallTimelineDot" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0.5):zoomto(5, 5):visible(false)
+		end,
+		SetCommand = function(self)
+			local skillset = ms.SkillSets[i]
+			local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
+			if not isStatsOverlayOverallTimelineSubview() or not skillset or not day then
+				self:visible(false)
+				return
+			end
+			self:visible(true)
+			self:xy(timelineGraphLeft + fitOverallTimelineX(overallTimelineHoveredIndex), timelineGraphTop + fitOverallTimelineY(day.values[skillset] or 0))
+			self:diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+local function overallTimelineLegend(i)
+	return Def.ActorFrame {
+		Name = "OverallTimelineLegend" .. i,
+		InitCommand = function(self)
+			local column = math.floor((i - 1) / 4)
+			local row = (i - 1) % 4
+			self:xy(timelineGraphLeft + (column * 210), timelineGraphTop + timelineGraphHeight + 22 + (row * 18))
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local skillset = ms.SkillSets[i]
+			local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
+			if not isStatsOverlayOverallTimelineSubview() or not skillset or not day then
+				self:visible(false)
+				return
+			end
+			self:visible(true)
+			self:GetChild("Swatch"):diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
+			self:GetChild("Label"):settext(skillset)
+			self:GetChild("Value"):settext(string.format("%.2f", day.values[skillset] or 0))
+			self:GetChild("Value"):diffuse(timelineSkillsetColors[i] or color("#FFFFFF"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			Name = "Swatch",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(10, 10)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(16, 0):halign(0):valign(0):zoom(0.22):maxwidth(240)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Value",
+			InitCommand = function(self)
+				self:xy(148, 0):halign(1):valign(0):zoom(0.22)
+			end
+		}
+	}
+end
+
+local function overallTimelineHorizontalGridline(i)
+	return Def.Quad {
+		Name = "OverallTimelineHorizontalGridline" .. i,
+		InitCommand = function(self)
+			self:halign(0):valign(0.5):zoomto(timelineGraphWidth, 1):diffuse(color("#FFFFFF")):diffusealpha(0.08):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
+			self:visible(active)
+			if not active then return end
+			self:xy(timelineGraphLeft, getOverallTimelineGridY(i, timelineYAxisTickCount))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+local function overallTimelineVerticalGridline(i)
+	return Def.Quad {
+		Name = "OverallTimelineVerticalGridline" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0):zoomto(1, timelineGraphHeight):diffuse(color("#FFFFFF")):diffusealpha(0.06):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
+			self:visible(active)
+			if not active then return end
+			self:xy(getOverallTimelineGridX(i, timelineXAxisTickCount), timelineGraphTop)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+local function overallTimelineYAxisLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "OverallTimelineYAxisLabel" .. i,
+		InitCommand = function(self)
+			self:halign(1):valign(0.5):zoom(0.16):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
+			self:visible(active)
+			if not active then return end
+			self:xy(timelineGraphLeft - 6, getOverallTimelineGridY(i, timelineYAxisTickCount))
+			self:settext(getOverallTimelineYAxisLabel(i))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+local function overallTimelineXAxisLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "OverallTimelineXAxisLabel" .. i,
+		InitCommand = function(self)
+			self:valign(0):zoom(0.16):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local x, day, fraction = getOverallTimelineXAxisDisplay(i)
+			local active = isStatsOverlayOverallTimelineSubview() and day ~= nil
+			self:visible(active)
+			if not active then return end
+			if fraction == 0 then
+				self:halign(0)
+			elseif fraction == 1 then
+				self:halign(1)
+			else
+				self:halign(0.5)
+			end
+			self:xy(x, timelineGraphTop + timelineGraphHeight + 12)
+			self:settext(day.label or os.date("%d %b %y", day.timestamp or os.time()))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function overallMsdGradePoint(i)
+return Def.Quad {
+Name = "OverallMsdGradePoint" .. i,
+InitCommand = function(self)
+self:halign(0.5):valign(0.5):zoomto(4, 4):visible(false)
+end,
+SetCommand = function(self)
+local point = overallMsdGradePointsForDisplay[i]
+if not isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) or not point then
+self:visible(false)
+return
+end
+local maxX = 1
+for _, candidate in ipairs(overallMsdGradePointsForDisplay) do
+if (candidate.x or 0) > maxX then maxX = candidate.x end
+end
+self:visible(true)
+self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), timelineGraphTop + timelineGraphHeight - (((point.y or 0) / 100) * timelineGraphHeight))
+self:diffuse(point.color or color("#FFFFFF"))
+end,
+StatsOverlayTabChangedMessageCommand = function(self)
+self:playcommand("Set")
+end,
+StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+self:playcommand("Set")
+end,
+StatsOverlayDataChangedMessageCommand = function(self)
+self:playcommand("Set")
+end
+}
+end
+function breakdownJudgeBar(i)
+return Def.ActorFrame {
+Name = "BreakdownJudgeBar" .. i,
+InitCommand = function(self)
+self:xy(102, 150 + ((i - 1) * 20)):visible(false)
+end,
+SetCommand = function(self)
+local entry = breakdownJudgeRowsForDisplay[i]
+local active = isStatsOverlayLeaderboardsTab() and entry ~= nil
+self:visible(active)
+if not entry then return end
+local maxCount = 1
+for _, row in ipairs(breakdownJudgeRowsForDisplay) do
+if (row.count or 0) > maxCount then maxCount = row.count end
+end
+self:GetChild("Label"):settext(entry.judge)
+self:GetChild("Bar"):zoomto(120 * ((entry.count or 0) / maxCount), 10)
+self:GetChild("Count"):settext(string.format("%d", entry.count or 0))
+self:GetChild("Average"):settext(string.format("%.2f%%", entry.average or 0))
+end,
+StatsOverlayTabChangedMessageCommand = function(self)
+self:playcommand("Set")
+end,
+StatsOverlayDataChangedMessageCommand = function(self)
+self:playcommand("Set")
+end,
+LoadFont("Common Normal") .. {
+Name = "Label",
+InitCommand = function(self)
+self:xy(0, 0):halign(0):zoom(0.2):diffuse(color("#DDDDDD"))
+end
+},
+Def.Quad {
+Name = "Bar",
+InitCommand = function(self)
+self:xy(28, 2):halign(0):valign(0):zoomto(0, 10):diffuse(getMainColor("positive")):diffusealpha(0.72)
+end
+},
+LoadFont("Common Normal") .. {
+Name = "Count",
+InitCommand = function(self)
+self:xy(158, 0):halign(1):zoom(0.19):diffuse(color("#FFFFFF"))
+end
+},
+LoadFont("Common Normal") .. {
+Name = "Average",
+InitCommand = function(self)
+self:xy(210, 0):halign(1):zoom(0.18):diffuse(color("#AFAFAF"))
+end
+}
+}
+end
+local function leaderboardRow(i)
+	return Def.ActorFrame {
+		Name = "LeaderboardRow" .. i,
+		InitCommand = function(self)
+			self:xy(sessionPanelX + 12, sessionPanelY + 88 + ((i - 1) * 34))
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local entry = leaderboardEntriesForDisplay[i]
+			local active = isStatsOverlayLeaderboardsTab() and leaderboardStatus.state == "ready"
+			self:visible(active and entry ~= nil)
+			if not entry then return end
+			self:GetChild("Rank"):settext(string.format("#%d", entry.rank))
+			self:GetChild("Name"):settext(entry.name)
+			self:GetChild("Metric"):settext(entry.metric)
+			self:GetChild("Metric"):diffuse(entry.gradeColor or color("#FFFFFF"))
+			self:GetChild("Activity"):settext(entry.activity)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(sessionCardWidth, 28):diffuse(color("#111111")):diffusealpha(0.82)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Rank",
+			InitCommand = function(self)
+				self:xy(6, 8):halign(0):valign(0):zoom(0.2):diffuse(color("#BBBBBB"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Name",
+			InitCommand = function(self)
+				self:xy(40, 8):halign(0):valign(0):zoom(0.2):maxwidth(920)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Metric",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 134, 8):halign(1):valign(0):zoom(0.2)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Activity",
+			InitCommand = function(self)
+				self:xy(sessionCardWidth - 8, 8):halign(1):valign(0):zoom(0.18):diffuse(color("#DDDDDD")):maxwidth(460)
+			end
+		}
+	}
+end
+
+local statsOverlay = Def.ActorFrame {
+	Name = "StatsOverlay",
+	InitCommand = function(self)
+		self:diffusealpha(0):visible(false):draworder(11000)
+		self:SetUpdateFunction(function(actor)
+			if not statsOverlayActive then return end
+			if isStatsOverlaySessionTab() then
+				if overallTimelineHoveredIndex ~= nil then
+					overallTimelineHoveredIndex = nil
+					actor:playcommand("Update")
+				end
+				local hovered = getActivityDayAtPosition(INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY())
+				if hoveredActivityDay ~= hovered then
+					hoveredActivityDay = hovered
+					actor:playcommand("Update")
+				end
+				return
+			end
+			if hoveredActivityDay ~= nil then
+				hoveredActivityDay = nil
+				actor:playcommand("Update")
+			end
+			if isStatsOverlayOverallTimelineSubview() then
+				local hoveredTimeline = getOverallTimelineHoverIndex(INPUTFILTER:GetMouseX(), INPUTFILTER:GetMouseY())
+				if overallTimelineHoveredIndex ~= hoveredTimeline then
+					overallTimelineHoveredIndex = hoveredTimeline
+					actor:playcommand("Update")
+				end
+			elseif overallTimelineHoveredIndex ~= nil then
+				overallTimelineHoveredIndex = nil
+				actor:playcommand("Update")
+			end
+		end)
+	end,
+	StatsOverlayStateChangedMessageCommand = function(self, params)
+		if params.active then
+			self:visible(true):stoptweening():linear(0.15):diffusealpha(1):queuecommand("Refresh")
+		else
+			self:stoptweening():linear(0.15):diffusealpha(0):queuecommand("HideIfClosed")
+		end
+	end,
+	HideIfClosedCommand = function(self)
+		if not statsOverlayActive then
+			self:visible(false)
+		end
+	end,
+	StatsOverlayDataChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
+	StatsOverlayTabChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
+	StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
+	CurrentRateChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
+	StatsOverlayMouseWheelMessageCommand = function(self, params)
+		if not statsOverlayActive then return end
+		local mouseX = INPUTFILTER:GetMouseX()
+		local mouseY = INPUTFILTER:GetMouseY()
+		if isStatsOverlaySessionTab() then
+			if not isOverSessionPanel(mouseX, mouseY) then return end
+			if params and params.direction == "up" then
+				pageSessionScores(-1)
+			elseif params and params.direction == "down" then
+				pageSessionScores(1)
+			end
+		elseif isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed) then
+			if not isOverOverallBestScoresPanel(mouseX, mouseY) then return end
+			if params and params.direction == "up" then
+				pageOverallBestScores(-1)
+			elseif params and params.direction == "down" then
+				pageOverallBestScores(1)
+			end
+		end
+	end,
+	RefreshCommand = function(self)
+		SCOREMAN:SortRecentScoresForGame()
+		self:playcommand("Update")
+	end,
+	UpdateCommand = function(self)
+		self:GetChild("Title"):settext(getStatsOverlayTitle())
+		self:GetChild("RightPaneSessions"):visible(isStatsOverlaySessionTab())
+		self:GetChild("RightPaneOverall"):visible(statsOverlayTab == statsOverlayTabs.Overall)
+		self:GetChild("RightPaneLeaderboards"):visible(statsOverlayTab == statsOverlayTabs.Leaderboards)
+		self:GetChild("LeftPaneOverall"):visible(isStatsOverlayOverallTab())
+		self:GetChild("LeftPaneLeaderboards"):visible(isStatsOverlayLeaderboardsTab())
+		for i = 1, 8 do
+			self:GetChild("OverallSkillset" .. i):playcommand("Set")
+		end
+		if isStatsOverlayOverallTab() then
+			refreshOverallDerivedData()
+			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
+				overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
+				overallTimelineMaxValue = 100
+			elseif overallSubviewTab == overallSubviewTabs.Rating then
+				overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+			end
+			overallBestScoresForDisplay = getOverallBestScores()
+			local rightPaneOverall = self:GetChild("RightPaneOverall")
+			rightPaneOverall:GetChild("OverallOverviewHeader"):playcommand("Set")
+			rightPaneOverall:GetChild("OverallOverviewEmpty"):playcommand("Set")
+			rightPaneOverall:GetChild("OverallTimelineGraphBackdrop"):playcommand("Set")
+			rightPaneOverall:GetChild("OverallTimelineHoverLine"):playcommand("Set")
+			rightPaneOverall:GetChild("OverallTimelineHoverDate"):playcommand("Set")
+			rightPaneOverall:GetChild("OverallTimelineEmpty"):playcommand("Set")
+			for i = 1, overviewRowCount do
+				self:GetChild("OverallOverviewRow" .. i):playcommand("Set")
+			end
+			for i = 1, getOverallTimelineSkillsetCount() do
+				self:GetChild("OverallTimelineLine" .. i):playcommand("Set")
+				self:GetChild("OverallTimelineDot" .. i):playcommand("Set")
+				self:GetChild("OverallTimelineLegend" .. i):playcommand("Set")
+			end
+			for i = 1, overallBestScoreRowCount do
+				self:GetChild("OverallBestScoreRow" .. i):playcommand("Set")
+			end
+		elseif isStatsOverlayLeaderboardsTab() then
+			refreshLeaderboardData()
+			self:GetChild("LeftPaneLeaderboards"):playcommand("Set")
+			for i = 1, leaderboardRowCount do
+				self:GetChild("LeaderboardRow" .. i):playcommand("Set")
+			end
+		end
+		if not isStatsOverlaySessionTab() then
+			self:GetChild("EmptyState"):visible(false)
+			for i = 1, sessionRowCount do
+				self:GetChild("Row" .. i):playcommand("Update")
+			end
+			return
+		end
+		local displayDay = hoveredActivityDay or selectedDay
+		local selectedDateTime = os.time({year = selectedYear, month = selectedMonth, day = displayDay, hour = 0, min = 0, sec = 0})
+		local selectedKey = formatDateKey(selectedYear, selectedMonth, displayDay)
+		if lastSessionDisplayKey ~= selectedKey then
+			sessionScoreOffset = 0
+			lastSessionDisplayKey = selectedKey
+		end
+		selectedScoresForDisplay = {}
+		for i = 1, 512 do
+			local score = SCOREMAN:GetRecentScoreForGame(i)
+			if not score then break end
+			if getScoreDateKey(score) == selectedKey then
+				selectedScoresForDisplay[#selectedScoresForDisplay + 1] = score
+			end
+		end
+		clampSessionScoreOffset()
+		activityMonthCounts, activityMonthMaxCount, activityMonthDayCount = getSelectedMonthActivity()
+		self:GetChild("Title"):settext("Session on " .. os.date("%d/%m/%Y", selectedDateTime))
+		self:GetChild("MonthLabel"):settext(os.date("%B %Y", os.time({year = selectedYear, month = selectedMonth, day = 1, hour = 0, min = 0, sec = 0})))
+		self:GetChild("SelectedDateLabel"):settext(os.date("%A, %d %B %Y", selectedDateTime))
+		self:GetChild("SessionTime"):settext("Session time: " .. SecondsToHHMMSS(getSelectedSessionSeconds(selectedScoresForDisplay)))
+		self:GetChild("SongsPlayed"):settext("Songs played: " .. #selectedScoresForDisplay)
+		self:GetChild("EmptyState"):visible(#selectedScoresForDisplay == 0)
+		for i = 1, sessionRowCount do
+			self:GetChild("Row" .. i):playcommand("Update")
+		end
+		for i = 1, activityCellCount do
+			self:GetChild("Activity" .. i):playcommand("Update")
+		end
+	end,
+	UIElements.QuadButton(1, 1) .. {
+		InitCommand = function(self)
+			self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("#000000")):diffusealpha(0.7)
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(20, 44):halign(0):valign(0):zoomto(SCREEN_WIDTH - 40, SCREEN_HEIGHT - 68):diffuse(color("#0E0E0E")):diffusealpha(0.92)
+		end
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(20, 44):halign(0):valign(0):zoomto(SCREEN_WIDTH - 40, 34):diffuse(color("#1A1A1A")):diffusealpha(0.95)
+		end
+	},
+	LoadFont("Common Large") .. {
+		Name = "Title",
+		InitCommand = function(self)
+			self:xy(430, 61):zoom(0.56):halign(0):valign(0.5)
+		end
+	},
+	statsOverlayTabButton(statsOverlayTabButtons[1]),
+	statsOverlayTabButton(statsOverlayTabButtons[2]),
+	statsOverlayTabButton(statsOverlayTabButtons[3]),
+	UIElements.TextToolTip(1, 1, "Common Large") .. {
+		InitCommand = function(self)
+			self:xy(overlayCloseButtonX, overlayCloseButtonY):zoom(0.38):halign(0.5):valign(0.5):settext("X")
+		end,
+		MouseOverCommand = function(self)
+			self:diffusealpha(hoverAlpha)
+		end,
+		MouseOutCommand = function(self)
+			self:diffusealpha(1)
+		end,
+		MouseDownCommand = function(self, params)
+			if params.event == "DeviceButton_left mouse button" then
+				setStatsOverlayActive(false)
+			end
+		end
+	},
+	Def.ActorFrame {
+		Name = "RightPaneSessions",
+		InitCommand = function(self)
+			self:visible(true)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#151515")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 12, sessionPanelY + 14):halign(0):zoom(0.34):settext("Selected day scores")
+			end
+		}
+	},
+	Def.ActorFrame {
+		Name = "RightPaneOverall",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(statsOverlayTab == statsOverlayTabs.Overall)
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#151515")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Large") .. {
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 18):halign(0):zoom(0.34):settext("Summary")
+			end
+		},
+		overallSubviewButton(overallSubviewButtons[1]),
+		overallSubviewButton(overallSubviewButtons[2]),
+		overallSubviewButton(overallSubviewButtons[3]),
+		overallSubviewButton(overallSubviewButtons[4]),
+		LoadFont("Common Normal") .. {
+			Name = "OverallOverviewHeader",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 12, sessionPanelY + 80):halign(0):zoom(0.2):diffuse(color("#AFAFAF"))
+			end,
+			SetCommand = function(self)
+				self:visible(false)
+				self:settext("Mode                Scores   Charts   Avg%     Best SSR")
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallOverviewEmpty",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 116):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+			end,
+			SetCommand = function(self)
+				self:visible(false and #overallOverviewRowsForDisplay == 0)
+				self:settext("No local score history available for overview.")
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		Def.Quad {
+			Name = "OverallTimelineGraphBackdrop",
+			InitCommand = function(self)
+				self:xy(timelineGraphLeft, timelineGraphTop):halign(0):valign(0):zoomto(timelineGraphWidth, timelineGraphHeight):diffuse(color("#101010")):diffusealpha(0.86)
+			end,
+			SetCommand = function(self)
+				self:visible(isStatsOverlayOverallTimelineSubview() or isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade))
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		Def.Quad {
+			Name = "OverallTimelineHoverLine",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(1, timelineGraphHeight):diffuse(color("#FFFFFF")):diffusealpha(0.3):visible(false)
+			end,
+			SetCommand = function(self)
+				if not isStatsOverlayOverallTimelineSubview() or not overallTimelineHoveredIndex then
+					self:visible(false)
+					return
+				end
+				self:visible(true):xy(timelineGraphLeft + fitOverallTimelineX(overallTimelineHoveredIndex), timelineGraphTop)
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallTimelineHoverDate",
+			InitCommand = function(self)
+				self:xy(timelineGraphLeft, timelineGraphTop + timelineGraphHeight + 10):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+			end,
+			SetCommand = function(self)
+				local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
+				self:visible(isStatsOverlayOverallTimelineSubview() and day ~= nil)
+				self:settext(day and day.label or "")
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallTimelineEmpty",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 116):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+			end,
+			SetCommand = function(self)
+				self:visible(isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay == 0)
+				self:settext("No dated local score history available for timeline.")
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		}
+	},
+	Def.ActorFrame {
+		Name = "RightPaneLeaderboards",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(statsOverlayTab == statsOverlayTabs.Leaderboards)
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(sessionPanelX, sessionPanelY):halign(0):valign(0):zoomto(sessionPanelWidth, sessionPanelHeight):diffuse(color("#151515")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Large") .. {
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 18):halign(0):zoom(0.34):settext("Scores per judge difficulty")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "LeaderboardStatusTitle",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 48):halign(0):zoom(0.28):diffuse(color("#DDDDDD")):maxwidth(1500)
+			end,
+			SetCommand = function(self)
+				self:settext(leaderboardStatus.title or "")
+				self:visible((leaderboardStatus.state or "") ~= "ready")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "LeaderboardStatusDetail",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 76):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):maxwidth(1700)
+			end,
+			SetCommand = function(self)
+				self:settext(leaderboardStatus.detail or "")
+				self:visible((leaderboardStatus.state or "") ~= "ready")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end
+		}
+	},
+	Def.ActorFrame {
+		Name = "LeftPaneOverall",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			self:GetChild("OverallName"):settext(overallProfileSummary and overallProfileSummary.name or "No profile loaded")
+			self:GetChild("OverallRating"):settext(string.format("%05.2f", overallProfileSummary and overallProfileSummary.rating or 0))
+			self:GetChild("OverallPlayTime"):settext("Play time  " .. SecondsToHHMMSS(overallProfileSummary and overallProfileSummary.playTimeSeconds or 0))
+			self:GetChild("OverallSongsPlayed"):settext("Songs played  " .. formatInteger(overallProfileSummary and overallProfileSummary.songsPlayed or 0))
+			self:GetChild("OverallNotesHit"):settext("Arrows smashed  " .. formatInteger(overallProfileSummary and overallProfileSummary.notesHit or 0))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlayOverallTab())
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Large") .. {
+			InitCommand = function(self)
+				self:xy(102, 114):halign(0):zoom(0.36):settext("Stats views")
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "OverallName",
+			InitCommand = function(self)
+				self:xy(102, 146):halign(0):zoom(0.3):maxwidth(520):visible(false)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "OverallRating",
+			InitCommand = function(self)
+				self:xy(102, 174):halign(0):valign(0.5):zoom(0.5):diffuse(getMainColor("positive")):visible(false)
+			end
+		},
+		-- Asset Settings button (same row as rating)
+		Def.ActorFrame {
+			Name = "AssetSettingsButton",
+			InitCommand = function(self)
+				self:xy(225, 174):visible(false)
+			end,
+			UIElements.QuadButton(1, 1) .. {
+				Name = "AssetSettingsBG",
+				InitCommand = function(self)
+					self:halign(0):valign(0.5):zoomto(80, 24)
+					self:diffuse(getMainColor("positive")):diffusealpha(0.18)
+				end,
+				MouseOverCommand = function(self)
+					self:finishtweening():smooth(0.08):diffusealpha(0.38)
+				end,
+				MouseOutCommand = function(self)
+					self:finishtweening():smooth(0.12):diffusealpha(0.18)
+				end,
+				MouseDownCommand = function(self, params)
+					if params.event == "DeviceButton_left mouse button" then
+						SCREENMAN:SetNewScreen("ScreenAssetSettings")
+					end
+				end
+			},
+			LoadFont("Common Normal") .. {
+				InitCommand = function(self)
+					self:xy(40, 0):halign(0.5):valign(0.5):zoom(0.22)
+					self:diffuse(getMainColor("positive")):settext("Asset Settings")
+				end
+			}
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallPlayTime",
+			InitCommand = function(self)
+				self:xy(102, 208):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallSongsPlayed",
+			InitCommand = function(self)
+				self:xy(102, 226):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "OverallNotesHit",
+			InitCommand = function(self)
+				self:xy(102, 244):halign(0):zoom(0.27):diffuse(color("#DDDDDD")):visible(false)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			InitCommand = function(self)
+				self:xy(102, 268):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):settext("Skillsets"):visible(false)
+			end
+		}
+	},
+	Def.ActorFrame {
+		Name = "LeftPaneLeaderboards",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local isLoggedIn = DLMAN and DLMAN.IsLoggedIn and DLMAN:IsLoggedIn()
+			local username = isLoggedIn and DLMAN:GetUsername() or "Offline"
+			local rating = isLoggedIn and DLMAN:GetSkillsetRating("Overall") or 0
+			self:GetChild("LeaderboardUser"):settext(username)
+			self:GetChild("LeaderboardRating"):settext(isLoggedIn and string.format("%05.2f overall", rating) or "Not logged in")
+			self:GetChild("LeaderboardHint"):settext(leaderboardStatus.detail or "")
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlayLeaderboardsTab())
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
+			end
+		},
+		LoadFont("Common Large") .. {
+			InitCommand = function(self)
+				self:xy(102, 114):halign(0):zoom(0.36):settext("Leaderboard status")
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "LeaderboardUser",
+			InitCommand = function(self)
+				self:xy(102, 148):halign(0):zoom(0.3):maxwidth(520)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "LeaderboardRating",
+			InitCommand = function(self)
+				self:xy(102, 176):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "LeaderboardHint",
+			InitCommand = function(self)
+				self:xy(102, 210):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):maxwidth(700)
+			end
+		}
+	},
+	Def.Quad {
+		InitCommand = function(self)
+			self:xy(90, 100):halign(0):valign(0):zoomto(220, 300):diffuse(color("#151515")):diffusealpha(0.95)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Large") .. {
+		InitCommand = function(self)
+			self:xy(102, 114):halign(0):zoom(0.36):settext("Activity")
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Large") .. {
+		Name = "PrevMonth",
+		InitCommand = function(self)
+			self:xy(activityPrevButtonX + 8, activityPrevButtonY + 8):halign(0.5):valign(0.5):zoom(0.26):settext("<"):diffuse(color("#DDDDDD"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "MonthLabel",
+		InitCommand = function(self)
+			self:xy(193, 141):halign(0.5):valign(0.5):zoom(0.28):diffuse(color("#DDDDDD"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Large") .. {
+		Name = "NextMonth",
+		InitCommand = function(self)
+			self:xy(activityNextButtonX + 8, activityNextButtonY + 8):halign(0.5):valign(0.5):zoom(0.26):settext(">"):diffuse(color("#DDDDDD"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "SessionTime",
+		InitCommand = function(self)
+			self:xy(102, 322):halign(0):zoom(0.34)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "SongsPlayed",
+		InitCommand = function(self)
+			self:xy(102, 342):halign(0):zoom(0.34)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "SelectedDateLabel",
+		InitCommand = function(self)
+			self:xy(102, 360):halign(0):zoom(0.28):diffuse(color("#DDDDDD")):maxwidth(620)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "ActivityHint",
+		InitCommand = function(self)
+			self:xy(102, 381):halign(0):zoom(0.24):diffuse(color("#AFAFAF")):settext("Select a date to view that day's session")
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(isStatsOverlaySessionTab())
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "EmptyState",
+		InitCommand = function(self)
+			self:xy(sessionPanelX + (sessionPanelWidth / 2), sessionPanelY + 150):halign(0.5):zoom(0.34):settext("No scores recorded on this date"):diffuse(color("#BBBBBB")):visible(false)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:visible(false)
+		end
+	}
+}
+
+for i = 1, activityCellCount do
+	local col = (i - 1) % activityColumnCount
+	local row = math.floor((i - 1) / activityColumnCount)
+	statsOverlay[#statsOverlay + 1] = Def.ActorFrame {
+		Name = "Activity" .. i,
+		InitCommand = function(self)
+			self:xy(activityGridX + (col * activityCellStepX), activityGridY + (row * activityCellStepY))
+		end,
+		UpdateCommand = function(self)
+			if not isStatsOverlaySessionTab() then
+				self:visible(false)
+				return
+			end
+			local active = i <= activityMonthDayCount
+			self:visible(active)
+			if not active then return end
+			local count = activityMonthCounts[i] or 0
+			local fill = self:GetChild("Fill")
+			local border = self:GetChild("Border")
+			local dayText = self:GetChild("Day")
+			if count > 0 and activityMonthMaxCount > 0 then
+				local ratio = count / activityMonthMaxCount
+				fill:diffuse(Brightness(getMainColor("positive"), 0.35 + (ratio * 0.85))):diffusealpha(0.4 + (ratio * 0.6))
+			else
+				fill:diffuse(color("#242424")):diffusealpha(1)
+			end
+			if i == selectedDay then
+				border:visible(true):diffuse(getMainColor("highlight")):diffusealpha(0.9)
+			elseif i == hoveredActivityDay then
+				border:visible(true):diffuse(getMainColor("positive")):diffusealpha(0.55)
+			else
+				border:visible(false)
+			end
+			dayText:settext(tostring(i))
+			dayText:diffuse(i == selectedDay and color("#FFFFFF") or color("#B8B8B8"))
+		end,
+		Def.Quad {
+			Name = "Border",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(activityCellSize + 4, activityCellSize + 4):diffuse(getMainColor("highlight")):diffusealpha(0):visible(false)
+			end
+		},
+		Def.Quad {
+			Name = "Fill",
+			InitCommand = function(self)
+				self:xy(2, 2):halign(0):valign(0):zoomto(activityCellSize, activityCellSize):diffuse(color("#242424"))
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Day",
+			InitCommand = function(self)
+				self:xy(2 + (activityCellSize / 2), 2 + (activityCellSize / 2)):halign(0.5):valign(0.5):zoom(0.23):diffuse(color("#B8B8B8"))
+			end
+		}
+	}
+end
+
+for i = 1, sessionRowCount do
+	statsOverlay[#statsOverlay + 1] = sessionRow(i)
+end
+
+for i = 1, 8 do
+	statsOverlay[#statsOverlay + 1] = overallSkillsetRow(i)
+end
+
+for i = 1, overviewRowCount do
+	statsOverlay[#statsOverlay + 1] = overallOverviewRow(i)
+end
+
+for i = 1, timelineYAxisTickCount do
+	statsOverlay[#statsOverlay + 1] = overallTimelineHorizontalGridline(i)
+	statsOverlay[#statsOverlay + 1] = overallTimelineYAxisLabel(i)
+	statsOverlay[#statsOverlay + 1] = overallTimelineVerticalGridline(i)
+end
+
+for i = 1, timelineXAxisTickCount do
+	statsOverlay[#statsOverlay + 1] = overallTimelineXAxisLabel(i)
+end
+
+for i = 1, getOverallTimelineSkillsetCount() do
+	statsOverlay[#statsOverlay + 1] = overallTimelineLine(i)
+	statsOverlay[#statsOverlay + 1] = overallTimelineDot(i)
+	statsOverlay[#statsOverlay + 1] = overallTimelineLegend(i)
+end
+
+for i = 1, overallBestScoreRowCount do
+	statsOverlay[#statsOverlay + 1] = overallBestScoreRow(i)
+end
+
+for i = 1, 240 do
+	statsOverlay[#statsOverlay + 1] = overallMsdGradePoint(i)
+end
+
+for i = 1, 12 do
+	statsOverlay[#statsOverlay + 1] = breakdownJudgeBar(i)
+end
+
+for i = 1, leaderboardRowCount do
+	statsOverlay[#statsOverlay + 1] = leaderboardRow(i)
+end
+
+local t = Def.ActorFrame {
+	BeginCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if screen and screen.AddInputCallback then screen:AddInputCallback(input) end
+		setStatsOverlayActive(true)
+	end,
+	StatsOverlayStateChangedMessageCommand = function(self, params)
+		if params and params.active == false then
+			SCREENMAN:SetNewScreen("ScreenSelectMusic")
+		end
+	end,
+	EndCommand = function(self)
+		local screen = SCREENMAN:GetTopScreen()
+		if screen and screen.RemoveInputCallback then screen:RemoveInputCallback(input) end
+		if statsOverlayActive then
+			SCREENMAN:set_input_redirected(PLAYER_1, statsOverlayInputRedirect)
+			statsOverlayActive = false
+		end
+		setenv("StatsOverlayActive", false)
+	end
+}
+
+t[#t + 1] = statsOverlay
+
+return t
+
+
+
+
+
+
+
+
+
+
+

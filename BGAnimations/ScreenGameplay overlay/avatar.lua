@@ -36,6 +36,21 @@ end
 local actual_dp = 0
 local total_max = 0
 
+local function updateDPFromJudgment(msg)
+	if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
+		if msg.TapNoteOffset then
+			local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
+			actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
+		elseif msg.TapNoteScore == "TapNoteScore_Miss" then
+			actual_dp = actual_dp - 5.5
+		elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
+			actual_dp = actual_dp - 7.0
+		end
+	elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
+		actual_dp = actual_dp - 4.5
+	end
+end
+
 local t = Def.ActorFrame {
 	Name = "AvatarDisplay",
 	InitCommand = function(self)
@@ -260,11 +275,11 @@ local t = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "DPDisplay",
 		InitCommand = function(self)
-			local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
-			self:xy(avatarSize + 4, -12):halign(0)
-			if isCustomizeGameplay then
-				self:xy(MovableValues.DPDisplayX or (avatarSize + 4), MovableValues.DPDisplayY or -12):zoom(MovableValues.DPDisplayZoom or 1)
-			end
+			self:xy(-panelX, -12):halign(0)
+			self:xy((MovableValues and MovableValues.DPDisplayX) or getDefaultGameplayCoordinate("DPDisplayX") or (-panelX), (MovableValues and MovableValues.DPDisplayY) or getDefaultGameplayCoordinate("DPDisplayY") or -12):zoom((MovableValues and MovableValues.DPDisplayZoom) or getDefaultGameplaySize("DPDisplayZoom") or 1)
+		end,
+		JudgmentMessageCommand = function(self, msg)
+			updateDPFromJudgment(msg)
 		end,
 		OnCommand = function(self)
 			setMovableActor({"DeviceButton_period", "DeviceButton_slash"}, self, self:GetChild("Border"))
@@ -280,19 +295,6 @@ local t = Def.ActorFrame {
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				self:stoptweening()
-				
-				if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
-					if msg.TapNoteOffset then
-						local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
-						actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
-					elseif msg.TapNoteScore == "TapNoteScore_Miss" then
-						actual_dp = actual_dp - 5.5
-					elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
-						actual_dp = actual_dp - 7.0
-					end
-				elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
-					actual_dp = actual_dp - 4.5
-				end
 				
 				local current_perc = pss:GetWifeScore() * 100
 				if total_max > 0 then
@@ -313,20 +315,6 @@ local t = Def.ActorFrame {
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				self:stoptweening()
-				
-				if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
-					if msg.TapNoteOffset then
-						local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
-						actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
-					elseif msg.TapNoteScore == "TapNoteScore_Miss" then
-						actual_dp = actual_dp - 5.5
-					elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
-						actual_dp = actual_dp - 7.0
-					end
-				elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
-					actual_dp = actual_dp - 4.5
-				end
-				
 				self:settextf("%.2f", actual_dp)
 			end
 		},
@@ -335,12 +323,16 @@ local t = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			Name = "MaxScore",
 			InitCommand = function(self)
-				self:y(0):halign(0):zoom(0.35)
+				self:y(0):x(42):halign(0):zoom(0.35)
 				self:settextf("/ %d", total_max)
 				self:diffuse(color("#888888"))
 			end,
 			JudgmentMessageCommand = function(self)
 				self:stoptweening()
+				local score = self:GetParent():GetChild("DPScore")
+				if score then
+					self:x(score:GetZoomedWidth() + 6)
+				end
 				self:settextf("/ %d", total_max)
 			end
 		},

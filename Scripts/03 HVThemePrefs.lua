@@ -14,10 +14,31 @@ local OldIniPath = "Save/ThemePrefs.ini"
 
 -- Internal storage for preferences (since _fallback's table is local to its script)
 local PrefsTable = {}
+local PrefDefinitions = {}
 local FallbackTheme = "_fallback"
 
 local function GetThemeName()
 	return (themeInfo and themeInfo.Name) or THEME:GetThemeDisplayName()
+end
+
+local function coerce_pref_value(pref, value)
+	local def = PrefDefinitions[pref]
+	if not def then return value end
+	local default = def.Default
+	if type(default) == "boolean" then
+		if value == "true" then return true end
+		if value == "false" then return false end
+	elseif type(default) == "number" then
+		if type(value) == "string" then
+			local num = tonumber(value)
+			if num ~= nil then return num end
+		end
+	elseif type(default) == "string" then
+		if value == true or value == false then
+			return tostring(value)
+		end
+	end
+	return value
 end
 
 -- Resolve which section a preference belongs to
@@ -83,8 +104,11 @@ ThemePrefs = {
 		local section = GetThemeName()
 		PrefsTable[section] = PrefsTable[section] or {}
 		for k, tbl in pairs(prefs) do
+			PrefDefinitions[k] = tbl
 			if PrefsTable[section][k] == nil then
 				PrefsTable[section][k] = tbl.Default
+			else
+				PrefsTable[section][k] = coerce_pref_value(k, PrefsTable[section][k])
 			end
 		end
 	end,
@@ -143,12 +167,34 @@ ThemePrefs = {
 	end,
 	Get = function(name)
 		local tbl = ResolveTable(name)
-		return tbl and tbl[name] or nil
+		if tbl and tbl[name] ~= nil then
+			local value = coerce_pref_value(name, tbl[name])
+			if value ~= tbl[name] then
+				tbl[name] = value
+				ThemePrefs.NeedsSaved = true
+			end
+			return value
+		end
+		local def = PrefDefinitions[name]
+		if def then
+			local section = GetThemeName()
+			PrefsTable[section] = PrefsTable[section] or {}
+			PrefsTable[section][name] = def.Default
+			ThemePrefs.NeedsSaved = true
+			ThemePrefs.Save()
+			return def.Default
+		end
+		return nil
 	end,
 	Set = function(name, value)
 		local tbl = ResolveTable(name)
+		if not tbl and PrefDefinitions[name] then
+			local section = GetThemeName()
+			PrefsTable[section] = PrefsTable[section] or {}
+			tbl = PrefsTable[section]
+		end
 		if tbl then
-			tbl[name] = value
+			tbl[name] = coerce_pref_value(name, value)
 			ThemePrefs.NeedsSaved = true
 			ThemePrefs.Save() -- Global Consistency: persist immediately on change
 		end
@@ -525,6 +571,20 @@ local HVPrefs = {
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
+
+	-- Gameplay: Display Lower Judgement Offset
+	HV_DisplayLowerJudgementOffset = {
+		Default = false,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
+	-- Gameplay: Offset Display Judgement
+	HV_OffsetDisplayJudgement = {
+		Default = "W3",
+		Choices = {"Marvelous", "Perfect", "Great", "Good", "Bad"},
+		Values = {"W1", "W2", "W3", "W4", "W5"}
+	},
 	
 	-- Visual: Judgment Animation
 	HV_JudgmentAnimation = {
@@ -788,6 +848,16 @@ end
 --- Check if lower judgments should be prioritized.
 function HV.PrioritizeLowerJudgements()
 	return isTrue(ThemePrefs.Get("HV_PrioritizeLowerJudgements"))
+end
+
+--- Check if lower judgment offsets should be displayed.
+function HV.DisplayLowerJudgementOffset()
+	return isTrue(ThemePrefs.Get("HV_DisplayLowerJudgementOffset"))
+end
+
+--- Get the lowest judgment threshold that should show hit offset text.
+function HV.GetOffsetDisplayJudgement()
+	return ThemePrefs.Get("HV_OffsetDisplayJudgement") or "W3"
 end
 
 --- Check if judgment animations are enabled.

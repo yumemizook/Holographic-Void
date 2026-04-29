@@ -146,7 +146,7 @@ UpdateScores()
 local t = Def.ActorFrame {
 	Name = "InGameLeaderboard",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.LeaderboardX or startX) or startX, isCustomizeGameplay and (MovableValues.LeaderboardY or startY) or startY):zoomtowidth(isCustomizeGameplay and (MovableValues.LeaderboardWidth or 1) or 1):zoomtoheight(isCustomizeGameplay and (MovableValues.LeaderboardHeight or 1) or 1)
+		self:xy((MovableValues and MovableValues.LeaderboardX) or getDefaultGameplayCoordinate("LeaderboardX") or startX, (MovableValues and MovableValues.LeaderboardY) or getDefaultGameplayCoordinate("LeaderboardY") or startY):zoomtowidth((MovableValues and MovableValues.LeaderboardWidth) or getDefaultGameplaySize("LeaderboardWidth") or 1):zoomtoheight((MovableValues and MovableValues.LeaderboardHeight) or getDefaultGameplaySize("LeaderboardHeight") or 1)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_a", "DeviceButton_s"}, self, self:GetChild("Border"))

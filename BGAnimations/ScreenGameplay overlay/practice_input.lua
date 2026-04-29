@@ -47,6 +47,42 @@ local function setSongPos(pos, unpause)
 	end
 end
 
+local function isPaused()
+	local top = getTop()
+	if top and top.GetPaused then
+		local ok, paused = pcall(function() return top:GetPaused() end)
+		if ok then return paused and true or false end
+	end
+	return GAMESTATE:IsPaused() and true or false
+end
+
+local function pauseAtCurrentPos()
+	local top = getTop()
+	if not top then return end
+	local pos = getSongPos()
+	if top.TogglePause then
+		if not isPaused() then
+			setSongPos(pos, false)
+		end
+		pcall(function() top:TogglePause() end)
+		if isPaused() then
+			setSongPos(pos, false)
+		end
+	end
+end
+
+local function getGraphHitbox()
+	local top = getTop()
+	if not top then return nil end
+	local overlay = top:GetChild("ChartPreview")
+	return overlay and overlay:GetChild("Hitbox") or nil
+end
+
+local function isMouseOverGraphHitbox()
+	local hitbox = getGraphHitbox()
+	return hitbox and isOver(hitbox) or false
+end
+
 local function setNativeLoopRegion()
 	local top = getTop()
 	if not top then return end
@@ -187,11 +223,13 @@ local function handlePracticeCommand(name)
 end
 
 local function duminput(event)
-	if event.type == "InputEventType_Release" then
+	if event.type == "InputEventType_FirstPress" then
 		if event.DeviceInput and event.DeviceInput.button == "DeviceButton_right mouse button" then
-			MESSAGEMAN:Broadcast("MouseRightClick")
+			if not isMouseOverGraphHitbox() then
+				pauseAtCurrentPos()
+				return true
+			end
 		end
-	elseif event.type == "InputEventType_FirstPress" then
 		if event.DeviceInput and event.DeviceInput.button == "DeviceButton_backspace" then
 			if loopStartPos ~= nil then
 				setSongPos(loopStartPos, true)
@@ -218,8 +256,8 @@ end
 local pm = Def.ActorFrame {
 	Name = "ChartPreview",
 	InitCommand = function(self)
-		local x = MovableValues and MovableValues.PracticeCDGraphX or SCREEN_LEFT + 20
-		local y = MovableValues and MovableValues.PracticeCDGraphY or SCREEN_CENTER_Y
+		local x = (MovableValues and MovableValues.PracticeCDGraphX) or getDefaultGameplayCoordinate("PracticeCDGraphX") or SCREEN_LEFT + 20
+		local y = (MovableValues and MovableValues.PracticeCDGraphY) or getDefaultGameplayCoordinate("PracticeCDGraphY") or SCREEN_CENTER_Y
 		self:xy(x, y)
 		self:SetUpdateFunction(UpdatePreviewPos)
 	end,
@@ -262,12 +300,13 @@ local pm = Def.ActorFrame {
 	UIElements.QuadButton(1, 1) .. {
 		Name = "Hitbox",
 		InitCommand = function(self)
-			self:halign(0):zoomto(wodth * prevZoom, hidth * prevZoom):diffusealpha(0)
+			self:halign(0):valign(1):zoomto(wodth * prevZoom, hidth * prevZoom):diffusealpha(0):draworder(1099)
 		end,
 		MouseDownCommand = function(self, params)
 			local event = params.event or params.button
-			local left = self:GetTrueX()
-			local pos = math.max(0, math.min(wodth, (INPUTFILTER:GetMouseX() - left) / prevZoom)) * musicratio
+			local width = self:GetZoomedWidth()
+			local left = self:GetTrueX() - (width * self:GetHAlign())
+			local pos = math.max(0, math.min(wodth, ((INPUTFILTER:GetMouseX() - left) / width) * wodth)) * musicratio
 			if event == "DeviceButton_left mouse button" then
 				if INPUTFILTER:IsControlPressed() then
 					handleRegionSetting(pos)
@@ -323,17 +362,21 @@ local pm = Def.ActorFrame {
 		end,
 		OnCommand = function(self)
 			self:SetUpdateFunction(function(self)
+				local hitbox = self:GetParent():GetChild("Hitbox")
+				if not hitbox then
+					self:visible(false)
+					return
+				end
+
+				local width = hitbox:GetZoomedWidth()
+				local height = hitbox:GetZoomedHeight()
+				local left = hitbox:GetTrueX() - (width * hitbox:GetHAlign())
+				local top = hitbox:GetTrueY() - (height * hitbox:GetVAlign())
 				local mouseX = INPUTFILTER:GetMouseX()
 				local mouseY = INPUTFILTER:GetMouseY()
-				local parent = self:GetParent()
-				local left = parent:GetTrueX()
-				local width = wodth * prevZoom
-				local height = hidth * prevZoom
-				local top = parent:GetTrueY() - height  -- valign(1) means top is at y - height
-				
+
 				if mouseX >= left and mouseX <= left + width and mouseY >= top and mouseY <= top + height then
-					local p = (mouseX - left) / width
-					self:visible(true):x(p * width)
+					self:visible(true):x(mouseX - left)
 				else
 					self:visible(false)
 				end

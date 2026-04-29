@@ -7,6 +7,14 @@ local HV_MaxPoints = 1 -- Placeholder, will be set in BeginCommand
 local HV_PBThreshold = 0
 local HV_JudgeScale = 1.0
 
+local function gameplayCoord(name)
+	return (MovableValues and MovableValues[name]) or getDefaultGameplayCoordinate(name) or 0
+end
+
+local function gameplaySize(name)
+	return (MovableValues and MovableValues[name]) or getDefaultGameplaySize(name) or 1
+end
+
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
 	BeginCommand = function(self)
@@ -224,7 +232,7 @@ if showProgressBar then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ProgressBarContainer",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.FullProgressBarX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.FullProgressBarY or barY) or barY)
+		self:xy(gameplayCoord("FullProgressBarX"), gameplayCoord("FullProgressBarY"))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_9"}, self, self:GetChild("Border"))
@@ -315,7 +323,7 @@ if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "VerticalLifeBar",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.LifeP1X or lifeBarX) or lifeBarX, isCustomizeGameplay and (MovableValues.LifeP1Y or lifeBarY) or lifeBarY):rotationz(isCustomizeGameplay and (MovableValues.LifeP1Rotation or 0) or 0):visible(false)
+		self:xy(gameplayCoord("LifeP1X"), gameplayCoord("LifeP1Y")):rotationz(gameplayCoord("LifeP1Rotation")):visible(false)
 	end,
 
 	Def.Quad {
@@ -419,7 +427,7 @@ if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.DisplayPercentX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.DisplayPercentY or (SCREEN_CENTER_Y - 90)) or (SCREEN_CENTER_Y - 90)):zoom(isCustomizeGameplay and (MovableValues.DisplayPercentZoom or 1) or 1):diffusealpha(0.8)
+		self:xy(gameplayCoord("DisplayPercentX"), gameplayCoord("DisplayPercentY")):zoom(gameplaySize("DisplayPercentZoom")):diffusealpha(0.8)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_w", "DeviceButton_e"}, self, self:GetChild("Border"))
@@ -538,7 +546,7 @@ if showGoalTrackerText then
 	t[#t + 1] = Def.ActorFrame {
 		Name = "TextPacemaker",
 		InitCommand = function(self)
-			self:xy(isCustomizeGameplay and (MovableValues.TargetTrackerX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.TargetTrackerY or (SCREEN_CENTER_Y - 115)) or (SCREEN_CENTER_Y - 115)):zoom(isCustomizeGameplay and (MovableValues.TargetTrackerZoom or 1) or 1)
+			self:xy(gameplayCoord("TargetTrackerX"), gameplayCoord("TargetTrackerY")):zoom(gameplaySize("TargetTrackerZoom"))
 		end,
 		OnCommand = function(self)
 			setMovableActor({"DeviceButton_7", "DeviceButton_8"}, self, self:GetChild("Border"))
@@ -585,7 +593,7 @@ end
 t[#t + 1] = Def.ActorFrame {
 	Name = "NotefieldMean",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.DisplayMeanX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.DisplayMeanY or (SCREEN_CENTER_Y + 70)) or (SCREEN_CENTER_Y + 70)):zoom(isCustomizeGameplay and (MovableValues.DisplayMeanZoom or 1) or 1):diffusealpha(0)
+		self:xy(gameplayCoord("DisplayMeanX"), gameplayCoord("DisplayMeanY")):zoom(gameplaySize("DisplayMeanZoom")):diffusealpha(0)
 		-- Check if notefield stat should be shown
 		local statType = HV.GetNotefieldStat()
 		local showStat = statType ~= "Off" and not HV.MinimalisticMode() and not isSync
@@ -702,7 +710,7 @@ if showCombo then
 t[#t + 1] = Def.ActorFrame {
 	Name = "ComboDisplay",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (SCREEN_CENTER_X + (MovableValues.ComboX or 0)) or SCREEN_CENTER_X, isCustomizeGameplay and (SCREEN_CENTER_Y + (MovableValues.ComboY or 0)) or (SCREEN_CENTER_Y - 55)):zoom(isCustomizeGameplay and (MovableValues.ComboZoom or 1) or 1)
+		self:xy(SCREEN_CENTER_X + gameplayCoord("ComboX"), SCREEN_CENTER_Y + gameplayCoord("ComboY")):zoom(gameplaySize("ComboZoom"))
 		self.comboBreaks = 0
 	end,
 	OnCommand = function(self)
@@ -966,7 +974,7 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		Name = "ErrorBar",
 		InitCommand = function(self)
 			local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
-			self:xy(isCustomizeGameplay and (MovableValues.ErrorBarX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.ErrorBarY or ebCenterY) or ebCenterY):visible(ebMode ~= "Off" and not isSync)
+			self:xy(gameplayCoord("ErrorBarX"), gameplayCoord("ErrorBarY")):visible(ebMode ~= "Off" and not isSync)
 		end,
 		OnCommand = function(self)
 			setMovableActor({"DeviceButton_5"}, self, self:GetChild("Border"))
@@ -1091,7 +1099,7 @@ if showJudgeCounter and not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.JudgeCounterX or tallyX) or tallyX, isCustomizeGameplay and (MovableValues.JudgeCounterY or tallyY) or tallyY):diffusealpha(0.8)
+		self:xy(gameplayCoord("JudgeCounterX"), gameplayCoord("JudgeCounterY")):diffusealpha(0.8)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_p"}, self, self:GetChild("Border"))
@@ -1435,7 +1443,7 @@ if not HV.MinimalisticMode() and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "BPMText",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.BPMTextX or SCREEN_CENTER_X) or SCREEN_CENTER_X, isCustomizeGameplay and (MovableValues.BPMTextY or (SCREEN_BOTTOM - 20)) or (SCREEN_BOTTOM - 20)):zoom(isCustomizeGameplay and (MovableValues.BPMTextZoom or 1) or 1)
+		self:xy(gameplayCoord("BPMTextX"), gameplayCoord("BPMTextY")):zoom(gameplaySize("BPMTextZoom"))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_x", "DeviceButton_c"}, self, self:GetChild("Border"))

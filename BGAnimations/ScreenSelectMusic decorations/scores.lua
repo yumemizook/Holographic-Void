@@ -366,6 +366,26 @@ local t = Def.ActorFrame {
 		end,
 	},
 
+	-- Empty state message
+	LoadFont("Common Normal") .. {
+		Name = "EmptyState",
+		InitCommand = function(self)
+			self:xy(0, 0):zoom(0.35):diffuse(dimText):visible(false)
+		end,
+		RefreshScoresCommand = function(self)
+			if #displayedScores == 0 and not (onlineLoading and currentView == VIEW_ONLINE) then
+				self:visible(true)
+				if currentView == VIEW_LOCAL then
+					self:settext(THEME:GetString("Scores", "NoScoresLocal"))
+				else
+					self:settext(THEME:GetString("Scores", "NoScoresOnline"))
+				end
+			else
+				self:visible(false)
+			end
+		end,
+	},
+
 	-- Hint
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)

@@ -323,15 +323,11 @@ local function input(event)
 
 	-- Keyboard Rate Control (EffectUp/EffectDown are logical game buttons)
 	if event.button == "EffectUp" then
-		local pos = ssm and ssm:GetSampleMusicPosition() or 0
 		changeMusicRate(0.05)
-		playFrom(pos, true)
 		return true
 	end
 	if event.button == "EffectDown" then
-		local pos = ssm and ssm:GetSampleMusicPosition() or 0
 		changeMusicRate(-0.05)
-		playFrom(pos, true)
 		return true
 	end
 
@@ -363,15 +359,11 @@ local function input(event)
 		local rateFrame = rootRef:GetChild("HeaderFrame"):GetChild("RateController")
 		if rateFrame then
 			if isOver(rateFrame:GetChild("Dec")) then 
-				local pos = ssm and ssm:GetSampleMusicPosition() or 0
 				changeMusicRate(-0.05)
-				playFrom(pos, true)
 				return true 
 			end
 			if isOver(rateFrame:GetChild("Inc")) then 
-				local pos = ssm and ssm:GetSampleMusicPosition() or 0
 				changeMusicRate(0.05)
-				playFrom(pos, true)
 				return true 
 			end
 		end

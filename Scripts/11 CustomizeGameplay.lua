@@ -32,34 +32,21 @@ local function loadValuesTable()
 	MovableValues.ComboZoom = size("ComboZoom")
 	MovableValues.ErrorBarX = coord("ErrorBarX")
 	MovableValues.ErrorBarY = coord("ErrorBarY")
-	MovableValues.ErrorBarWidth = size("ErrorBarWidth")
-	MovableValues.ErrorBarHeight = size("ErrorBarHeight")
 	MovableValues.TargetTrackerX = coord("TargetTrackerX")
 	MovableValues.TargetTrackerY = coord("TargetTrackerY")
 	MovableValues.TargetTrackerZoom = size("TargetTrackerZoom")
 	MovableValues.FullProgressBarX = coord("FullProgressBarX")
 	MovableValues.FullProgressBarY = coord("FullProgressBarY")
-	MovableValues.FullProgressBarWidth = size("FullProgressBarWidth")
-	MovableValues.FullProgressBarHeight = size("FullProgressBarHeight")
-	MovableValues.MiniProgressBarX = coord("MiniProgressBarX")
-	MovableValues.MiniProgressBarY = coord("MiniProgressBarY")
 	MovableValues.DisplayPercentX = coord("DisplayPercentX")
 	MovableValues.DisplayPercentY = coord("DisplayPercentY")
 	MovableValues.DisplayPercentZoom = size("DisplayPercentZoom")
 	MovableValues.DisplayMeanX = coord("DisplayMeanX")
 	MovableValues.DisplayMeanY = coord("DisplayMeanY")
 	MovableValues.DisplayMeanZoom = size("DisplayMeanZoom")
-	MovableValues.NotefieldX = coord("NotefieldX")
-	MovableValues.NotefieldY = coord("NotefieldY")
-	MovableValues.NotefieldWidth = size("NotefieldWidth")
-	MovableValues.NotefieldHeight = size("NotefieldHeight")
-	MovableValues.NotefieldSpacing = size("NotefieldSpacing")
 	MovableValues.JudgeCounterX = coord("JudgeCounterX")
 	MovableValues.JudgeCounterY = coord("JudgeCounterY")
 	MovableValues.ReplayButtonsX = coord("ReplayButtonsX")
 	MovableValues.ReplayButtonsY = coord("ReplayButtonsY")
-	MovableValues.ReplayButtonsSpacing = size("ReplayButtonsSpacing")
-	MovableValues.ReplayButtonsZoom = size("ReplayButtonsZoom")
 	MovableValues.NPSGraphX = coord("NPSGraphX")
 	MovableValues.NPSGraphY = coord("NPSGraphY")
 	MovableValues.NPSGraphWidth = size("NPSGraphWidth")
@@ -69,34 +56,27 @@ local function loadValuesTable()
 	MovableValues.NPSDisplayZoom = size("NPSDisplayZoom")
 	MovableValues.LeaderboardX = coord("LeaderboardX")
 	MovableValues.LeaderboardY = coord("LeaderboardY")
-	MovableValues.LeaderboardSpacing = size("LeaderboardSpacing")
 	MovableValues.LeaderboardWidth = size("LeaderboardWidth")
 	MovableValues.LeaderboardHeight = size("LeaderboardHeight")
 	MovableValues.LifeP1X = coord("LifeP1X")
 	MovableValues.LifeP1Y = coord("LifeP1Y")
 	MovableValues.LifeP1Rotation = coord("LifeP1Rotation")
-	MovableValues.LifeP1Width = size("LifeP1Width")
-	MovableValues.LifeP1Height = size("LifeP1Height")
 	MovableValues.PracticeCDGraphX = coord("PracticeCDGraphX")
 	MovableValues.PracticeCDGraphY = coord("PracticeCDGraphY")
-	MovableValues.PracticeCDGraphHeight = size("PracticeCDGraphHeight")
-	MovableValues.PracticeCDGraphWidth = size("PracticeCDGraphWidth")
 	MovableValues.BPMTextX = coord("BPMTextX")
 	MovableValues.BPMTextY = coord("BPMTextY")
 	MovableValues.BPMTextZoom = size("BPMTextZoom")
 	MovableValues.RecentJudgmentDisplayX = coord("RecentJudgmentDisplayX")
 	MovableValues.RecentJudgmentDisplayY = coord("RecentJudgmentDisplayY")
 	MovableValues.RecentJudgmentDisplayZoom = size("RecentJudgmentDisplayZoom")
-	MovableValues.MusicRateX = coord("MusicRateX")
-	MovableValues.MusicRateY = coord("MusicRateY")
-	MovableValues.MusicRateZoom = size("MusicRateZoom")
+	MovableValues.DPDisplayX = coord("DPDisplayX")
+	MovableValues.DPDisplayY = coord("DPDisplayY")
+	MovableValues.DPDisplayZoom = size("DPDisplayZoom")
 
 	-- Apply widescreen offsets
 	if GetScreenAspectRatio() > 1.7 then
 		MovableValues.TargetTrackerY = MovableValues.TargetTrackerY + WIDESCREENWHY
 		MovableValues.TargetTrackerX = MovableValues.TargetTrackerX - WIDESCREENWHX
-		MovableValues.JudgeY = MovableValues.JudgeY - 5
-		MovableValues.JudgeX = MovableValues.JudgeX + 5
 	end
 end
 
@@ -157,6 +137,7 @@ Movable = {
 		children = {"Judgment", "Border"},
 		properties = {"X", "Y"},
 		mouseRelativeToCenter = true,
+		actorUsesAbsolutePosition = true,
 		propertyOffsets = nil,	-- manual offsets for stuff hardcoded to be relative to center and maybe other things (init in wifejudgmentspotting)
 		elementTree = "GameplayXYCoordinates",
 		DeviceButton_up = {
@@ -261,30 +242,6 @@ Movable = {
 			inc = 5
 		}
 	},
-	DeviceButton_6 = {
-		name = "ErrorBar",
-		textHeader = "Error Bar Size:",
-		element = {},
-		properties = {"Width", "Height"},
-		children = {"Center", "WeightedBar"},
-		elementTree = "GameplaySizes",
-		DeviceButton_up = {
-			property = "Height",
-			inc = 1
-		},
-		DeviceButton_down = {
-			property = "Height",
-			inc = -1
-		},
-		DeviceButton_left = {
-			property = "Width",
-			inc = -10
-		},
-		DeviceButton_right = {
-			property = "Width",
-			inc = 10
-		}
-	},
 	DeviceButton_7 = {
 		name = "TargetTracker",
 		textHeader = "Goal Tracker Position:",
@@ -347,53 +304,6 @@ Movable = {
 			inc = 5
 		}
 	},
-	DeviceButton_0 = {
-		name = "FullProgressBar",
-		textHeader = "Full Progress Bar Size:",
-		element = {},
-		properties = {"Width", "Height"},
-		elementTree = "GameplaySizes",
-		noBorder = true,
-		DeviceButton_up = {
-			property = "Height",
-			inc = 0.1
-		},
-		DeviceButton_down = {
-			property = "Height",
-			inc = -0.1
-		},
-		DeviceButton_left = {
-			property = "Width",
-			inc = -0.01
-		},
-		DeviceButton_right = {
-			property = "Width",
-			inc = 0.01
-		}
-	},
-	DeviceButton_q = {
-		name = "MiniProgressBar",
-		textHeader = "Mini Progress Bar Position:",
-		element = {},
-		properties = {"X", "Y"},
-		elementTree = "GameplayXYCoordinates",
-		DeviceButton_up = {
-			property = "AddY",
-			inc = -5
-		},
-		DeviceButton_down = {
-			property = "AddY",
-			inc = 5
-		},
-		DeviceButton_left = {
-			property = "AddX",
-			inc = -5
-		},
-		DeviceButton_right = {
-			property = "AddX",
-			inc = 5
-		}
-	},
 	DeviceButton_w = {
 		name = "DisplayPercent",
 		textHeader = "Current Percent Position:",
@@ -430,57 +340,6 @@ Movable = {
 		DeviceButton_down = {
 			property = "Zoom",
 			inc = -0.01
-		}
-	},
-	DeviceButton_r = {
-		name = "Notefield",
-		textHeader = "Notefield Position:",
-		element = {},
-		properties = {"X", "Y"},
-		elementTree = "GameplayXYCoordinates",
-		noBorder = true,
-		DeviceButton_up = {
-			notefieldY = true,
-			property = "AddY",
-			inc = -3
-		},
-		DeviceButton_down = {
-			notefieldY = true,
-			property = "AddY",
-			inc = 3
-		},
-		DeviceButton_left = {
-			property = "AddX",
-			inc = -3
-		},
-		DeviceButton_right = {
-			property = "AddX",
-			inc = 3
-		}
-	},
-	DeviceButton_t = {
-		name = "Notefield",
-		textHeader = "Notefield Size:",
-		element = {},
-		elementList = true, -- god bless the notefield
-		properties = {"Width", "Height"},
-		elementTree = "GameplaySizes",
-		noBorder = true,
-		DeviceButton_up = {
-			property = "Height",
-			inc = 0.01
-		},
-		DeviceButton_down = {
-			property = "Height",
-			inc = -0.01
-		},
-		DeviceButton_left = {
-			property = "Width",
-			inc = -0.01
-		},
-		DeviceButton_right = {
-			property = "Width",
-			inc = 0.01
 		}
 	},
 	DeviceButton_y = {
@@ -642,22 +501,6 @@ Movable = {
 			inc = 0.01
 		}
 	},
-	DeviceButton_d = {
-		name = "Leaderboard",
-		textHeader = "Leaderboard Spacing:",
-		properties = {"Spacing"},
-		elementTree = "GameplaySizes",
-		DeviceButton_up = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = -0.3
-		},
-		DeviceButton_down = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = 0.3
-		},
-	},
 	DeviceButton_f = {
 		name = "ReplayButtons",
 		textHeader = "Replay Buttons Position:",
@@ -681,40 +524,6 @@ Movable = {
 			property = "AddX",
 			inc = 3
 		}
-	},--[[[
-	DeviceButton_g = {
-		name = "ReplayButtons",
-		textHeader = "Replay Buttons Size:",
-		element = {},
-		noBorder = true,
-		properties = {"Zoom"},
-		elementTree = "GameplaySizes",
-		condition = false,
-		DeviceButton_up = {
-			property = "Zoom",
-			inc = 0.01
-		},
-		DeviceButton_down = {
-			property = "Zoom",
-			inc = -0.01
-		}
-	},]]
-	DeviceButton_h = {
-		name = "ReplayButtons",
-		textHeader = "Replay Buttons Spacing:",
-		properties = {"Spacing"},
-		elementTree = "GameplaySizes",
-		condition = false,
-		DeviceButton_up = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = -0.5
-		},
-		DeviceButton_down = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = 0.5
-		},
 	},
 	DeviceButton_z = {
 		name = "PracticeCDGraph",
@@ -740,30 +549,6 @@ Movable = {
 			inc = 5
 		}
 	},
-	--[[DeviceButton_x = {
-		name = "PracticeCDGraph",
-		textHeader = "Chord Density Graph Size:",
-		properties = {"Width", "Height"},
-		element = {},
-		elementTree = "GameplaySizes",
-		propertyOffsets = nil,
-		DeviceButton_up = {
-			property = "Height",
-			inc = 0.1
-		},
-		DeviceButton_down = {
-			property = "Height",
-			inc = -0.1
-		},
-		DeviceButton_left = {
-			property = "Width",
-			inc = -0.01
-		},
-		DeviceButton_right = {
-			property = "Width",
-			inc = 0.01
-		}
-	},]]
 	DeviceButton_x = {
 		name = "BPMText",
 		textHeader = "BPM / Rate Position:",
@@ -840,23 +625,6 @@ Movable = {
 			property = "Zoom",
 			inc = -0.01
 		}
-	},
-	DeviceButton_n = {
-		name = "Notefield",
-		textHeader = "Notefield Columns:",
-		properties = {"Spacing"},
-		elementTree = "GameplaySizes",
-		noBorder = true,
-		DeviceButton_up = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = 1
-		},
-		DeviceButton_down = {
-			arbitraryInc = true,
-			property = "Spacing",
-			inc = -1
-		},
 	},
 	DeviceButton_m = {
 		name = "DisplayMean",

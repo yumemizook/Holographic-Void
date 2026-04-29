@@ -1,6 +1,7 @@
---- Holographic Void: Online Leaderboard (ported from spawncamping-wallhack)
--- Displays EtternaOnline chart leaderboard with Local/Online toggle,
--- Current/All rate filtering, sorted by SSR.
+-- Holographic Void: Online Leaderboard (ported from spawncamping-wallhack)
+-- Displays EtternaOnline chart leaderboard with Local/Online toggle.
+-- Current Rate: same-rate only, sorted by Wife%.
+-- All Rates: all rates, sorted by SSR.
 -- maybe merge this with MPscoreboard.lua?
 
 local pn = GAMESTATE:GetEnabledPlayers()[1]
@@ -30,6 +31,32 @@ local curPage = 1
 local alreadyPulled = false
 local scoreList = hsTable
 local showAllRates = false
+
+local function getViewedRateValue()
+	if score and score.GetMusicRate then
+		local viewedRate = score:GetMusicRate()
+		if type(viewedRate) == "number" and viewedRate > 0 then
+			return viewedRate
+		end
+	end
+	return getCurRateValue and getCurRateValue() or 1.0
+end
+
+local function getViewedRateString()
+	return string.format("%.2fx", getViewedRateValue())
+end
+
+local function isSameRateValue(a, b)
+	return math.abs((a or 0) - (b or 0)) < 0.001
+end
+
+local function isSameRateScore(s, targetRateValue, targetRateString)
+	if not s then return false end
+	if s.GetMusicRate and isSameRateValue(s:GetMusicRate(), targetRateValue) then
+		return true
+	end
+	return getRate and getRate(s) == targetRateString
+end
 
 local function getJudge(score)
 	local scale = (score and type(score.GetJudgeScale) == "function") and score:GetJudgeScale() or 1.0
@@ -61,6 +88,17 @@ local function updateLeaderBoardForCurrentChart()
 	end
 end
 
+local function syncOnlineRateFilter()
+	if not DLMAN then return end
+	if DLMAN.SetRateFilter then
+		-- DLMAN's boolean semantics are inverted relative to the original theme-side assumption:
+		-- `true` returns all rates, `false` keeps the current-rate filter active.
+		pcall(function() DLMAN:SetRateFilter(showAllRates) end)
+	elseif DLMAN.ToggleRateFilter then
+		pcall(function() DLMAN:ToggleRateFilter() end)
+	end
+end
+
 local function movePage(n)
 	if maxPages <= 1 then return end
 	if n > 0 then
@@ -72,9 +110,10 @@ local function movePage(n)
 end
 
 local function refreshScores(self)
+	local targetRateValue = getViewedRateValue()
+	local targetRate = getViewedRateString()
 	if isLocal then
 		scoreList = {}
-		local targetRate = getCurRate()
 		local ck = (steps and steps.GetChartKey) and steps:GetChartKey() or ""
 		local scoresByKey = (ck ~= "") and SCOREMAN:GetScoresByKey(ck) or nil
 
@@ -91,12 +130,18 @@ local function refreshScores(self)
 			end
 		end
 
-		-- Fallback to initial table if nothing found (shouldn't happen with current play)
-		if #scoreList == 0 then
-			scoreList = hsTable
+		-- Exact-rate fallback only. Do not leak nearby-rate scores into Current Rate.
+		if #scoreList == 0 and not showAllRates and hsTable then
+			for i = 1, #hsTable do
+				if isSameRateScore(hsTable[i], targetRateValue, targetRate) then
+					scoreList[#scoreList + 1] = hsTable[i]
+				end
+			end
 		end
 
-		-- Sort local scores: Highest SSR then J4% for All Rates, J4% for Current Rate
+		-- Local sorting:
+		-- Current Rate -> J4/Wife%-first within the current rate only.
+		-- All Rates -> SSR-first across every available rate.
 		table.sort(scoreList, function(a, b)
 			if showAllRates then
 				local sa = a:GetSkillsetSSR("Overall") or 0
@@ -111,12 +156,23 @@ local function refreshScores(self)
 			end
 		end)
 	else
-		scoreList = DLMAN:GetChartLeaderBoard(steps:GetChartKey(), currentCountry)
+		local rawOnlineScores = DLMAN:GetChartLeaderBoard(steps:GetChartKey(), currentCountry)
+		scoreList = {}
+		if rawOnlineScores then
+			for i = 1, #rawOnlineScores do
+				local s = rawOnlineScores[i]
+				if showAllRates or isSameRateScore(s, targetRateValue, targetRate) then
+					scoreList[#scoreList + 1] = s
+				end
+			end
+		end
 		if scoreList ~= nil and #scoreList == 0 and not alreadyPulled then
 			updateLeaderBoardForCurrentChart()
 		end
 		if scoreList then
-			-- Sort online scores: Highest SSR then Wife% for All Rates, Wife% for Current Rate
+			-- Online sorting:
+			-- Current Rate -> Wife%-first within the current rate only.
+			-- All Rates -> SSR-first across every available rate.
 			table.sort(scoreList, function(a, b)
 				if showAllRates then
 					local sa = a:GetSkillsetSSR("Overall") or 0
@@ -341,6 +397,9 @@ local t = Def.ActorFrame {
 		MouseDownCommand = function(self)
 			if isOver(self) and isLocal and DLMAN:IsLoggedIn() then
 				isLocal = false
+				syncOnlineRateFilter()
+				alreadyPulled = false
+				updateLeaderBoardForCurrentChart()
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
 			end
@@ -366,12 +425,9 @@ local t = Def.ActorFrame {
 		MouseDownCommand = function(self)
 			if isOver(self) and not isLocal and showAllRates then
 				showAllRates = false
-				-- SetRateFilter(true) means Filter ON (Current Rate only)
-				if DLMAN and DLMAN.SetRateFilter then
-					pcall(function() DLMAN:SetRateFilter(true) end)
-				else
-					pcall(function() DLMAN:ToggleRateFilter() end)
-				end
+				syncOnlineRateFilter()
+				alreadyPulled = false
+				updateLeaderBoardForCurrentChart()
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
 			end
@@ -395,12 +451,9 @@ local t = Def.ActorFrame {
 		MouseDownCommand = function(self)
 			if isOver(self) and not isLocal and not showAllRates then
 				showAllRates = true
-				-- SetRateFilter(false) means Filter OFF (All Rates)
-				if DLMAN and DLMAN.SetRateFilter then
-					pcall(function() DLMAN:SetRateFilter(false) end)
-				else
-					pcall(function() DLMAN:ToggleRateFilter() end)
-				end
+				syncOnlineRateFilter()
+				alreadyPulled = false
+				updateLeaderBoardForCurrentChart()
 				refreshScores(self:GetParent())
 				self:GetParent():playcommand("RefreshUI")
 			end

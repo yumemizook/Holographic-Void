@@ -95,7 +95,7 @@ local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).
 local t = Def.ActorFrame {
 	Name = "ReplayControls",
 	InitCommand = function(self)
-		self:xy(isCustomizeGameplay and (MovableValues.ReplayButtonsX or (SCREEN_RIGHT - 40)) or (SCREEN_RIGHT - 40), isCustomizeGameplay and (MovableValues.ReplayButtonsY or (SCREEN_CENTER_Y + 50)) or (SCREEN_CENTER_Y + 50))
+		self:xy((MovableValues and MovableValues.ReplayButtonsX) or getDefaultGameplayCoordinate("ReplayButtonsX") or (SCREEN_RIGHT - 40), (MovableValues and MovableValues.ReplayButtonsY) or getDefaultGameplayCoordinate("ReplayButtonsY") or (SCREEN_CENTER_Y + 50))
 		self:diffusealpha(0)
 	end,
 	OnCommand = function(self)
