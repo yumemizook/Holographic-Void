@@ -1,70 +1,70 @@
-local hoverAlpha = 0.6
-local statsOverlayActive = false
-local statsOverlayInputRedirect = false
-local settingsOverlayActive = false
-local settingsOverlayInputRedirect = false
-local quickMenuActive = false
-local quickMenuInputRedirect = false
-local pendingMenuMusicRestore = false
-local settingsOverlayPanelX = SCREEN_WIDTH - 430
-local settingsOverlayPanelY = 52
-local settingsOverlayPanelWidth = 360
-local settingsOverlayPanelHeight = 208
-local settingsOverlayItemX = settingsOverlayPanelX + 18
-local settingsOverlayItemY = settingsOverlayPanelY + 58
-local settingsOverlayItemWidth = settingsOverlayPanelWidth - 36
-local settingsOverlayItemHeight = 32
-local settingsOverlayItemGap = 12
-local quickMenuPanelX = 34
-local quickMenuPanelY = 50
-local quickMenuPanelWidth = 262
-local quickMenuPanelHeight = 214
-local quickMenuItemX = quickMenuPanelX + 18
-local quickMenuItemY = quickMenuPanelY + 58
-local musicWheelSettingsButtonX = SCREEN_WIDTH - 34
-local musicWheelSettingsButtonY = 100
-local musicWheelSettingsButtonWidth = 24
-local musicWheelSettingsButtonHeight = 24
-local quickMenuItemWidth = quickMenuPanelWidth - 36
-local quickMenuItemHeight = 38
-local quickMenuItemGap = 14
-local sessionRowCount = 7
-local overallBestScoreRowCount = 8
-local leaderboardRowCount = 8
-local sessionPanelX = 342
-local sessionPanelY = 86
-local sessionPanelWidth = SCREEN_WIDTH - sessionPanelX - 24
-local sessionPanelHeight = SCREEN_HEIGHT - sessionPanelY - 28
-local sessionCardWidth = sessionPanelWidth - 24
-local overlayCloseButtonX = SCREEN_WIDTH - 38
-local overlayCloseButtonY = 61
-local overlayCloseButtonHalfWidth = 14
-local overlayCloseButtonHalfHeight = 12
-local activityColumnCount = 7
-local activityCellCount = 35
-local activityCellSize = 18
-local activityCellStepX = 26
-local activityCellStepY = 24
-local activityGridX = 102
-local activityGridY = 160
-local activityPrevButtonX = 104
-local activityPrevButtonY = 133
-local activityNextButtonX = 286
-local activityNextButtonY = 133
-local activityButtonWidth = 16
-local activityButtonHeight = 16
-local selectedYear = tonumber(os.date("%Y"))
-local selectedMonth = tonumber(os.date("%m"))
-local selectedDay = tonumber(os.date("%d"))
-local hoveredActivityDay = nil
-local activityMonthCounts = {}
-local activityMonthMaxCount = 0
-local activityMonthDayCount = 31
-local selectedScoresForDisplay = {}
-local overallBestScoresForDisplay = {}
-local leaderboardEntriesForDisplay = {}
-local overallOverviewRowsForDisplay = {}
-local overallTimelineDaysForDisplay = {}
+hoverAlpha = 0.6
+statsOverlayActive = false
+statsOverlayInputRedirect = false
+settingsOverlayActive = false
+settingsOverlayInputRedirect = false
+quickMenuActive = false
+quickMenuInputRedirect = false
+pendingMenuMusicRestore = false
+settingsOverlayPanelX = SCREEN_WIDTH - 430
+settingsOverlayPanelY = 52
+settingsOverlayPanelWidth = 360
+settingsOverlayPanelHeight = 208
+settingsOverlayItemX = SCREEN_WIDTH - 430 + 18
+settingsOverlayItemY = 52 + 58
+settingsOverlayItemWidth = 360 - 36
+settingsOverlayItemHeight = 32
+settingsOverlayItemGap = 12
+quickMenuPanelX = 34
+quickMenuPanelY = 50
+quickMenuPanelWidth = 262
+quickMenuPanelHeight = 214
+quickMenuItemX = 34 + 18
+quickMenuItemY = 50 + 58
+musicWheelSettingsButtonX = SCREEN_WIDTH - 34
+musicWheelSettingsButtonY = 100
+musicWheelSettingsButtonWidth = 24
+musicWheelSettingsButtonHeight = 24
+quickMenuItemWidth = 262 - 36
+quickMenuItemHeight = 38
+quickMenuItemGap = 14
+sessionRowCount = 7
+overallBestScoreRowCount = 8
+leaderboardRowCount = 8
+sessionPanelX = 342
+sessionPanelY = 86
+sessionPanelWidth = SCREEN_WIDTH - 342 - 24
+sessionPanelHeight = SCREEN_HEIGHT - 86 - 28
+sessionCardWidth = SCREEN_WIDTH - 342 - 24 - 24
+overlayCloseButtonX = SCREEN_WIDTH - 38
+overlayCloseButtonY = 61
+overlayCloseButtonHalfWidth = 14
+overlayCloseButtonHalfHeight = 12
+activityColumnCount = 7
+activityCellCount = 35
+activityCellSize = 18
+activityCellStepX = 26
+activityCellStepY = 24
+activityGridX = 102
+activityGridY = 160
+activityPrevButtonX = 104
+activityPrevButtonY = 133
+activityNextButtonX = 286
+activityNextButtonY = 133
+activityButtonWidth = 16
+activityButtonHeight = 16
+selectedYear = tonumber(os.date("%Y"))
+selectedMonth = tonumber(os.date("%m"))
+selectedDay = tonumber(os.date("%d"))
+hoveredActivityDay = nil
+activityMonthCounts = {}
+activityMonthMaxCount = 0
+activityMonthDayCount = 31
+selectedScoresForDisplay = {}
+overallBestScoresForDisplay = {}
+leaderboardEntriesForDisplay = {}
+overallOverviewRowsForDisplay = {}
+overallTimelineDaysForDisplay = {}
 overallRatingTimelineDaysForDisplay = {}
 overallWifeTimelineDaysForDisplay = {}
 overallMsdGradePointsForDisplay = {}
@@ -72,79 +72,79 @@ overallMostPlayedChartsForDisplay = {}
 overallMostPlayedFoldersForDisplay = {}
 breakdownJudgeRowsForDisplay = {}
 breakdownSelectedJudge = "J4"
-local overallProfileSummary = nil
-local leaderboardStatus = {state = "loading", title = "", detail = ""}
-local sessionScoreOffset = 0
-local overallBestScoreOffset = 0
-local overallTimelineHoveredIndex = nil
-local overallTimelineMaxValue = 1
-local overallLocalScoreEntries = nil
-local overallDerivedDataDirty = true
-local lastSessionDisplayKey = nil
-local statsOverlayTabs = {
+overallProfileSummary = nil
+leaderboardStatus = {state = "loading", title = "", detail = ""}
+sessionScoreOffset = 0
+overallBestScoreOffset = 0
+overallTimelineHoveredIndex = nil
+overallTimelineMaxValue = 1
+overallLocalScoreEntries = nil
+overallDerivedDataDirty = true
+lastSessionDisplayKey = nil
+statsOverlayTabs = {
 	Sessions = 1,
 	Overall = 2,
 	Leaderboards = 3
 }
-local overallSubviewTabs = {
+overallSubviewTabs = {
 	WifeTimeline = 1,
 	Rating = 2,
 	MsdGrade = 3,
 	MostPlayed = 4
 }
-local statsOverlayTab = statsOverlayTabs.Sessions
-local overallSubviewTab = overallSubviewTabs.WifeTimeline
-local statsOverlayTabTop = 44
-local statsOverlayTabHeight = 34
-local statsOverlayTabButtons = {
+statsOverlayTab = statsOverlayTabs.Sessions
+overallSubviewTab = overallSubviewTabs.WifeTimeline
+statsOverlayTabTop = 44
+statsOverlayTabHeight = 34
+statsOverlayTabButtons = {
 	{tab = statsOverlayTabs.Sessions, left = 80, width = 70, label = "Sessions"},
-	{tab = statsOverlayTabs.Overall, left = 152, width = 64, label = "Stats"},
-	{tab = statsOverlayTabs.Leaderboards, left = 218, width = 104, label = "Breakdown"}
+	{tab = statsOverlayTabs.Overall, left = 150, width = 60, label = "Overall"},
+	{tab = statsOverlayTabs.Leaderboards, left = 210, width = 90, label = "Leaderboards"}
 }
-local overviewRowCount = 6
-local timelineGraphLeft = sessionPanelX + 18
-local timelineGraphTop = sessionPanelY + 84
-local timelineGraphWidth = sessionPanelWidth - 36
-local timelineGraphHeight = 126
-local timelineYAxisTickCount = 5
-local timelineXAxisTickCount = 3
-local timelineSkillsetColors = {
-	color("#FFFFFF"),
-	color("#00C2A8"),
-	color("#FFB020"),
-	color("#FF6B6B"),
-	color("#B084FF"),
-	color("#4DD2FF"),
-	color("#8BD450"),
-	color("#5B8CFF")
+overviewRowCount = 6
+timelineGraphLeft = 342 + 18
+timelineGraphTop = 86 + 84
+timelineGraphWidth = SCREEN_WIDTH - 342 - 24 - 36
+timelineGraphHeight = 126
+timelineYAxisTickCount = 5
+timelineXAxisTickCount = 3
+timelineSkillsetColors = {
+	["Overall"] = HVColor.GetMSDRatingColor(30),
+	["Stream"] = HVColor.GetMSDRatingColor(28),
+	["Jumpstream"] = HVColor.GetMSDRatingColor(26),
+	["Handstream"] = HVColor.GetMSDRatingColor(24),
+	["Stamina"] = HVColor.GetMSDRatingColor(22),
+	["Jackspeed"] = HVColor.GetMSDRatingColor(20),
+	["Chordjack"] = HVColor.GetMSDRatingColor(18),
+	["Technical"] = HVColor.GetMSDRatingColor(16)
 }
-local overallSubviewButtons = {
+overallSubviewButtons = {
 	{tab = overallSubviewTabs.WifeTimeline, left = 102, top = 150, width = 180, label = "Wife% over time"},
 	{tab = overallSubviewTabs.Rating, left = 102, top = 184, width = 180, label = "Rating"},
 	{tab = overallSubviewTabs.MsdGrade, left = 102, top = 218, width = 180, label = "MSD/Grade distribution"},
 	{tab = overallSubviewTabs.MostPlayed, left = 102, top = 252, width = 180, label = "Most played charts/folders"}
 }
-local musicWheelDisplayOptions = {
+musicWheelDisplayOptions = {
 	{key = "OnlyShowGrades", label = "Only show grades:"},
 	{key = "ShowPBTimestamps", label = "Show PB timestamps:"},
 	{key = "ShowNativeMetadata", label = "Show native metadata:"}
 }
-local formatPercent
-local formatRate
-local formatJudge
-local formatChartMeter
-local formatDateKey
-local parseScoreTime
-local getScoreDateParts
-local setSettingsOverlayActive
-local setQuickMenuActive
-local getGradeColor = getGradeColor or function(grade)
+formatPercent = nil
+formatRate = nil
+formatJudge = nil
+formatChartMeter = nil
+formatDateKey = nil
+parseScoreTime = nil
+getScoreDateParts = nil
+setSettingsOverlayActive = nil
+setQuickMenuActive = nil
+getGradeColor = getGradeColor or function(grade)
 	if HVColor and HVColor.GetGradeColor then
 		return HVColor.GetGradeColor(grade)
 	end
 	return color("#FFFFFF")
 end
-local getClearTypeFromScore = function(player, score, mode)
+getClearTypeFromScore = function(player, score, mode)
 	local clearType = "NoPlay"
 	if score then
 		local chartKey = score:GetChartKey()
@@ -159,19 +159,19 @@ local getClearTypeFromScore = function(player, score, mode)
 	return getClearTypeText and getClearTypeText(clearType) or THEME:GetString("ClearTypes", clearType)
 end
 
-local function pointInBox(x, y, centerX, centerY, halfWidth, halfHeight)
+function pointInBox(x, y, centerX, centerY, halfWidth, halfHeight)
 	return x >= centerX - halfWidth and x <= centerX + halfWidth and y >= centerY - halfHeight and y <= centerY + halfHeight
 end
 
-local function pointInRect(x, y, left, top, width, height)
+function pointInRect(x, y, left, top, width, height)
 	return x >= left and x <= left + width and y >= top and y <= top + height
 end
 
-local function isStatsOverlaySessionTab()
+function isStatsOverlaySessionTab()
 	return statsOverlayTab == statsOverlayTabs.Sessions
 end
 
-local function getStatsOverlayTitle()
+function getStatsOverlayTitle()
 	if statsOverlayTab == statsOverlayTabs.Overall then
 		return "Stats"
 	elseif statsOverlayTab == statsOverlayTabs.Leaderboards then
@@ -180,7 +180,7 @@ local function getStatsOverlayTitle()
 	return "Sessions"
 end
 
-local function getStatsOverlayTabAtPosition(mouseX, mouseY)
+function getStatsOverlayTabAtPosition(mouseX, mouseY)
 	if mouseY < statsOverlayTabTop or mouseY > statsOverlayTabTop + statsOverlayTabHeight then return nil end
 	for _, button in ipairs(statsOverlayTabButtons) do
 		if pointInRect(mouseX, mouseY, button.left, statsOverlayTabTop, button.width, statsOverlayTabHeight) then
@@ -190,23 +190,23 @@ local function getStatsOverlayTabAtPosition(mouseX, mouseY)
 	return nil
 end
 
-local function isStatsOverlayOverallTab()
+function isStatsOverlayOverallTab()
 	return statsOverlayTab == statsOverlayTabs.Overall
 end
 
-local function isStatsOverlayLeaderboardsTab()
+function isStatsOverlayLeaderboardsTab()
 	return statsOverlayTab == statsOverlayTabs.Leaderboards
 end
 
-local function isStatsOverlayOverallSubview(tab)
+function isStatsOverlayOverallSubview(tab)
 	return statsOverlayTab == statsOverlayTabs.Overall and overallSubviewTab == tab
 end
 
-local function isStatsOverlayOverallTimelineSubview()
+function isStatsOverlayOverallTimelineSubview()
 	return isStatsOverlayOverallSubview(overallSubviewTabs.Rating) or isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline)
 end
 
-local function getOverallSubviewTabAtPosition(mouseX, mouseY)
+function getOverallSubviewTabAtPosition(mouseX, mouseY)
 	if not isStatsOverlayOverallTab() then return nil end
 	for _, button in ipairs(overallSubviewButtons) do
 		if pointInRect(mouseX, mouseY, button.left, button.top, button.width, 24) then
@@ -216,15 +216,15 @@ local function getOverallSubviewTabAtPosition(mouseX, mouseY)
 	return nil
 end
 
-local function getSettingsOverlayItemTop(index)
+function getSettingsOverlayItemTop(index)
 	return settingsOverlayItemY + ((index - 1) * (settingsOverlayItemHeight + settingsOverlayItemGap))
 end
 
-local function pointInSettingsOverlayItem(mouseX, mouseY, index)
+function pointInSettingsOverlayItem(mouseX, mouseY, index)
 	return pointInRect(mouseX, mouseY, settingsOverlayItemX, getSettingsOverlayItemTop(index), settingsOverlayItemWidth, settingsOverlayItemHeight)
 end
 
-local function pointInMusicWheelSettingsButton(mouseX, mouseY)
+function pointInMusicWheelSettingsButton(mouseX, mouseY)
 	return pointInRect(
 		mouseX,
 		mouseY,
@@ -235,14 +235,14 @@ local function pointInMusicWheelSettingsButton(mouseX, mouseY)
 	)
 end
 
-local function getMusicWheelDisplayOptionValue(key)
+function getMusicWheelDisplayOptionValue(key)
 	if getMusicWheelDisplaySetting then
 		return getMusicWheelDisplaySetting(key)
 	end
 	return false
 end
 
-local function refreshMusicWheelDisplay()
+function refreshMusicWheelDisplay()
 	local top = SCREENMAN:GetTopScreen()
 	if top and top.GetMusicWheel then
 		local wheel = top:GetMusicWheel()
@@ -253,7 +253,7 @@ local function refreshMusicWheelDisplay()
 	MESSAGEMAN:Broadcast("MusicWheelDisplayRefresh")
 end
 
-local function toggleMusicWheelDisplayOption(key)
+function toggleMusicWheelDisplayOption(key)
 	local nextValue = not getMusicWheelDisplayOptionValue(key)
 	if setMusicWheelDisplaySetting then
 		setMusicWheelDisplaySetting(key, nextValue)
@@ -261,7 +261,7 @@ local function toggleMusicWheelDisplayOption(key)
 	refreshMusicWheelDisplay()
 end
 
-local function setOverallSubviewTab(tab)
+function setOverallSubviewTab(tab)
 	if not tab then return end
 	if overallSubviewTab == tab then return end
 	overallSubviewTab = tab
@@ -275,7 +275,7 @@ local function setOverallSubviewTab(tab)
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
 end
 
-local function formatInteger(value)
+function formatInteger(value)
 	value = math.floor(tonumber(value) or 0)
 	local formatted = tostring(value)
 	while true do
@@ -285,7 +285,7 @@ local function formatInteger(value)
 	return formatted
 end
 
-local function formatStepsTypeLabel(stepsType)
+function formatStepsTypeLabel(stepsType)
 	if not stepsType or stepsType == "" then return "Unknown" end
 	local label = tostring(stepsType):gsub("^StepsType_", ""):gsub("_", " ")
 	return label:gsub("(%a)([%w']*)", function(first, rest)
@@ -293,43 +293,43 @@ local function formatStepsTypeLabel(stepsType)
 	end)
 end
 
-local function getOverallTimelineSkillsetCount()
+function getOverallTimelineSkillsetCount()
 	return math.min(#ms.SkillSets, 8)
 end
 
-local function fitOverallTimelineX(index)
+function fitOverallTimelineX(index)
 	if #overallTimelineDaysForDisplay <= 1 then
 		return timelineGraphWidth / 2
 	end
 	return ((index - 1) / (#overallTimelineDaysForDisplay - 1)) * timelineGraphWidth
 end
 
-local function fitOverallTimelineY(value)
+function fitOverallTimelineY(value)
 	if overallTimelineMaxValue <= 0 then
 		return timelineGraphHeight
 	end
 	return timelineGraphHeight - ((value / overallTimelineMaxValue) * timelineGraphHeight)
 end
 
-local function getOverallTimelineGridFraction(index, count)
+function getOverallTimelineGridFraction(index, count)
 	if count <= 1 then return 0 end
 	return (index - 1) / (count - 1)
 end
 
-local function getOverallTimelineGridX(index, count)
+function getOverallTimelineGridX(index, count)
 	return timelineGraphLeft + (timelineGraphWidth * getOverallTimelineGridFraction(index, count))
 end
 
-local function getOverallTimelineGridY(index, count)
+function getOverallTimelineGridY(index, count)
 	return timelineGraphTop + (timelineGraphHeight * getOverallTimelineGridFraction(index, count))
 end
 
-local function getOverallTimelineYAxisLabel(index)
+function getOverallTimelineYAxisLabel(index)
 	local fraction = getOverallTimelineGridFraction(index, timelineYAxisTickCount)
 	return string.format("%.1f", overallTimelineMaxValue * (1 - fraction))
 end
 
-local function getOverallTimelineXAxisDisplay(index)
+function getOverallTimelineXAxisDisplay(index)
 	local dayCount = #overallTimelineDaysForDisplay
 	if dayCount == 0 then return nil, nil, nil end
 	if dayCount == 1 then
@@ -348,7 +348,7 @@ local function getOverallTimelineXAxisDisplay(index)
 	return getOverallTimelineGridX(index, timelineXAxisTickCount), day, getOverallTimelineGridFraction(index, timelineXAxisTickCount)
 end
 
-local function getOverallProfileSummary()
+function getOverallProfileSummary()
 	local profile = GetPlayerOrMachineProfile(PLAYER_1)
 	if not profile then return nil end
 	local summary = {
@@ -371,7 +371,7 @@ local function getOverallProfileSummary()
 	return summary
 end
 
-local function isScoreValidForOverallDerivedData(score)
+function isScoreValidForOverallDerivedData(score)
 	if not score then return false end
 	local okValid, valid = pcall(function() return score:GetEtternaValid() end)
 	if okValid and not valid then
@@ -388,7 +388,7 @@ local function isScoreValidForOverallDerivedData(score)
 	return true
 end
 
-local function collectOverallLocalScoreEntries()
+function collectOverallLocalScoreEntries()
 	local entries = {}
 	local songs = SONGMAN:GetAllSongs() or {}
 	for _, song in ipairs(songs) do
@@ -422,7 +422,7 @@ local function collectOverallLocalScoreEntries()
 	return entries
 end
 
-local function buildOverallOverviewRows(entries)
+function buildOverallOverviewRows(entries)
 	local buckets = {}
 	for _, entry in ipairs(entries) do
 		local stepsType = entry.steps and entry.steps:GetStepsType() or nil
@@ -465,7 +465,7 @@ local function buildOverallOverviewRows(entries)
 	return rows
 end
 
-local function erfcApprox(value)
+function erfcApprox(value)
 	local sign = value < 0 and -1 or 1
 	local x = math.abs(value)
 	local t = 1 / (1 + (0.3275911 * x))
@@ -477,7 +477,7 @@ local function erfcApprox(value)
 	return 1 - erf
 end
 
-local function calculateAggregateRating(values, finalMultiplier, deltaMultiplier)
+function calculateAggregateRating(values, finalMultiplier, deltaMultiplier)
 	if not values or #values == 0 then return 0 end
 	local rating = 0
 	local resolution = 10.24
@@ -506,20 +506,20 @@ local function calculateAggregateRating(values, finalMultiplier, deltaMultiplier
 	return rating * finalMultiplier
 end
 
-local function calculatePlayerSkillsetRatingFromScores(values)
+function calculatePlayerSkillsetRatingFromScores(values)
 	return calculateAggregateRating(values, 1.05, 0.1)
 end
 
-local function calculatePlayerOverallFromSkillsets(values)
+function calculatePlayerOverallFromSkillsets(values)
 	return calculateAggregateRating(values, 1.125, 0.1)
 end
 
-local function getOverallTimelineRateKey(score)
+function getOverallTimelineRateKey(score)
 	local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
 	return string.format("%.3f", tonumber(rate) or 1)
 end
 
-local function getOverallTimelinePBMetric(score)
+function getOverallTimelinePBMetric(score)
 	if not score then return 0 end
 	local okNorm, normPercent = pcall(function() return score:GetSSRNormPercent() end)
 	if okNorm and normPercent then
@@ -528,7 +528,7 @@ local function getOverallTimelinePBMetric(score)
 	return tonumber(score:GetWifeScore() or 0) or 0
 end
 
-local function isOverallTimelineRatingEntry(entry)
+function isOverallTimelineRatingEntry(entry)
 	if not entry or not entry.score or not entry.steps then return false end
 	local okStepsType, stepsType = pcall(function() return entry.steps:GetStepsType() end)
 	if not okStepsType or not stepsType then
@@ -541,7 +541,7 @@ local function isOverallTimelineRatingEntry(entry)
 	return isScoreValidForOverallDerivedData(entry.score)
 end
 
-local function applyOverallTimelineRatings(day, pbByBucket, skillsetCount)
+function applyOverallTimelineRatings(day, pbByBucket, skillsetCount)
 	local specificSkillsetRatings = {}
 	for i = 1, skillsetCount do
 		local skillset = ms.SkillSets[i]
@@ -563,7 +563,7 @@ local function applyOverallTimelineRatings(day, pbByBucket, skillsetCount)
 	end
 end
 
-local function updateOverallTimelineMaxValue(day, skillsetCount, currentMax)
+function updateOverallTimelineMaxValue(day, skillsetCount, currentMax)
 	local maxValue = currentMax
 	for i = 1, skillsetCount do
 		local skillset = ms.SkillSets[i]
@@ -576,19 +576,19 @@ local function updateOverallTimelineMaxValue(day, skillsetCount, currentMax)
 end
 
 -- Weekly grouping helpers for the Overall timeline graph
-local function getWeekStartTime(year, month, day)
+function getWeekStartTime(year, month, day)
 	local t = os.time({year = year, month = month, day = day, hour = 0, min = 0, sec = 0})
 	local weekday = tonumber(os.date("%w", t)) -- 0=Sun, 1=Mon, ..., 6=Sat
 	local daysToMonday = (weekday + 6) % 7
 	return t - daysToMonday * 86400
 end
 
-local function formatWeekKey(weekStartT)
+function formatWeekKey(weekStartT)
 	-- Zero-padded ISO week: "YYYY-WNN" (sorts correctly within a year)
 	return os.date("%Y-W", weekStartT) .. string.format("%02d", tonumber(os.date("%V", weekStartT)))
 end
 
-local function formatWeekLabel(weekStartT)
+function formatWeekLabel(weekStartT)
 	local weekEndT = weekStartT + 6 * 86400
 	local sd = os.date("%d", weekStartT)
 	local sm = os.date("%b", weekStartT)
@@ -602,7 +602,7 @@ local function formatWeekLabel(weekStartT)
 	end
 end
 
-local function buildOverallTimelineDataFallback(entries)
+function buildOverallTimelineDataFallback(entries)
 	local datedEntries = {}
 	local maxValue = 1
 	local skillsetCount = getOverallTimelineSkillsetCount()
@@ -671,7 +671,7 @@ local function buildOverallTimelineDataFallback(entries)
 	return days, maxValue
 end
 
-local function buildOverallTimelineData(entries)
+function buildOverallTimelineData(entries)
 	local datedEntries = {}
 	local maxValue = 1
 	local skillsetCount = getOverallTimelineSkillsetCount()
@@ -832,7 +832,7 @@ function buildOverallMostPlayed(entries)
 	return charts, folders
 end
 
-local function refreshOverallDerivedData()
+function refreshOverallDerivedData()
 	if not overallDerivedDataDirty and overallLocalScoreEntries then return end
 	overallLocalScoreEntries = collectOverallLocalScoreEntries()
 	overallOverviewRowsForDisplay = buildOverallOverviewRows(overallLocalScoreEntries)
@@ -844,7 +844,7 @@ local function refreshOverallDerivedData()
 	overallDerivedDataDirty = false
 end
 
-local function getOverallBestScores()
+function getOverallBestScores()
 	local scores = {}
 	SCOREMAN:SortSSRsForGame("Overall")
 	for i = 1, overallBestScoreRowCount do
@@ -871,7 +871,7 @@ local function getOverallBestScores()
 	return scores
 end
 
-local function refreshLeaderboardData()
+function refreshLeaderboardData()
 	leaderboardEntriesForDisplay = {}
 	refreshOverallDerivedData()
 	local buckets = {}
@@ -937,7 +937,7 @@ local function refreshLeaderboardData()
 	}
 end
 
-local function setStatsOverlayTab(tab)
+function setStatsOverlayTab(tab)
 	if not tab then return end
 	if statsOverlayTab == tab then return end
 	statsOverlayTab = tab
@@ -960,7 +960,7 @@ formatRate = function(score)
 	return string.format("%.2f", score:GetMusicRate()):gsub("%.?0+$", "") .. "x"
 end
 
-local function getRecentScoreCount()
+function getRecentScoreCount()
 	local count = 0
 	for i = 1, 64 do
 		if SCOREMAN:GetRecentScoreForGame(i) then
@@ -976,17 +976,17 @@ formatDateKey = function(year, month, day)
 	return string.format("%04d-%02d-%02d", year, month, day)
 end
 
-local function getTodayDateParts()
+function getTodayDateParts()
 	local now = os.time()
 	return tonumber(os.date("%Y", now)), tonumber(os.date("%m", now)), tonumber(os.date("%d", now))
 end
 
-local function daysInMonth(year, month)
+function daysInMonth(year, month)
 	local nextMonth = os.time({year = year, month = month + 1, day = 1, hour = 0, min = 0, sec = 0})
 	return tonumber(os.date("%d", nextMonth - 86400))
 end
 
-local function shiftSelectedMonth(offset)
+function shiftSelectedMonth(offset)
 	local shifted = os.time({year = selectedYear, month = selectedMonth + offset, day = 1, hour = 0, min = 0, sec = 0})
 	selectedYear = tonumber(os.date("%Y", shifted))
 	selectedMonth = tonumber(os.date("%m", shifted))
@@ -1027,13 +1027,13 @@ getScoreDateParts = function(score)
 	return year, month, day
 end
 
-local function getScoreDateKey(score)
+function getScoreDateKey(score)
 	local year, month, day = getScoreDateParts(score)
 	if not year then return nil end
 	return formatDateKey(year, month, day)
 end
 
-local function getScoresForSelectedDate()
+function getScoresForSelectedDate()
 	local selectedKey = formatDateKey(selectedYear, selectedMonth, selectedDay)
 	local scores = {}
 	for i = 1, 512 do
@@ -1046,7 +1046,7 @@ local function getScoresForSelectedDate()
 	return scores
 end
 
-local function getSelectedMonthActivity()
+function getSelectedMonthActivity()
 	local counts = {}
 	local monthDays = daysInMonth(selectedYear, selectedMonth)
 	for day = 1, monthDays do
@@ -1067,7 +1067,7 @@ local function getSelectedMonthActivity()
 	return counts, maxCount, monthDays
 end
 
-local function getSelectedSessionSeconds(scores)
+function getSelectedSessionSeconds(scores)
 	local displayDay = hoveredActivityDay or selectedDay
 	local todayYear, todayMonth, todayDay = getTodayDateParts()
 	if selectedYear == todayYear and selectedMonth == todayMonth and displayDay == todayDay then
@@ -1113,7 +1113,7 @@ formatChartMeter = function(steps)
 	return table.concat(parts, " ")
 end
 
-local function getActivityDayAtPosition(mouseX, mouseY)
+function getActivityDayAtPosition(mouseX, mouseY)
 	for day = 1, activityMonthDayCount do
 		local index = day - 1
 		local col = index % activityColumnCount
@@ -1127,12 +1127,12 @@ local function getActivityDayAtPosition(mouseX, mouseY)
 	return nil
 end
 
-local function isOverSessionPanel(mouseX, mouseY)
+function isOverSessionPanel(mouseX, mouseY)
 	if not isStatsOverlaySessionTab() then return false end
 	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY, sessionPanelWidth, sessionPanelHeight)
 end
 
-local function getOverallTimelineHoverIndex(mouseX, mouseY)
+function getOverallTimelineHoverIndex(mouseX, mouseY)
 	if not isStatsOverlayOverallSubview(overallSubviewTabs.Rating) and not isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline) then return nil end
 	if not pointInRect(mouseX, mouseY, timelineGraphLeft, timelineGraphTop, timelineGraphWidth, timelineGraphHeight) then return nil end
 	if #overallTimelineDaysForDisplay == 0 then return nil end
@@ -1144,12 +1144,12 @@ local function getOverallTimelineHoverIndex(mouseX, mouseY)
 	return index
 end
 
-local function isOverOverallBestScoresPanel(mouseX, mouseY)
+function isOverOverallBestScoresPanel(mouseX, mouseY)
 	if not isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed) then return false end
 	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY + 72, sessionPanelWidth, sessionPanelHeight - 90)
 end
 
-local function clampSessionScoreOffset()
+function clampSessionScoreOffset()
 	local maxOffset = math.max(0, #selectedScoresForDisplay - sessionRowCount)
 	if sessionScoreOffset < 0 then
 		sessionScoreOffset = 0
@@ -1158,19 +1158,19 @@ local function clampSessionScoreOffset()
 	end
 end
 
-local function pageSessionScores(direction)
+function pageSessionScores(direction)
 	sessionScoreOffset = sessionScoreOffset + (direction * sessionRowCount)
 	clampSessionScoreOffset()
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
 end
 
-local function clampOverallBestScoreOffset()
+function clampOverallBestScoreOffset()
 	if overallBestScoreOffset < 0 then
 		overallBestScoreOffset = 0
 	end
 end
 
-local function pageOverallBestScores(direction)
+function pageOverallBestScores(direction)
 	local nextOffset = overallBestScoreOffset + (direction * overallBestScoreRowCount)
 	if nextOffset < 0 then
 		nextOffset = 0
@@ -1190,15 +1190,15 @@ local function pageOverallBestScores(direction)
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
 end
 
-local function getQuickMenuItemTop(index)
+function getQuickMenuItemTop(index)
 	return quickMenuItemY + ((index - 1) * (quickMenuItemHeight + quickMenuItemGap))
 end
 
-local function pointInQuickMenuItem(mouseX, mouseY, index)
+function pointInQuickMenuItem(mouseX, mouseY, index)
 	return pointInRect(mouseX, mouseY, quickMenuItemX, getQuickMenuItemTop(index), quickMenuItemWidth, quickMenuItemHeight)
 end
 
-local function setStatsOverlayActive(active)
+function setStatsOverlayActive(active)
 	if statsOverlayActive == active then return end
 	statsOverlayActive = active
 	setenv("StatsOverlayActive", active)
@@ -1273,12 +1273,12 @@ setQuickMenuActive = function(active)
 	MESSAGEMAN:Broadcast("QuickMenuStateChanged", {active = active})
 end
 
-local function openServiceMenu()
+function openServiceMenu()
 	setQuickMenuActive(false)
 	SCREENMAN:SetNewScreen("ScreenOptionsService")
 end
 
-local function openNoteskinOptions()
+function openNoteskinOptions()
 	setQuickMenuActive(false)
 	setenv("NewOptions", "Main")
 	local top = SCREENMAN:GetTopScreen()
@@ -1287,12 +1287,12 @@ local function openNoteskinOptions()
 	end
 end
 
-local function openKeyConfig()
+function openKeyConfig()
 	setQuickMenuActive(false)
 	SCREENMAN:SetNewScreen("ScreenMapControllers")
 end
 
-local function input(event)
+function input(event)
 	local deviceButton = event.DeviceInput and event.DeviceInput.button or nil
 	if deviceButton == "DeviceButton_left mouse button" then
 		local mouseX = INPUTFILTER:GetMouseX()
@@ -1433,7 +1433,7 @@ local function input(event)
 	return false
 end
 
-local function sessionRow(i)
+function sessionRow(i)
 	return Def.ActorFrame {
 		Name = "Row" .. i,
 		InitCommand = function(self)
@@ -1529,7 +1529,7 @@ local function sessionRow(i)
 	}
  end
 
-local function statsOverlayTabButton(button)
+function statsOverlayTabButton(button)
 	return Def.ActorFrame {
 		Name = "TabButton" .. tostring(button.tab),
 		InitCommand = function(self)
@@ -1564,7 +1564,7 @@ local function statsOverlayTabButton(button)
 	}
 end
 
-local function overallSubviewButton(button)
+function overallSubviewButton(button)
 	return Def.ActorFrame {
 		Name = "OverallSubviewButton" .. tostring(button.tab),
 		InitCommand = function(self)
@@ -1602,7 +1602,7 @@ local function overallSubviewButton(button)
 	}
 end
 
-local function overallSkillsetRow(i)
+function overallSkillsetRow(i)
 	return Def.ActorFrame {
 		Name = "OverallSkillset" .. i,
 		InitCommand = function(self)
@@ -1639,7 +1639,7 @@ local function overallSkillsetRow(i)
 	}
 end
 
-local function overallBestScoreRow(i)
+function overallBestScoreRow(i)
 	return Def.ActorFrame {
 		Name = "OverallBestScoreRow" .. i,
 		InitCommand = function(self)
@@ -1716,7 +1716,7 @@ local function overallBestScoreRow(i)
 	}
 end
 
-local function overallOverviewRow(i)
+function overallOverviewRow(i)
 	return Def.ActorFrame {
 		Name = "OverallOverviewRow" .. i,
 		InitCommand = function(self)
@@ -1782,7 +1782,7 @@ local function overallOverviewRow(i)
 	}
 end
 
-local function overallTimelineLine(i)
+function overallTimelineLine(i)
 	return Def.ActorMultiVertex {
 		Name = "OverallTimelineLine" .. i,
 		InitCommand = function(self)
@@ -1817,7 +1817,7 @@ local function overallTimelineLine(i)
 	}
 end
 
-local function overallTimelineDot(i)
+function overallTimelineDot(i)
 	return Def.Quad {
 		Name = "OverallTimelineDot" .. i,
 		InitCommand = function(self)
@@ -1846,7 +1846,7 @@ local function overallTimelineDot(i)
 	}
 end
 
-local function overallTimelineLegend(i)
+function overallTimelineLegend(i)
 	return Def.ActorFrame {
 		Name = "OverallTimelineLegend" .. i,
 		InitCommand = function(self)
@@ -1898,7 +1898,7 @@ local function overallTimelineLegend(i)
 	}
 end
 
-local function overallTimelineHorizontalGridline(i)
+function overallTimelineHorizontalGridline(i)
 	return Def.Quad {
 		Name = "OverallTimelineHorizontalGridline" .. i,
 		InitCommand = function(self)
@@ -1922,7 +1922,7 @@ local function overallTimelineHorizontalGridline(i)
 	}
 end
 
-local function overallTimelineVerticalGridline(i)
+function overallTimelineVerticalGridline(i)
 	return Def.Quad {
 		Name = "OverallTimelineVerticalGridline" .. i,
 		InitCommand = function(self)
@@ -1946,7 +1946,7 @@ local function overallTimelineVerticalGridline(i)
 	}
 end
 
-local function overallTimelineYAxisLabel(i)
+function overallTimelineYAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineYAxisLabel" .. i,
 		InitCommand = function(self)
@@ -1971,7 +1971,7 @@ local function overallTimelineYAxisLabel(i)
 	}
 end
 
-local function overallTimelineXAxisLabel(i)
+function overallTimelineXAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineXAxisLabel" .. i,
 		InitCommand = function(self)
@@ -2087,7 +2087,7 @@ end
 }
 }
 end
-local function leaderboardRow(i)
+function leaderboardRow(i)
 	return Def.ActorFrame {
 		Name = "LeaderboardRow" .. i,
 		InitCommand = function(self)
