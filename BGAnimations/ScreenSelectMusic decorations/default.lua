@@ -1709,36 +1709,13 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "ProfileName",
 		InitCommand = function(self)
 			self:halign(0):valign(0):x(56):y(-4):zoom(0.40):diffuse(mainText)
-			self.cycleState = 0
 		end,
 		SetCommand = function(self)
-			self:stoptweening()
-			local pn = PLAYER_1
-			local onlineName = (DLMAN:IsLoggedIn()) and DLMAN:GetUsername() or ""
-			local localName = ""
-			local profile = PROFILEMAN:GetProfile(pn)
-			if profile then localName = profile:GetDisplayName() end
-			if localName == "" then localName = "Player 1" end
-			
-			if onlineName ~= "" and onlineName ~= localName then
-				if self.cycleState == 0 then
-					self:settext(onlineName)
-				else
-					self:settext(localName)
-				end
-				self.cycleState = 1 - self.cycleState
-				
-				self:diffusealpha(0):linear(0.25):diffusealpha(1)
-				self:sleep(2.5):linear(0.25):diffusealpha(0):queuecommand("Set")
-			else
-				self:diffusealpha(1)
-				self:settext(onlineName ~= "" and onlineName or localName)
-				self:sleep(3):queuecommand("Set")
-			end
+			self:settext(HV.GetPlayerName())
 		end,
-		LoginMessageCommand = function(self) self.cycleState = 0 self:playcommand("Set") end,
-		LogOutMessageCommand = function(self) self.cycleState = 0 self:playcommand("Set") end,
-		OnlineUpdateMessageCommand = function(self) self.cycleState = 0 self:playcommand("Set") end,
+		LoginMessageCommand = function(self) self:playcommand("Set") end,
+		LogOutMessageCommand = function(self) self:playcommand("Set") end,
+		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		OnCommand = function(self) self:playcommand("Set") end
 	},
 
