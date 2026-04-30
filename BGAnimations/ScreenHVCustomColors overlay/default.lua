@@ -7,12 +7,12 @@ local cursorIndex = {1, 1}
 local selected = {"", ""}
 local currentItems = {{}, {}}
 
-local maxItems = 17
+local maxItems = 18
 local categoryX = 60
 local elementX = 240
 local colorX = 480
 local startY = 80
-local spacing = 22
+local spacing = 20
 local scale = 0.65
 
 local categories = HVCustomColors.GetCategories()

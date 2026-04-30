@@ -226,7 +226,13 @@ end
 function HVCustomColors.GetElements(category)
 	initCustomColors()
 	local ordered = {
-		grades = { "AAAAA", "AAAA", "AAA", "AA", "A", "B", "C", "D", "F", "None" },
+		grades = {
+			"AAAAA", "AAAA:", "AAAA.", "AAAA",
+			"AAA:", "AAA.", "AAA",
+			"AA:", "AA.", "AA",
+			"A:", "A.", "A",
+			"B", "C", "D", "F", "None",
+		},
 		judgment = { "W1", "W2", "W3", "W4", "W5", "Miss", "Held", "LetGo" },
 		difficulty = { "Beginner", "Easy", "Medium", "Hard", "Challenge", "Edit" },
 		clearType = {
