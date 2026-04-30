@@ -84,7 +84,8 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 
 ## Credits
 * Everyone in the EtternaOnline Discord
-  In particular:
+
+### In particular:
 * poco0317 for creating Etterna
 * martzi for putting this theme on the theme repo
 * ifwas (reimuboobs) for one of the feedbacks
