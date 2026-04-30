@@ -84,11 +84,14 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 
 ## Credits
 * Everyone in the EtternaOnline Discord
+  In particular:
 * poco0317 for creating Etterna
 * martzi for putting this theme on the theme repo
 * ifwas (reimuboobs) for one of the feedbacks
 * Matthia for accing
-* iwct for being the rising goat
+* ivct for being the rising goat
 * Jole for creating the goat of Etterna themes
 * 1033Forest and PoRa for noteskins porting
 * Etienne for Etienne
+* nonyu for being bald
+* the Fatigue theme for inspo for theme creation, this is basically what Fatigue could have been
