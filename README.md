@@ -8,14 +8,15 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 
 ### OLED-Optimized Visuals
 *   **True Black Backgrounds:** Designed specifically for OLED displays to provide infinite contrast and eliminate "IPS glow" distractions.
-*   **Desat Color Palette:** A sophisticated, muted neon color system for Difficulties, Judgments, and Clear Types that maintains high legibility without being garish. The classic color systems from Rebith/'Til Death are available.
-*   **25+ Dynamic Preset Accent Colors:** Instantly swap the entire UI's highlight color (Lavender, Cyan, Crimson, etc.) from the **Color Theme** menu. A proper Color Customization Screen will come at a later time.
+*   **Desat Color Palette:** A sophisticated, muted neon color system for Difficulties, Judgments, and Clear Types that maintains high legibility without being garish. The classic color systems from Rebith/'Til Death are available, or custom colors if you prefer.
+*   **25+ Dynamic Preset Accent Colors with Custom Color support:** Instantly swap the entire UI's highlight color (Lavender, Cyan, Crimson, etc.) from the **Color Theme** menu, with options to use custom colors!
 
 ### Technical Stuff
 *   **MSD, but cleaner:** A revamped radar graph in the Song Select screen that visualizes MSD breakdowns (Stream, Jumpstream, Handstream, etc.) on hover, saving space for other important features.
 *   **Advanced Evaluation:** Built on and extended from what is available from other themes, the themes features **RA/LA judgement/ratio display**, **Stacked Combo Graph bars** for different judgements and judge windows, and **Online/Local leaderboards**, visible at a glance.
 *   **Real-time metrics:** More than just a jduge counter, it also includes a live Judge 4 rescoring display, as well as a live MA/PA ratio display, along with offset metrics.
 *   **Celebratory Display:** Visual indicators for specialized clears like MFC, WF (White Flag), SDP (Single Digit Perfects), and more at the end of a chart.
+*   **Cutting-edge for Accuracy Extremeists:** Included options for people who crave absolute perfection, with proper visual feedbacks
 
 ### Performance & UX:
 *   **Optimized Music Wheel:** The wheel also displays the MSD of the selected difficulty of each and every song, at the cost of some performance bottleneck.
@@ -66,18 +67,18 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 ---
 
 ## Bugs
-1. There is an unfixed input callback error. I do not know how to fix this.
-2. The search bar can be a bit buggy, pressing Enter starts the highlighted song instead.
-3. The J4 scoring might or might not be accurate at times.
-4. The preview music might not play in a few circumstances.
+~~1. There is an unfixed input callback error. I do not know how to fix this.~~ fixed ig?
+~~2. The search bar can be a bit buggy, pressing Enter starts the highlighted song instead.~~ fixed
+~~3. The J4 scoring might or might not be accurate at times.~~ Edge cases are scores with a lot of mines hit
+~~4. The preview music might not play in a few circumstances.~~ much more controlled, only one instance
 
 ---
 
 ## TODO
-1. Add the proper Customize Gameplay mechanic from other themes
-2. Also add the full-fledged color configuration screen
-3. Add the song background to other screens
-4. Clean up the very scuffed ThemePref saving
+~~1. Add the proper Customize Gameplay mechanic from other themes~~ done
+~~2. Also add the full-fledged color configuration screen~~ done
+~~3. Add the song background to other screens~~ done
+1. Clean up the very scuffed ThemePref saving
 
 ---
 
@@ -87,3 +88,7 @@ A futuristic, high-performance Etterna theme built for technical players who dem
 * martzi for putting this theme on the theme repo
 * ifwas (reimuboobs) for one of the feedbacks
 * Matthia for accing
+* iwct for being the rising goat
+* Jole for creating the goat of Etterna themes
+* 1033Forest and PoRa for noteskins porting
+* Etienne for Etienne
