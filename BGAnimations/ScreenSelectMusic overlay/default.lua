@@ -1201,7 +1201,7 @@ local profileOverlay = Def.ActorFrame {
 						Name = "SSR",
 						InitCommand = function(self) self:halign(0):x(-mainPartW/2 + 30):zoom(0.4) end
 					},
-					LoadFont("zpix/_zpix 20px") .. {
+					LoadFont("Zpix normal") .. {
 						Name = "Title",
 						InitCommand = function(self) self:halign(0):x(-mainPartW/2 + 90):y(-5):zoom(0.35):diffuse(brightText):maxwidth(400 * 1.5) end
 					},

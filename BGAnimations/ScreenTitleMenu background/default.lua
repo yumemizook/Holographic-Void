@@ -108,6 +108,7 @@ local mpNextPath = THEME:GetPathG("", "mp_next")
 
 local t = Def.ActorFrame {
 	InitCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex or 1
 		self:SetUpdateFunction(function(af)
 			local screen = SCREENMAN:GetTopScreen()
 			if screen then
@@ -142,10 +143,11 @@ local t = Def.ActorFrame {
 
 			-- Title Menu Hover (5 items)
 			local hovered = nil
-			for i = 1, 5 do
-				local static_iy = (SCREEN_CENTER_Y + 20) + 44 * (i - 3)
+			local choiceNames = {"Start", "Multi", "ColorTheme", "PackDownloader", "Options", "Quit"}
+			for i = 1, #choiceNames do
+				local static_iy = SCREEN_CENTER_Y + 40 * (i - ((#choiceNames + 1) / 2))
 				if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-				   and virtualY >= static_iy-22 and virtualY <= static_iy+22 then
+				   and virtualY >= static_iy-20 and virtualY <= static_iy+20 then
 					hovered = i break
 				end
 			end
@@ -154,7 +156,7 @@ local t = Def.ActorFrame {
 			local selGlow = af:GetChild("SelectionGlow")
 			if selGlow then
 				if hovered then
-					local selY = (SCREEN_CENTER_Y + 20) + 44 * (hovered - 3)
+					local selY = SCREEN_CENTER_Y + 40 * (hovered - ((#choiceNames + 1) / 2))
 					selGlow:stoptweening():linear(0.05):y(selY):diffusealpha(isGlowEnabled and 0.4 or 0)
 				else
 					selGlow:stoptweening():linear(0.1):diffusealpha(0)
@@ -163,16 +165,36 @@ local t = Def.ActorFrame {
 
 			if hovered ~= HV.TitleState.mouse.lastHovered then
 				HV.TitleState.mouse.lastHovered = hovered
-				local screen = SCREENMAN:GetTopScreen()
-				if screen and hovered then
-					-- 1. Sync scroller (visual)
-					if screen:GetChild("Scroller") then
-						screen:GetChild("Scroller"):SetDestinationItem(hovered - 1)
+			end
+
+			-- Always derive visual highlight from actual scroller/engine selection.
+			local selectedIndex = HV.TitleState.keyboardIndex or 1
+			local screen = SCREENMAN:GetTopScreen()
+			if screen then
+				local scroller = screen:GetChild("Scroller")
+				if scroller then
+					local destItem = scroller:GetDestinationItem()
+					if destItem ~= nil then
+						selectedIndex = destItem + 1
+					else
+						local currItem = scroller:GetCurrentItem()
+						if currItem ~= nil then
+							selectedIndex = currItem + 1
+						end
 					end
-					-- 2. Sync selection (engine)
-					if screen.SetCurrentChoice then
-						local choiceNames = {"Start", "ColorTheme", "PackDownloader", "Options", "Exit"}
-						screen:SetCurrentChoice(choiceNames[hovered])
+				end
+			end
+
+			HV.TitleState.keyboardIndex = selectedIndex
+
+			-- Update custom label colors based on selection state
+			for i = 1, 6 do
+				local lbl = af:GetChild("ChoiceLabel" .. i)
+				if lbl then
+					if i == selectedIndex then
+						lbl:stoptweening():decelerate(0.15):zoom(0.7):diffuse(color("1,1,1,1"))
+					else
+						lbl:stoptweening():decelerate(0.15):zoom(0.6):diffuse(color("0.5,0.5,0.5,1"))
 					end
 				end
 			end
@@ -198,6 +220,22 @@ local t = Def.ActorFrame {
 		if HV.TitleState and HV.TitleState.player then
 			HV.TitleState.player.history = {}
 		end
+	end,
+	MenuUpCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex - 1
+		if HV.TitleState.keyboardIndex < 1 then HV.TitleState.keyboardIndex = 6 end
+	end,
+	MenuDownCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex + 1
+		if HV.TitleState.keyboardIndex > 6 then HV.TitleState.keyboardIndex = 1 end
+	end,
+	Player1UpCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex - 1
+		if HV.TitleState.keyboardIndex < 1 then HV.TitleState.keyboardIndex = 6 end
+	end,
+	Player1DownCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex + 1
+		if HV.TitleState.keyboardIndex > 6 then HV.TitleState.keyboardIndex = 1 end
 	end,
 	LoginMessageCommand = function(self)
 		local user = DLMAN:GetUsername()
@@ -355,6 +393,20 @@ t[#t + 1] = Def.Quad {
 	Name = "SelectionGlow",
 	InitCommand = function(self) self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):zoomto(300, 40):diffusealpha(0):fadetop(0.2):fadebottom(0.2) end
 }
+
+--- Title Menu Text Labels (Custom rendering to bypass engine scroller text issues)
+local choiceLabels = {"START", "MULTI", "COLOR THEME", "PACK DOWNLOADER", "OPTIONS", "EXIT"}
+local choiceKeys = {"Start", "Multi", "ColorTheme", "PackDownloader", "Options", "Quit"}
+for i, label in ipairs(choiceLabels) do
+	local iy = SCREEN_CENTER_Y + 40 * (i - ((#choiceLabels + 1) / 2))
+	t[#t + 1] = LoadFont("Common Normal") .. {
+		Name = "ChoiceLabel" .. i,
+		Text = label,
+		InitCommand = function(self)
+			self:xy(SCREEN_CENTER_X, iy):zoom(0.6):diffuse(color("0.5,0.5,0.5,1")):uppercase(true)
+		end
+	}
+end
 
 -- GRID EFFECT
 local grid = Def.ActorFrame { 
@@ -837,7 +889,7 @@ t[#t + 1] = Def.ActorFrame {
 				if p.song then
 					local artist = p.song:GetDisplayArtist() or "?"
 					local title = p.song:GetDisplayMainTitle() or "?"
-					songTxt:settext(artist .. " — " .. title)
+					songTxt:settext(artist .. " - " .. title)
 					songTxt:diffuse(subText)
 				else
 					songTxt:settext(THEME:GetString("ScreenTitleMenu", "JukeboxNoTrack"))
@@ -851,11 +903,11 @@ t[#t + 1] = Def.ActorFrame {
 					local elapsed = p.offset + (os.clock() - p.lastStart)
 					timeTxt:settext(SecondsToMSS(elapsed))
 					timeTxt:diffuse(subText)
-				elseif p.song and p.paused then
+				elseif p.song and p.offset then
 					timeTxt:settext(SecondsToMSS(p.offset))
 					timeTxt:diffuse(dimText)
 				else
-					timeTxt:settext("—:——")
+					timeTxt:settext("-:--")
 					timeTxt:diffuse(dimText)
 				end
 			end
@@ -963,7 +1015,7 @@ t[#t + 1] = Def.ActorFrame {
 	-- Elapsed time
 	LoadFont("Common Normal") .. {
 		Name = "ElapsedTime",
-		Text = "—:——",
+		Text = "-:--",
 		InitCommand = function(self)
 			self:xy(SCREEN_RIGHT - 16, mpBtnY):halign(1):zoom(0.3)
 			self:diffuse(dimText)

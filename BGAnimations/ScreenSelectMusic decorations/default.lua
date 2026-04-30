@@ -1589,7 +1589,7 @@ t[#t + 1] = Def.ActorFrame {
 				if bg and lbl and valTxt then
 					valTxt:settext(tostring(j.val))
 					
-					local c = HVColor.Judgment and HVColor.Judgment[j.name] or color("0.5,0.5,0.5,1")
+					local c = HVColor.GetJudgmentColor(j.name)
 					bg:diffuse(c):diffusealpha(0.2) -- translucent colored quad
 					lbl:settext(j.label):diffuse(c):zoom(0.2)
 					valTxt:diffuse(c):zoom(0.45)
@@ -1597,6 +1597,16 @@ t[#t + 1] = Def.ActorFrame {
 			end
 		end,
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
+		ThemePrefChangedMessageCommand = function(self, params)
+			if params and params.Name == "HV_JudgmentColorStyle" then
+				self:playcommand("Set")
+			end
+		end,
+		CustomColorChangedMessageCommand = function(self, params)
+			if params and params.Category == "judgment" then
+				self:playcommand("Set")
+			end
+		end,
 		(function()
 			local blocks = Def.ActorFrame{ Name = "Blocks" }
 			local numBlocks = 6
@@ -2063,5 +2073,7 @@ t[#t + 1] = Def.ActorFrame {
 		self:playcommand("UpdateHover")
 	end
 }
+
+t[#t + 1] = LoadActor("netplay.lua")
 
 return t

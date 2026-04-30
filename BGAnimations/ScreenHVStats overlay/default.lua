@@ -114,12 +114,12 @@ timelineGraphHeight = 240
 timelineYAxisTickCount = 5
 timelineXAxisTickCount = 3
 timelineSkillsetColors = {
-	["Overall"] = HVColor.GetMSDRatingColor(20),
+	["Overall"] = color("#FFFFFF"),
 	["Stream"] = HVColor.GetMSDRatingColor(28),
 	["Jumpstream"] = HVColor.GetMSDRatingColor(26),
 	["Handstream"] = HVColor.GetMSDRatingColor(24),
 	["Stamina"] = HVColor.GetMSDRatingColor(22),
-	["Jackspeed"] = color("#FFFFFF"),
+	["JackSpeed"] = HVColor.GetMSDRatingColor(20),
 	["Chordjack"] = HVColor.GetMSDRatingColor(18),
 	["Technical"] = HVColor.GetMSDRatingColor(16)
 }
@@ -1906,7 +1906,7 @@ function overallTimelineLine(i)
 			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
 				if i == 1 then
 					key = "Overall"
-					lineColor = HVColor.GetMSDRatingColor(20)
+					lineColor = timelineSkillsetColors["Overall"]
 				elseif i == 2 then
 					key = "Average"
 					lineColor = color("#B8B8B8")
@@ -1925,11 +1925,7 @@ function overallTimelineLine(i)
 					return
 				end
 				key = skillset
-				if skillset == "Jackspeed" then
-					lineColor = color("#FFFFFF")
-				else
-					lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
-				end
+				lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
 			end
 			local verts = {}
 			for index, day in ipairs(overallTimelineDaysForDisplay) do
@@ -1972,7 +1968,7 @@ function overallTimelineDot(i)
 			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
 				if i == 1 then
 					key = "Overall"
-					lineColor = HVColor.GetMSDRatingColor(20)
+					lineColor = timelineSkillsetColors["Overall"]
 				elseif i == 2 then
 					key = "Average"
 					lineColor = color("#B8B8B8")
@@ -1987,11 +1983,7 @@ function overallTimelineDot(i)
 					return
 				end
 				key = skillset
-				if skillset == "Jackspeed" then
-					lineColor = color("#FFFFFF")
-				else
-					lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
-				end
+				lineColor = timelineSkillsetColors[skillset] or color("#FFFFFF")
 			end
 			local x = timelineGraphLeft + fitOverallTimelineX(overallTimelineHoveredIndex)
 			local y = timelineGraphTop + fitOverallTimelineY(day.values[key] or 0)
@@ -2033,7 +2025,7 @@ function overallTimelineLegend(i)
 				if i == 1 then
 					label = "Overall"
 					value = day.values.Overall or 0
-					lineColor = HVColor.GetMSDRatingColor(20)
+					lineColor = timelineSkillsetColors["Overall"]
 				elseif i == 2 then
 					label = "Average"
 					value = day.values.Average or 0

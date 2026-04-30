@@ -39,6 +39,9 @@ local accentChoices = {
 	{ name = "Platinum",        hex = "#E5E4E2" },
 	{ name = "White",           hex = "#FFFFFF" },
 	{ name = "Charcoal",        hex = "#333b40" },      -- Extended neutral color
+	
+	-- Custom (opens color picker)
+	{ name = "Custom",          hex = "#5ABAFF", isCustom = true },
 }
 
 -- Layout constants
@@ -60,6 +63,14 @@ local chunkGap = 6
 local function getChunkY(i) return previewStartY + (i-1) * (chunkH + chunkGap) end
 
 local function getSwatchPos(i)
+	if accentChoices[i] and accentChoices[i].isCustom and i > 1 then
+		local prevR = math.ceil((i - 1) / cols) - 1
+		local prevC = ((i - 2) % cols) + 1
+		sx = swatchStartX + prevC * (swatchSize + swatchGapX)
+		sy = swatchStartY + prevR * (swatchSize + swatchGapY)
+		return sx, sy
+	end
+
 	local r = math.ceil(i / cols) - 1
 	local c = (i - 1) % cols
 	sx = swatchStartX + c * (swatchSize + swatchGapX)
@@ -68,11 +79,12 @@ local function getSwatchPos(i)
 end
 
 -- Interactivity for chunks
-local gradeStyles = {"Holographic", "Classic"}
+local gradeStyles = {"Holographic", "Classic", "Custom"}
 local msdScales = {"Holographic", "Classic", "None", "Monochrome"}
-local judgeStyles = {"Holographic", "Classic"}
-local diffStyles = {"Holographic", "Classic"}
-local ctStyles = {"Holographic", "Classic"}
+local judgeStyles = {"Holographic", "Classic", "Custom"}
+local diffStyles = {"Holographic", "Classic", "Custom"}
+local ctStyles = {"Holographic", "Classic", "Custom"}
+local gtStyles = {"Holographic", "Classic", "Custom"}
 
 local function getGradeStyle() return ThemePrefs.Get("HV_GradeColorStyle") or "Holographic" end
 local function cycleGradeStyle()
@@ -128,10 +140,47 @@ local function cycleCTStyle()
 	MESSAGEMAN:Broadcast("CTStyleChanged")
 end
 
+local function getGTStyle() return ThemePrefs.Get("HV_GoalTrackerColorStyle") or "Holographic" end
+local function cycleGTStyle()
+	local current = getGTStyle()
+	local nextStyle = gtStyles[1]
+	for i, s in ipairs(gtStyles) do if s == current then nextStyle = gtStyles[i % #gtStyles + 1] break end end
+	ThemePrefs.Set("HV_GoalTrackerColorStyle", nextStyle)
+	ThemePrefs.ForceSave()
+	if HVColor and HVColor.RefreshGoalTrackerColors then HVColor.RefreshGoalTrackerColors() end
+	MESSAGEMAN:Broadcast("GTStyleChanged")
+end
+
 -- State
 local selectedIdx = 1
 local hoveredIdx = nil
 local previewColor = color("#5ABAFF")
+local lastCustomClickTime = 0
+
+local function getCustomAccentHex()
+	if HVCustomColors and HVCustomColors.GetColor then
+		local hex = HVCustomColors.GetColor("accent", "Accent")
+		if hex and type(hex) == "string" and hex ~= "#FFFFFF" and hex:match("^#?[0-9A-Fa-f]+$") then
+			if hex:sub(1, 1) ~= "#" then hex = "#" .. hex end
+			return hex
+		end
+	end
+	local activeHex = ThemePrefs and ThemePrefs.Get and ThemePrefs.Get("HV_AccentColor") or "#5ABAFF"
+	if not activeHex or activeHex == "" then activeHex = "#5ABAFF" end
+	if activeHex:sub(1, 1) ~= "#" then activeHex = "#" .. activeHex end
+	return activeHex
+end
+
+local function refreshCustomChoiceHex()
+	for _, choice in ipairs(accentChoices) do
+		if choice.isCustom then
+			choice.hex = getCustomAccentHex()
+			break
+		end
+	end
+end
+
+refreshCustomChoiceHex()
 
 -- ============================================================
 -- Helpers
@@ -152,14 +201,48 @@ local function findSelectedIdx()
 	return 1
 end
 
-local function applyColor(idx)
+local function syncSelectionFromActive()
+	refreshCustomChoiceHex()
+	selectedIdx = findSelectedIdx()
+	previewColor = color(getActiveHex())
+	MESSAGEMAN:Broadcast("ColorThemeChanged")
+end
+
+local function applyColor(idx, openCustomPicker)
 	local choice = accentChoices[idx]
 	if not choice then return end
+	openCustomPicker = openCustomPicker or false
+
+	if choice.isCustom then
+		refreshCustomChoiceHex()
+		selectedIdx = idx
+		ThemePrefs.Set("HV_AccentColor", choice.hex)
+		ThemePrefs.ForceSave()
+		if HVColor and HVColor.RefreshAccent then
+			HVColor.RefreshAccent()
+		end
+		if HVCustomColors and HVCustomColors.SyncAccentLinkedColors then
+			HVCustomColors.SyncAccentLinkedColors(choice.hex)
+		end
+		previewColor = color(choice.hex)
+		MESSAGEMAN:Broadcast("ColorThemeChanged")
+		MESSAGEMAN:Broadcast("ThemePrefChanged", { Name = "HV_AccentColor" })
+
+		if openCustomPicker then
+			HV.SelectedCustomColor = {"accent", "Accent"}
+			SCREENMAN:AddNewScreenToTop("ScreenHVColorEdit")
+		end
+		return
+	end
+
 	selectedIdx = idx
 	ThemePrefs.Set("HV_AccentColor", choice.hex)
 	ThemePrefs.ForceSave()
 	if HVColor and HVColor.RefreshAccent then
 		HVColor.RefreshAccent()
+	end
+	if HVCustomColors and HVCustomColors.SyncAccentLinkedColors then
+		HVCustomColors.SyncAccentLinkedColors(choice.hex)
 	end
 	previewColor = color(choice.hex)
 	MESSAGEMAN:Broadcast("ColorThemeChanged")
@@ -172,6 +255,7 @@ end
 local t = Def.ActorFrame {
 	Name = "ColorThemeRoot",
 	BeginCommand = function(self)
+		refreshCustomChoiceHex()
 		selectedIdx = findSelectedIdx()
 		previewColor = color(getActiveHex())
 
@@ -227,7 +311,14 @@ local t = Def.ActorFrame {
 					local sx, sy = getSwatchPos(i)
 					if mx >= sx - swatchSize/2 and mx <= sx + swatchSize/2
 					   and my >= sy - swatchSize/2 and my <= sy + swatchSize/2 then
-						applyColor(i)
+						if accentChoices[i].isCustom then
+							local now = (GetTimeSinceStart and GetTimeSinceStart()) or os.clock()
+							local doubleClicked = (lastCustomClickTime > 0) and ((now - lastCustomClickTime) <= 0.30)
+							lastCustomClickTime = now
+							applyColor(i, doubleClicked)
+						else
+							applyColor(i)
+						end
 						return true
 					end
 				end
@@ -245,8 +336,21 @@ local t = Def.ActorFrame {
 				if isOverChunk(getChunkY(3)) then cycleJudgeStyle() return true end
 				if isOverChunk(getChunkY(4)) then cycleDiffStyle() return true end
 				if isOverChunk(getChunkY(5)) then cycleCTStyle() return true end
+				if isOverChunk(getChunkY(6)) then
+					HV.SelectedCustomColor = {"grades", "AAAAA"}
+					SCREENMAN:AddNewScreenToTop("ScreenHVCustomColors")
+					return true
+				end
 			end
 		end)
+	end,
+	GainFocusCommand = function(self)
+		syncSelectionFromActive()
+	end,
+	CustomColorChangedMessageCommand = function(self, params)
+		if params and params.Category == "accent" and params.Element == "Accent" then
+			syncSelectionFromActive()
+		end
 	end,
 	InitCommand = function(self)
 		self:SetUpdateFunction(function(af)
@@ -282,12 +386,14 @@ local t = Def.ActorFrame {
 			local overJ = isOverChunk(getChunkY(3))
 			local overD = isOverChunk(getChunkY(4))
 			local overC = isOverChunk(getChunkY(5))
+			local overCustom = isOverChunk(getChunkY(6))
 			
 			if overG ~= self.HG then self.HG = overG MESSAGEMAN:Broadcast("GradeHoverChanged", { Hovering = overG }) end
 			if overM ~= self.HM then self.HM = overM MESSAGEMAN:Broadcast("MSDHoverChanged", { Hovering = overM }) end
 			if overJ ~= self.HJ then self.HJ = overJ MESSAGEMAN:Broadcast("JudgeHoverChanged", { Hovering = overJ }) end
 			if overD ~= self.HD then self.HD = overD MESSAGEMAN:Broadcast("DiffHoverChanged", { Hovering = overD }) end
 			if overC ~= self.HC then self.HC = overC MESSAGEMAN:Broadcast("CTHoverChanged", { Hovering = overC }) end
+			if overCustom ~= self.HCustom then self.HCustom = overCustom MESSAGEMAN:Broadcast("CustomElementHoverChanged", { Hovering = overCustom }) end
 		end)
 	end
 }
@@ -338,6 +444,12 @@ for i, choice in ipairs(accentChoices) do
 			InitCommand = function(self)
 				self:zoomto(swatchSize, swatchSize):diffuse(color(choice.hex))
 			end,
+			CustomColorChangedMessageCommand = function(self, params)
+				if choice.isCustom and params and params.Color and params.Category == "accent" and params.Element == "Accent" then
+					choice.hex = params.Color
+					self:stoptweening():linear(0.12):diffuse(color(choice.hex))
+				end
+			end,
 			SwatchHoverChangedMessageCommand = function(self)
 				if hoveredIdx == i then
 					self:stoptweening():decelerate(0.1):zoomto(swatchSize + 6, swatchSize + 6)
@@ -366,6 +478,14 @@ for i, choice in ipairs(accentChoices) do
 				if selectedIdx == i then
 					self:diffuse(color(choice.hex)):diffusealpha(0.7)
 				end
+			end,
+			CustomColorChangedMessageCommand = function(self, params)
+				if choice.isCustom and params and params.Color and params.Category == "accent" and params.Element == "Accent" then
+					choice.hex = params.Color
+					if selectedIdx == i then
+						self:stoptweening():linear(0.12):diffuse(color(choice.hex)):diffusealpha(0.7)
+					end
+				end
 			end
 		},
 
@@ -387,8 +507,24 @@ for i, choice in ipairs(accentChoices) do
 				if selectedIdx == i then
 					self:diffuse(color(choice.hex)):diffusealpha(1)
 				end
+			end,
+			CustomColorChangedMessageCommand = function(self, params)
+				if choice.isCustom and params and params.Color and params.Category == "accent" and params.Element == "Accent" then
+					choice.hex = params.Color
+					if selectedIdx == i then
+						self:stoptweening():linear(0.1):diffuse(color(choice.hex)):diffusealpha(1)
+					end
+				end
 			end
 		},
+
+		-- Custom indicator (only for Custom swatch)
+		choice.isCustom and LoadFont("Common Normal") .. {
+			Name = "CustomIndicator",
+			InitCommand = function(self)
+				self:zoom(0.5):diffuse(color("1,1,1,0.8")):settext("C")
+			end
+		} or nil,
 
 		-- Label
 		LoadFont("Common Normal") .. {
@@ -667,6 +803,39 @@ t[#t+1] = Def.ActorFrame {
 			end
 			return am
 		end)()
+	}
+}
+
+-- ============================================================
+-- CUSTOM ELEMENT COLORING BUTTON (replaces Goal Tracker chunk)
+-- ============================================================
+t[#t+1] = Def.ActorFrame {
+	Name = "Chunk_CustomElement",
+	InitCommand = function(self) 
+		self:xy(previewStartX, getChunkY(6))
+	end,
+	
+	Def.Quad {
+		Name = "ButtonBg",
+		InitCommand = function(self) self:zoomto(chunkW, chunkH):diffuse(color("0.06,0.06,0.06,0.9")) end,
+		CustomElementHoverChangedMessageCommand = function(self, params)
+			self:stoptweening():linear(0.1):diffuse(params.Hovering and color("0.1,0.1,0.1,0.95") or color("0.06,0.06,0.06,0.9"))
+		end
+	},
+	
+	Def.Quad {
+		InitCommand = function(self) self:halign(0):x(-chunkW/2):zoomto(3, chunkH):diffuse(HVColor.Accent):diffusealpha(0.8) end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor):diffusealpha(0.8) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 18, 0):zoom(0.4):diffuse(HVColor.Accent):settext("+") end,
+		ColorThemeChangedMessageCommand = function(self) self:stoptweening():linear(0.15):diffuse(previewColor) end
+	},
+	
+	LoadFont("Common Normal") .. {
+		InitCommand = function(self) self:xy(-chunkW/2 + 38, 0):halign(0):zoom(0.34):diffuse(color("1,1,1,1")) end,
+		BeginCommand = function(self) self:settext("Custom Element Coloring") end
 	}
 }
 

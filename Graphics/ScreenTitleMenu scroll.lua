@@ -8,17 +8,22 @@ local gc = Var("GameCommand")
 
 return Def.ActorFrame {
 	LoadFont("Common Normal") .. {
-		Text = gc:GetText(),
 		InitCommand = function(self)
-			self:zoom(0.6):diffuse(color("0.5,0.5,0.5,1")):uppercase(true)
+			self:zoom(0.6):diffuse(color("0.5,0.5,0.5,1")):uppercase(true):maxwidth(280 / 0.6):diffusealpha(0)
+			self:playcommand("Refresh")
+		end,
+		RefreshCommand = function(self)
+			self:settext((gc and gc.GetText and gc:GetText()) or "")
 		end,
 		GainFocusCommand = function(self)
 			self:stoptweening():decelerate(0.15)
-			self:zoom(0.7):diffuse(color("1,1,1,1"))
+			self:zoom(0.7):diffuse(color("1,1,1,1")):maxwidth(280 / 0.7):diffusealpha(0)
+			self:playcommand("Refresh")
 		end,
 		LoseFocusCommand = function(self)
 			self:stoptweening():decelerate(0.15)
-			self:zoom(0.6):diffuse(color("0.5,0.5,0.5,1"))
+			self:zoom(0.6):diffuse(color("0.5,0.5,0.5,1")):maxwidth(280 / 0.6):diffusealpha(0)
+			self:playcommand("Refresh")
 		end
 	}
 }

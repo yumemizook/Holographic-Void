@@ -1,7 +1,7 @@
 --- Holographic Void: ScreenTitleMenu Overlay
 -- Rebuilt to focus only on custom cursor and jukebox shortcuts.
 
-local choiceNames = {"Start", "ColorTheme", "PackDownloader", "Options", "Exit"}
+local choiceNames = {"Start", "Multi", "ColorTheme", "PackDownloader", "Options", "Quit"}
 
 local t = Def.ActorFrame {}
 
@@ -11,6 +11,7 @@ t[#t+1] = LoadActor("../_cursor")
 -- Combined Input Controller
 t[#t+1] = Def.ActorFrame {
 	BeginCommand = function(self)
+		HV.TitleState.keyboardIndex = HV.TitleState.keyboardIndex or 1
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
 		screen:AddInputCallback(function(event)
@@ -30,17 +31,17 @@ t[#t+1] = Def.ActorFrame {
 -- Menu Click Handler
 t[#t+1] = UIElements.QuadButton(1) .. {
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y + 20):zoomto(300, 220):diffusealpha(0)
+		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):zoomto(300, 240):diffusealpha(0)
 	end,
 	MouseDownCommand = function(self, params)
 		if params.event == "DeviceButton_left mouse button" then
 			local virtualX = INPUTFILTER:GetMouseX()
 			local virtualY = INPUTFILTER:GetMouseY()
 			local hovered = nil
-			for i = 1, 5 do
-				local static_iy = (SCREEN_CENTER_Y + 20) + 44 * (i - 3)
+			for i = 1, #choiceNames do
+				local static_iy = SCREEN_CENTER_Y + 40 * (i - ((#choiceNames + 1) / 2))
 				if virtualX >= SCREEN_CENTER_X-150 and virtualX <= SCREEN_CENTER_X+150 
-				   and virtualY >= static_iy-22 and virtualY <= static_iy+22 then
+				   and virtualY >= static_iy-20 and virtualY <= static_iy+20 then
 					hovered = i break
 				end
 			end

@@ -426,6 +426,7 @@ local HVPrefs = {
 
 	-- Visual: Accent color hex
 	HV_AccentColor = { Default = "#5ABAFF" },
+	HV_ColorEditSyncAccent = { Default = false },
 
 	-- Auth: Saved EtternaOnline username and login token
 	HV_Username = { Default = "" },
@@ -441,29 +442,36 @@ local HVPrefs = {
 	-- Visual: Grade Coloring Style
 	HV_GradeColorStyle = {
 		Default = "Holographic",
-		Choices = {"Holographic", "Classic"},
-		Values = {"Holographic", "Classic"}
+		Choices = {"Holographic", "Classic", "Custom"},
+		Values = {"Holographic", "Classic", "Custom"}
 	},
 	
 	-- Judgment Color Style
 	HV_JudgmentColorStyle = {
 		Default = "Holographic",
-		Choices = {"Holographic", "Classic"},
-		Values = {"Holographic", "Classic"}
+		Choices = {"Holographic", "Classic", "Custom"},
+		Values = {"Holographic", "Classic", "Custom"}
 	},
 
 	-- Difficulty Color Style
 	HV_DifficultyColorStyle = {
 		Default = "Holographic",
-		Choices = {"Holographic", "Classic"},
-		Values = {"Holographic", "Classic"}
+		Choices = {"Holographic", "Classic", "Custom"},
+		Values = {"Holographic", "Classic", "Custom"}
 	},
 
 	-- Clear Type Color Style
 	HV_ClearTypeColorStyle = {
 		Default = "Holographic",
-		Choices = {"Holographic", "Classic"},
-		Values = {"Holographic", "Classic"}
+		Choices = {"Holographic", "Classic", "Custom"},
+		Values = {"Holographic", "Classic", "Custom"}
+	},
+
+	-- Goal Tracker Color Style
+	HV_GoalTrackerColorStyle = {
+		Default = "Holographic",
+		Choices = {"Holographic", "Classic", "Custom"},
+		Values = {"Holographic", "Classic", "Custom"}
 	},
 
 	-- Visual: Background Effect Style
@@ -697,6 +705,7 @@ if HVColor then
 	if HVColor.RefreshJudgmentColors then HVColor.RefreshJudgmentColors() end
 	if HVColor.RefreshClearTypeColors then HVColor.RefreshClearTypeColors() end
 	if HVColor.RefreshGradeColors then HVColor.RefreshGradeColors() end
+	if HVColor.RefreshGoalTrackerColors then HVColor.RefreshGoalTrackerColors() end
 end
 
 -- ==========================================================================

@@ -46,7 +46,7 @@ local t = Def.ActorFrame {
 	end,
 	OffCommand = function(self)
 		BUTTON:ResetButtonTable(screenName)
-		TOOLTIP:Hide()
+		pcall(function() TOOLTIP:Hide() end)
 	end,
 	CancelCommand = function(self)
 		self:playcommand("Off")

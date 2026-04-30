@@ -886,6 +886,9 @@ local function OnThemePrefChanged(params)
 		if HVColor and HVColor.RefreshAccent then
 			HVColor.RefreshAccent()
 		end
+		if HVCustomColors and HVCustomColors.SyncAccentLinkedColors then
+			HVCustomColors.SyncAccentLinkedColors(ThemePrefs.Get("HV_AccentColor"))
+		end
 	end
 end
 

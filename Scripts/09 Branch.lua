@@ -11,6 +11,16 @@ Branch.AfterInit = function()
 	return "ScreenTitleMenu"
 end
 
+function SMOnlineScreen()
+	if not IsNetSMOnline() then
+		return "ScreenSelectMusic"
+	end
+	if not IsSMOnlineLoggedIn() then
+		return "ScreenSMOnlineLogin"
+	end
+	return "ScreenNetRoom"
+end
+
 Branch.TitleMenu = function()
 	return "ScreenTitleMenu"
 end
@@ -19,7 +29,32 @@ Branch.AfterTitleMenu = function()
 	return "ScreenSelectProfile"
 end
 
+Branch.MultiScreen = function()
+	if IsNetSMOnline() then
+		return "ScreenNetSelectProfile"
+	end
+	return "ScreenNetworkOptions"
+end
+
 Branch.AfterSelectProfile = function()
+	return "ScreenSelectMusic"
+end
+
+Branch.AfterNetSelectProfile = function()
+	return SMOnlineScreen()
+end
+
+Branch.LeavePackDownloader = function()
+	return "ScreenTitleMenu"
+end
+
+Branch.LeaveAssets = function()
+	if IsSMOnlineLoggedIn(PLAYER_1) then
+		if NSMAN:GetCurrentRoomName() then
+			return "ScreenNetSelectMusic"
+		end
+		return "ScreenNetRoom"
+	end
 	return "ScreenSelectMusic"
 end
 

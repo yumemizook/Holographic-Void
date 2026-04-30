@@ -903,7 +903,7 @@ t[#t + 1] = Def.ActorFrame {
 		packList:FilterAndSearch("", {}, true, packsPerPage)
 		self:GetParent():GetChild("LoadingText"):playcommand("ShowLoading")
 
-		SCREENMAN:GetTopScreen():AddInputCallback(function(event)
+		local inputCallback = function(event)
 			if event.type == "InputEventType_Release" then return end
 
 			local btn = event.DeviceInput.button
@@ -1142,9 +1142,21 @@ t[#t + 1] = Def.ActorFrame {
 				end
 				return
 			end
-		end)
+		end
+
+		SCREENMAN:GetTopScreen():AddInputCallback(inputCallback)
+
+		-- Store callback reference for cleanup
+		self.inputCallback = inputCallback
 
 		self:GetParent():GetChild("SearchBar"):playcommand("UpdateSearch")
+	end,
+
+	OffCommand = function(self)
+		-- Remove input callback when screen exits to prevent crash
+		if self.inputCallback then
+			SCREENMAN:GetTopScreen():RemoveInputCallback(self.inputCallback)
+		end
 	end,
 
 	-- Auto-search triggered after typing debounce

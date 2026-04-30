@@ -9,13 +9,19 @@ local POINTS_SCALE = 200 / MAX_DISPLAY
 local CAP = 2.5
 
 local categories = {
-	{name=THEME:GetString("Radar", "POWER"),  color=color("#E0B080"), canOverflow=true},  -- Muted Orange
-	{name=THEME:GetString("Radar", "CHAOS"),  color=color("#B898CF"), canOverflow=true},  -- Muted Purple
-	{name=THEME:GetString("Radar", "HELL"),   color=color("#CF9898"), canOverflow=false}, -- Muted Red
-	{name=THEME:GetString("Radar", "MACH"),   color=color("#80C0CF"), canOverflow=false}, -- Muted Cyan
-	{name=THEME:GetString("Radar", "FREEZE"), color=color("#CFD198"), canOverflow=false}, -- Muted Yellow
-	{name=THEME:GetString("Radar", "EARTH"),  color=color("#A0CFAB"), canOverflow=true},  -- Muted Green
+	{name=THEME:GetString("Radar", "POWER"),  key="Power",  color=HVColor.GetRadarColor("Power"),  canOverflow=true},
+	{name=THEME:GetString("Radar", "CHAOS"),  key="Chaos",  color=HVColor.GetRadarColor("Chaos"),  canOverflow=true},
+	{name=THEME:GetString("Radar", "HELL"),   key="Hell",   color=HVColor.GetRadarColor("Hell"),   canOverflow=false},
+	{name=THEME:GetString("Radar", "MACH"),   key="Mach",   color=HVColor.GetRadarColor("Mach"),   canOverflow=false},
+	{name=THEME:GetString("Radar", "FREEZE"), key="Freeze", color=HVColor.GetRadarColor("Freeze"), canOverflow=false},
+	{name=THEME:GetString("Radar", "EARTH"),  key="Earth",  color=HVColor.GetRadarColor("Earth"),  canOverflow=true},
 }
+
+local function refreshCategoryColors()
+	for i = 1, #categories do
+		categories[i].color = HVColor.GetRadarColor(categories[i].key)
+	end
+end
 
 local labelAlign = {
 	{h=0.5, v=1,   dx=0,  dy=-2},
@@ -312,7 +318,9 @@ local t = Def.ActorFrame {
 	InitCommand = function(self) self:xy(0,0):visible(false) end,
 	BeginCommand = function(self) self:queuecommand("Set") end,
 	SetCommand = function(self)
+		refreshCategoryColors()
 		if previewVisible then self:visible(false); return end
+
 		local song, steps = GAMESTATE:GetCurrentSong(), GAMESTATE:GetCurrentSteps()
 		if not (song and steps) then self:visible(false); return end
 
@@ -462,6 +470,10 @@ for i = 1, 6 do
 				:shadowlength(0.5):shadowcolor(shadow)
 				:halign(la.h):valign(la.v):addx(la.dx):addy(la.dy)
 		end,
+		UpdateRadarCommand = function(self)
+			local c = categories[i].color
+			self:diffuse(c):shadowcolor(shadowOf(c))
+		end,
 	}
 
 	t[#t+1] = LoadFont("Common Normal") .. {
@@ -473,6 +485,8 @@ for i = 1, 6 do
 			tooltipActors[i] = self
 		end,
 		UpdateRadarCommand = function(self)
+			local c = categories[i].color
+			self:diffuse(lighten(c, 0.8)):shadowcolor(shadowOf(c))
 			self:settextf("%.2f", displayFn[i](rawValues[i]) * POINTS_SCALE)
 		end,
 	}
@@ -489,6 +503,8 @@ for i = 1, 6 do
 						:diffuse(lighten(cat.color, 0.8)):shadowlength(0.5):shadowcolor(shadow)
 				end,
 				UpdateRadarCommand = function(self)
+					local c = categories[3].color
+					self:diffuse(lighten(c, 0.8)):shadowcolor(shadowOf(c))
 					local val = hellBreakdown[self.srcKey]
 					if val and val > 0.01 then
 						self:settextf("%.2f %s", val, self.srcLabel)

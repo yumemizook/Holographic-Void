@@ -475,7 +475,7 @@ local t = Def.ActorFrame {
 			if scoreList and #scoreList > 0 then
 				local src = isLocal and "Local" or "Online"
 				local rateLabel = showAllRates and "All Rates" or "Current Rate"
-				self:settextf("%s (%s) — Page %d/%d — %d scores", src, rateLabel, curPage, maxPages, #scoreList)
+				self:settextf("%s (%s) - Page %d/%d - %d scores", src, rateLabel, curPage, maxPages, #scoreList)
 			else
 				self:settext("No scores")
 			end

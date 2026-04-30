@@ -359,19 +359,22 @@ t[#t + 1] = Def.ActorFrame {
 				local fillH = lifeBarH * lifeVal
 				self:zoomto(lifeBarW, fillH)
 
-				-- Coloring based on Life Difficulty (consistent with avatar.lua)
 				local diff = GetLifeDifficulty()
-				if diff <= 2 then
-					self:diffuse(color("#A0CFAB")) -- Green
-				elseif diff <= 4 then
-					self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+				local lifeKey = "L7"
+				if diff <= 1 then
+					lifeKey = "L1"
+				elseif diff == 2 then
+					lifeKey = "L2"
+				elseif diff == 3 then
+					lifeKey = "L3"
+				elseif diff == 4 then
+					lifeKey = "L4"
 				elseif diff == 5 then
-					self:diffuse(color("#CFD198")) -- Yellow
+					lifeKey = "L5"
 				elseif diff == 6 then
-					self:diffuse(color("#E0B080")) -- Orange
-				else
-					self:diffuse(color("#CF9898")) -- Red
+					lifeKey = "L6"
 				end
+				self:diffuse(HVColor.GetLifeBarColor(lifeKey))
 				self:diffusealpha(0.8)
 			end
 		end
@@ -574,9 +577,9 @@ if showGoalTrackerText then
 				end
 
 				if tDiff and tDiff >= 0 then
-					self:diffuse(color("#91ff91ff"))
+					self:diffuse(HVColor.GetGoalTrackerColor("positive"))
 				else
-					self:diffuse(HVColor.Negative or color("#ff0000"))
+					self:diffuse(HVColor.GetGoalTrackerColor("negative"))
 				end
 				self:settextf("%+5.2f (%5.2f%%)", tDiff or 0, displayTarget)
 			end,

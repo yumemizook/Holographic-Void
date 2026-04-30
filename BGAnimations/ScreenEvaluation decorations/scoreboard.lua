@@ -310,7 +310,7 @@ local t = Def.ActorFrame {
 		InitCommand = function(self) self:xy(0, -18):zoom(0.35):halign(0):diffuse(accentColor) end,
 		OnCommand = function(self)
 			local label = HV.ShowMSD() and "Local Scores (sorted by SSR)" or "Local Scores"
-			self:settextf("%s — %d total", label, #hsTable)
+			self:settextf("%s - %d total", label, #hsTable)
 		end,
 		UpdateLocalScoreboardMessageCommand = function(self)
 			-- Show indicator if viewing a different score
@@ -318,7 +318,7 @@ local t = Def.ActorFrame {
 				self:settextf("Viewing Score #%d (Click current play to return)", selectedScoreIndex)
 			else
 				local label = HV.ShowMSD() and "Local Scores (sorted by SSR)" or "Local Scores"
-				self:settextf("%s — %d total", label, #hsTable)
+				self:settextf("%s - %d total", label, #hsTable)
 			end
 		end
 	},

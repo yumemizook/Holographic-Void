@@ -4,7 +4,9 @@
 -- THe judgement display is not shown here.
 
 local leaderboardMode = HV.ShowInGameLeaderboard() or "Off"
-if leaderboardMode == "Off" or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
+local topScreen = SCREENMAN:GetTopScreen()
+local isNetMultiplayer = NSMAN and NSMAN.IsETTP and NSMAN:IsETTP() and topScreen and topScreen:GetName() and topScreen:GetName():find("Net") ~= nil or false
+if (leaderboardMode == "Off" and not isNetMultiplayer) or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
 	return Def.ActorFrame {}
 end
 
@@ -63,7 +65,25 @@ local function UpdateScores()
 	local curRate = getCurRateValue()
 	local curRateStr = getCurRateString()
 
-	if leaderboardMode == "Online" then
+	if isNetMultiplayer then
+		local lb = NSMAN:GetMPLeaderboard() or {}
+		table.sort(lb, function(a, b)
+			return (a.wife or -1) > (b.wife or -1)
+		end)
+		for i = 1, math.min(maxEntries, #lb) do
+			local s = lb[i]
+			local wife = (s.wife or 0) * 100
+			highScores[#highScores + 1] = {
+				rank = i,
+				wife = wife,
+				combo = 0,
+				gradeStr = GetGradeStr(wife),
+				name = s.user or "???",
+				rate = curRate,
+				ssr = -1,
+			}
+		end
+	elseif leaderboardMode == "Online" then
 		-- Fetch from DLMAN
 		local lb = DLMAN:GetChartLeaderBoard(ck)
 		if lb then
@@ -150,13 +170,19 @@ local t = Def.ActorFrame {
 		UpdateScores()
 		self:playcommand("RefreshScores")
 	end,
+	JudgmentMessageCommand = function(self)
+		if isNetMultiplayer then
+			UpdateScores()
+			self:playcommand("RefreshScores")
+		end
+	end,
 
 	-- Mode Tag
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(4, -12):zoom(0.24)
 				:diffuse(accentColor):diffusealpha(0.6)
-				:settext(leaderboardMode:upper())
+				:settext((isNetMultiplayer and "MULTI") or leaderboardMode:upper())
 		end
 	}
 }

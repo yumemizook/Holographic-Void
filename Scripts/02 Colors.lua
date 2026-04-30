@@ -66,7 +66,22 @@ HVColor.Difficulty = HVColor.DifficultyHolographic
 --- Refresh global difficulty color overrides based on style.
 function HVColor.RefreshDifficultyColors()
 	local style = ThemePrefs.Get("HV_DifficultyColorStyle") or "Holographic"
-	local palette = (tostring(style):lower() == "classic") and HVColor.DifficultyClassic or HVColor.DifficultyHolographic
+	local s = tostring(style):lower()
+	local palette
+	if s == "custom" and HVCustomColors then
+		palette = {
+			Beginner    = color(HVCustomColors.GetColor("difficulty", "Beginner")),
+			Easy        = color(HVCustomColors.GetColor("difficulty", "Easy")),
+			Medium      = color(HVCustomColors.GetColor("difficulty", "Medium")),
+			Hard        = color(HVCustomColors.GetColor("difficulty", "Hard")),
+			Challenge   = color(HVCustomColors.GetColor("difficulty", "Challenge")),
+			Edit        = color(HVCustomColors.GetColor("difficulty", "Edit")),
+		}
+	elseif s == "classic" then
+		palette = HVColor.DifficultyClassic
+	else
+		palette = HVColor.DifficultyHolographic
+	end
 	HVColor.Difficulty = palette
 	
 	if GameColor and GameColor.Difficulty then
@@ -111,8 +126,19 @@ HVColor.JudgmentClassic = {
 --- Refresh global judgment colors based on style.
 function HVColor.RefreshJudgmentColors()
 	local style = ThemePrefs.Get("HV_JudgmentColorStyle") or "Holographic"
-	-- Case-insensitive check for maximum robustness
-	if tostring(style):lower() == "classic" then
+	local s = tostring(style):lower()
+	if s == "custom" and HVCustomColors then
+		HVColor.Judgment = {
+			W1   = color(HVCustomColors.GetColor("judgment", "W1")),
+			W2   = color(HVCustomColors.GetColor("judgment", "W2")),
+			W3   = color(HVCustomColors.GetColor("judgment", "W3")),
+			W4   = color(HVCustomColors.GetColor("judgment", "W4")),
+			W5   = color(HVCustomColors.GetColor("judgment", "W5")),
+			Miss = color(HVCustomColors.GetColor("judgment", "Miss")),
+			Held = color(HVCustomColors.GetColor("judgment", "Held")),
+			LetGo = color(HVCustomColors.GetColor("judgment", "LetGo")),
+		}
+	elseif s == "classic" then
 		HVColor.Judgment = HVColor.JudgmentClassic
 	else
 		HVColor.Judgment = HVColor.JudgmentHolographic
@@ -238,8 +264,30 @@ HVColor.ClearTypeClassic = {
 --- Refresh global clear type colors based on style.
 function HVColor.RefreshClearTypeColors()
 	local style = ThemePrefs.Get("HV_ClearTypeColorStyle") or "Holographic"
-	local palette = (tostring(style):lower() == "classic") and HVColor.ClearTypeClassic or HVColor.ClearTypeHolographic
-	HVColor.ClearType = palette
+	local s = tostring(style):lower()
+	if s == "custom" and HVCustomColors then
+		HVColor.ClearType = {
+			MFC     = color(HVCustomColors.GetColor("clearType", "MFC")),
+			WF      = color(HVCustomColors.GetColor("clearType", "WF")),
+			SDP     = color(HVCustomColors.GetColor("clearType", "SDP")),
+			PFC     = color(HVCustomColors.GetColor("clearType", "PFC")),
+			BF      = color(HVCustomColors.GetColor("clearType", "BF")),
+			SDG     = color(HVCustomColors.GetColor("clearType", "SDG")),
+			FC      = color(HVCustomColors.GetColor("clearType", "FC")),
+			MF      = color(HVCustomColors.GetColor("clearType", "MF")),
+			SDCB    = color(HVCustomColors.GetColor("clearType", "SDCB")),
+			Clear   = color(HVCustomColors.GetColor("clearType", "Clear")),
+			Failed  = color(HVCustomColors.GetColor("clearType", "Failed")),
+			Invalid = color(HVCustomColors.GetColor("clearType", "Invalid")),
+			NoPlay  = color(HVCustomColors.GetColor("clearType", "NoPlay")),
+			None    = color(HVCustomColors.GetColor("clearType", "None")),
+			SoftInvalid = color(HVCustomColors.GetColor("clearType", "SoftInvalid")),
+		}
+	elseif s == "classic" then
+		HVColor.ClearType = HVColor.ClearTypeClassic
+	else
+		HVColor.ClearType = HVColor.ClearTypeHolographic
+	end
 end
 
 --- Get a color for a Clear Type string.
@@ -308,8 +356,33 @@ HVColor.GradeClassic = {
 --- Refresh global grade colors based on style.
 function HVColor.RefreshGradeColors()
 	local style = ThemePrefs.Get("HV_GradeColorStyle") or "Holographic"
-	local palette = (tostring(style):lower() == "classic") and HVColor.GradeClassic or HVColor.Grade
-	HVColor.GradePalette = palette
+	local s = tostring(style):lower()
+	if s == "custom" and HVCustomColors then
+		HVColor.GradePalette = {
+			AAAAA = color(HVCustomColors.GetColor("grades", "AAAAA")),
+			AAAA  = color(HVCustomColors.GetColor("grades", "AAAA")),
+			AAA   = color(HVCustomColors.GetColor("grades", "AAA")),
+			AA    = color(HVCustomColors.GetColor("grades", "AA")),
+			A     = color(HVCustomColors.GetColor("grades", "A")),
+			B     = color(HVCustomColors.GetColor("grades", "B")),
+			C     = color(HVCustomColors.GetColor("grades", "C")),
+			D     = color(HVCustomColors.GetColor("grades", "D")),
+			F     = color(HVCustomColors.GetColor("grades", "F")),
+			None  = color(HVCustomColors.GetColor("grades", "None")),
+			["AAAA:"] = color(HVCustomColors.GetColor("grades", "AAAA:")),
+			["AAAA."] = color(HVCustomColors.GetColor("grades", "AAAA.")),
+			["AAA:"]  = color(HVCustomColors.GetColor("grades", "AAA:")),
+			["AAA."]  = color(HVCustomColors.GetColor("grades", "AAA.")),
+			["AA:"]   = color(HVCustomColors.GetColor("grades", "AA:")),
+			["AA."]   = color(HVCustomColors.GetColor("grades", "AA.")),
+			["A:"]    = color(HVCustomColors.GetColor("grades", "A:")),
+			["A."]    = color(HVCustomColors.GetColor("grades", "A.")),
+		}
+	elseif s == "classic" then
+		HVColor.GradePalette = HVColor.GradeClassic
+	else
+		HVColor.GradePalette = HVColor.Grade
+	end
 end
 
 --- Get a color for a Grade string or enum.
@@ -344,6 +417,79 @@ function HVColor.GetGradeColor(grade)
 	return palette.None
 end
 
+-- Goal Tracker colors
+HVColor.GoalTrackerHolographic = {
+	Positive = color("#A0CFAB"),
+	Negative = color("#CF9898"),
+}
+
+HVColor.GoalTrackerClassic = {
+	Positive = color("#4CBB17"),
+	Negative = color("#FF9999"),
+}
+
+HVColor.GoalTracker = HVColor.GoalTrackerHolographic
+
+--- Refresh goal tracker colors based on style.
+function HVColor.RefreshGoalTrackerColors()
+	local style = ThemePrefs.Get("HV_GoalTrackerColorStyle") or "Holographic"
+	local s = tostring(style):lower()
+	if s == "custom" and HVCustomColors then
+		HVColor.GoalTracker = {
+			Positive = color(HVCustomColors.GetColor("goalTracker", "Positive")),
+			Negative = color(HVCustomColors.GetColor("goalTracker", "Negative")),
+		}
+	elseif s == "classic" then
+		HVColor.GoalTracker = HVColor.GoalTrackerClassic
+	else
+		HVColor.GoalTracker = HVColor.GoalTrackerHolographic
+	end
+	HVColor.Positive = HVColor.GoalTracker.Positive
+	HVColor.Negative = HVColor.GoalTracker.Negative
+end
+
+--- Get a goal tracker color (positive or negative)
+function HVColor.GetGoalTrackerColor(type)
+	HVColor.RefreshGoalTrackerColors()
+	if type == "positive" then return HVColor.GoalTracker.Positive end
+	if type == "negative" then return HVColor.GoalTracker.Negative end
+	return HVColor.GoalTracker.Positive
+end
+
+HVColor.LifeBarDefaults = {
+	L1 = color("#A0CFAB"),
+	L2 = color("#A0CFAB"),
+	L3 = color("#5ABAFF"),
+	L4 = color("#5ABAFF"),
+	L5 = color("#CFD198"),
+	L6 = color("#E0B080"),
+	L7 = color("#CF9898"),
+	Danger = color("#FF4444"),
+}
+
+function HVColor.GetLifeBarColor(key)
+	if HVCustomColors and HVCustomColors.GetColor then
+		return color(HVCustomColors.GetColor("lifeBar", key))
+	end
+	return HVColor.LifeBarDefaults[key] or HVColor.Accent
+end
+
+HVColor.RadarDefaults = {
+	Power = color("#E0B080"),
+	Chaos = color("#B898CF"),
+	Hell = color("#CF9898"),
+	Mach = color("#80C0CF"),
+	Freeze = color("#CFD198"),
+	Earth = color("#A0CFAB"),
+}
+
+function HVColor.GetRadarColor(key)
+	if HVCustomColors and HVCustomColors.GetColor then
+		return color(HVCustomColors.GetColor("radar", key))
+	end
+	return HVColor.RadarDefaults[key] or HVColor.Accent
+end
+
 --- Get a color for an online rank number.
 function HVColor.GetSkillsetRankColor(rank)
 	if not rank or rank <= 0 then return color("#737373") end
@@ -372,6 +518,7 @@ if ThemePrefs and ThemePrefs.Get then
 	HVColor.RefreshJudgmentColors()
 	HVColor.RefreshClearTypeColors()
 	HVColor.RefreshGradeColors()
+	HVColor.RefreshGoalTrackerColors()
 end
 
 Trace("Holographic Void: 02 Colors.lua loaded.")

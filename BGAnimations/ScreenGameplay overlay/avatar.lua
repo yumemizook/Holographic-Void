@@ -196,20 +196,23 @@ local t = Def.ActorFrame {
 		UpdateLifeCommand = function(self)
 			local life = PLife()
 			self:settextf("%.1f%%", life * 100)
-			
-			-- Coloring based on Life Difficulty (Range 1-7)
+
 			local diff = GetLifeDifficulty()
-			if diff <= 2 then
-				self:diffuse(color("#A0CFAB")) -- Green
-			elseif diff <= 4 then
-				self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+			local lifeKey = "L7"
+			if diff <= 1 then
+				lifeKey = "L1"
+			elseif diff == 2 then
+				lifeKey = "L2"
+			elseif diff == 3 then
+				lifeKey = "L3"
+			elseif diff == 4 then
+				lifeKey = "L4"
 			elseif diff == 5 then
-				self:diffuse(color("#CFD198")) -- Yellow
+				lifeKey = "L5"
 			elseif diff == 6 then
-				self:diffuse(color("#E0B080")) -- Orange
-			else
-				self:diffuse(color("#CF9898")) -- Red
+				lifeKey = "L6"
 			end
+			self:diffuse(HVColor.GetLifeBarColor(lifeKey))
 		end
 	},
 
@@ -249,23 +252,26 @@ local t = Def.ActorFrame {
 			-- Color shift based on Life Difficulty and low life
 			local life = PLife()
 			if life < 0.3 and life > 0 then
-				self:diffuse(color("#FF4444"))
+				self:diffuse(HVColor.GetLifeBarColor("Danger"))
 			elseif life <= 0 then
-				self:diffuse(color("#440000"))
+				self:diffuse(HVColor.GetLifeBarColor("Danger"))
 			else
-				-- Unified Difficulty-based tinting
 				local diff = GetLifeDifficulty()
-				if diff <= 2 then
-					self:diffuse(color("#A0CFAB")) -- Green
-				elseif diff <= 4 then
-					self:diffuse(color("#5ABAFF")) -- Cyan/Blue
+				local lifeKey = "L7"
+				if diff <= 1 then
+					lifeKey = "L1"
+				elseif diff == 2 then
+					lifeKey = "L2"
+				elseif diff == 3 then
+					lifeKey = "L3"
+				elseif diff == 4 then
+					lifeKey = "L4"
 				elseif diff == 5 then
-					self:diffuse(color("#CFD198")) -- Yellow
+					lifeKey = "L5"
 				elseif diff == 6 then
-					self:diffuse(color("#E0B080")) -- Orange
-				else
-					self:diffuse(color("#CF9898")) -- Red
+					lifeKey = "L6"
 				end
+				self:diffuse(HVColor.GetLifeBarColor(lifeKey))
 			end
 		end
 	},
