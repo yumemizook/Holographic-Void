@@ -276,9 +276,7 @@ function setOverallSubviewTab(tab)
 		overallTimelineMaxValue = 100
 	elseif tab == overallSubviewTabs.Rating then
 		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
-		local minRating, maxRating = getProfileRatingMinMax()
-		overallTimelineMinValue = minRating
-		overallTimelineMaxValue = maxRating
+		setOverallTimelineRatingBounds()
 	end
 	MESSAGEMAN:Broadcast("StatsOverlayOverallSubviewChanged", {tab = tab})
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
@@ -405,6 +403,48 @@ function getProfileRatingMinMax()
 	local padding = (maxRating - minRating) * 0.1
 	if padding == 0 then padding = 5 end
 	return math.max(0, minRating - padding), maxRating + padding
+end
+
+function getOverallTimelineRatingMinMax(days)
+	local minRating = math.huge
+	local maxRating = -math.huge
+	local skillsetCount = getOverallTimelineSkillsetCount()
+	for _, day in ipairs(days or {}) do
+		local values = day and day.values
+		if values then
+			for i = 1, skillsetCount do
+				local skillset = ms.SkillSets[i]
+				local rating = tonumber(values[skillset])
+				if rating then
+					if rating < minRating then minRating = rating end
+					if rating > maxRating then maxRating = rating end
+				end
+			end
+		end
+	end
+	if minRating == math.huge or maxRating == -math.huge then
+		return nil, nil
+	end
+	local range = maxRating - minRating
+	local padding = range * 0.1
+	if padding == 0 then
+		padding = math.max(1, maxRating * 0.05)
+	end
+	local lower = math.max(0, minRating - padding)
+	local upper = maxRating + padding
+	if upper <= lower then
+		upper = lower + 1
+	end
+	return lower, upper
+end
+
+function setOverallTimelineRatingBounds()
+	local minRating, maxRating = getOverallTimelineRatingMinMax(overallRatingTimelineDaysForDisplay)
+	if not minRating or not maxRating then
+		minRating, maxRating = getProfileRatingMinMax()
+	end
+	overallTimelineMinValue = minRating
+	overallTimelineMaxValue = maxRating
 end
 
 function isScoreValidForOverallDerivedData(score)
@@ -884,10 +924,8 @@ function refreshOverallDerivedData()
 		overallTimelineMaxValue = 100
 		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
 	elseif overallSubviewTab == overallSubviewTabs.Rating then
-		local minRating, maxRating = getProfileRatingMinMax()
-		overallTimelineMinValue = minRating
-		overallTimelineMaxValue = maxRating
 		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
+		setOverallTimelineRatingBounds()
 	end
 	overallDerivedDataDirty = false
 end
