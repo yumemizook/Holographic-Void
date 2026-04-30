@@ -469,9 +469,9 @@ local HVPrefs = {
 
 	-- Goal Tracker Color Style
 	HV_GoalTrackerColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "Custom"},
-		Values = {"Holographic", "Classic", "Custom"}
+		Default = "Custom",
+		Choices = {"Custom"},
+		Values = {"Custom"}
 	},
 
 	-- Visual: Background Effect Style

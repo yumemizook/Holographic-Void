@@ -558,7 +558,7 @@ if showGoalTrackerText then
 			InitCommand = function(self)
 				self:halign(0.5):zoom(0.35)
 				self:settextf("%+5.2f (%5.2f%%)", 0, targetGoalPct)
-				self:diffuse(color("#00ff00"))
+				self:diffuse(HVColor.GetGoalTrackerColor("positive"))
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				self.msg = msg

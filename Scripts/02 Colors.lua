@@ -430,20 +430,20 @@ HVColor.GoalTrackerClassic = {
 
 HVColor.GoalTracker = HVColor.GoalTrackerHolographic
 
---- Refresh goal tracker colors based on style.
+--- Refresh goal tracker colors from Custom values with Holographic fallbacks.
 function HVColor.RefreshGoalTrackerColors()
-	local style = ThemePrefs.Get("HV_GoalTrackerColorStyle") or "Holographic"
-	local s = tostring(style):lower()
-	if s == "custom" and HVCustomColors then
-		HVColor.GoalTracker = {
-			Positive = color(HVCustomColors.GetColor("goalTracker", "Positive")),
-			Negative = color(HVCustomColors.GetColor("goalTracker", "Negative")),
-		}
-	elseif s == "classic" then
-		HVColor.GoalTracker = HVColor.GoalTrackerClassic
-	else
-		HVColor.GoalTracker = HVColor.GoalTrackerHolographic
+	local positive = "#A0CFAB"
+	local negative = "#CF9898"
+
+	if HVCustomColors and HVCustomColors.GetColor then
+		positive = HVCustomColors.GetColor("goalTracker", "Positive") or positive
+		negative = HVCustomColors.GetColor("goalTracker", "Negative") or negative
 	end
+
+	HVColor.GoalTracker = {
+		Positive = color(positive),
+		Negative = color(negative),
+	}
 	HVColor.Positive = HVColor.GoalTracker.Positive
 	HVColor.Negative = HVColor.GoalTracker.Negative
 end

@@ -84,7 +84,6 @@ local msdScales = {"Holographic", "Classic", "None", "Monochrome"}
 local judgeStyles = {"Holographic", "Classic", "Custom"}
 local diffStyles = {"Holographic", "Classic", "Custom"}
 local ctStyles = {"Holographic", "Classic", "Custom"}
-local gtStyles = {"Holographic", "Classic", "Custom"}
 
 local function getGradeStyle() return ThemePrefs.Get("HV_GradeColorStyle") or "Holographic" end
 local function cycleGradeStyle()
@@ -140,12 +139,9 @@ local function cycleCTStyle()
 	MESSAGEMAN:Broadcast("CTStyleChanged")
 end
 
-local function getGTStyle() return ThemePrefs.Get("HV_GoalTrackerColorStyle") or "Holographic" end
+local function getGTStyle() return "Custom" end
 local function cycleGTStyle()
-	local current = getGTStyle()
-	local nextStyle = gtStyles[1]
-	for i, s in ipairs(gtStyles) do if s == current then nextStyle = gtStyles[i % #gtStyles + 1] break end end
-	ThemePrefs.Set("HV_GoalTrackerColorStyle", nextStyle)
+	ThemePrefs.Set("HV_GoalTrackerColorStyle", "Custom")
 	ThemePrefs.ForceSave()
 	if HVColor and HVColor.RefreshGoalTrackerColors then HVColor.RefreshGoalTrackerColors() end
 	MESSAGEMAN:Broadcast("GTStyleChanged")

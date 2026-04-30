@@ -1,3 +1,5 @@
+-- is this messy? yep
+-- am i going to clean it up? nope
 hoverAlpha = 0.6
 statsOverlayActive = false
 
