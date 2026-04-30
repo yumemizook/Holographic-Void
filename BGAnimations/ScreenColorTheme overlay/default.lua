@@ -80,7 +80,7 @@ end
 
 -- Interactivity for chunks
 local gradeStyles = {"Holographic", "Classic", "Custom"}
-local msdScales = {"Holographic", "Classic", "None", "Monochrome"}
+local msdScales = {"Holographic", "Classic", "None", "Monochrome", "Accent"}
 local judgeStyles = {"Holographic", "Classic", "Custom"}
 local diffStyles = {"Holographic", "Classic", "Custom"}
 local ctStyles = {"Holographic", "Classic", "Custom"}

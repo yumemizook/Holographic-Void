@@ -208,6 +208,9 @@ function HVColor.GetMSDRatingColor(msd)
 		-- Asymptotically darker (White -> Dark Gray)
 		local v = 1.0 / (1.0 + (msd * 0.04))
 		return color(v..","..v..","..v..",1")
+	elseif s == "accent" then
+		-- Match current accent color
+		return HVColor.Accent or color("#5ABAFF")
 	end
 
 	-- Holographic Void: smooth interpolation between muted thresholds

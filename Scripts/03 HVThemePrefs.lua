@@ -250,8 +250,8 @@ local HVPrefs = {
 	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
 	HV_MSDColorScaleV3 = {
 		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "None", "Monochrome"},
-		Values = {"Holographic", "Classic", "None", "Monochrome"}
+		Choices = {"Holographic", "Classic", "None", "Monochrome", "Accent Color"},
+		Values = {"Holographic", "Classic", "None", "Monochrome", "Accent"}
 	},
 
 	-- Visual: Enable glow/bloom effects on active elements
