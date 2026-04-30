@@ -115,13 +115,13 @@ timelineYAxisTickCount = 5
 timelineXAxisTickCount = 3
 timelineSkillsetColors = {
 	["Overall"] = color("#FFFFFF"),
-	["Stream"] = HVColor.GetMSDRatingColor(28),
-	["Jumpstream"] = HVColor.GetMSDRatingColor(26),
-	["Handstream"] = HVColor.GetMSDRatingColor(24),
-	["Stamina"] = HVColor.GetMSDRatingColor(22),
-	["JackSpeed"] = HVColor.GetMSDRatingColor(20),
-	["Chordjack"] = HVColor.GetMSDRatingColor(18),
-	["Technical"] = HVColor.GetMSDRatingColor(16)
+	["Stream"] = color("#FF6B6B"),
+	["Jumpstream"] = color("#4D96FF"),
+	["Handstream"] = color("#2ED573"),
+	["Stamina"] = color("#FF9F43"),
+	["JackSpeed"] = color("#9B5DE5"),
+	["Chordjack"] = color("#FFD166"),
+	["Technical"] = color("#00D1B2")
 }
 overallSubviewButtons = {
 	{tab = overallSubviewTabs.WifeTimeline, left = 16, top = SCREEN_CENTER_Y + 10, width = 240, label = "Wife% over time"},
@@ -272,7 +272,7 @@ function setOverallSubviewTab(tab)
 	overallSubviewTab = tab
 	if tab == overallSubviewTabs.WifeTimeline then
 		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
-		overallTimelineMinValue = 0
+		overallTimelineMinValue = 80
 		overallTimelineMaxValue = 100
 	elseif tab == overallSubviewTabs.Rating then
 		overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
@@ -337,10 +337,10 @@ function getOverallTimelineYAxisLabel(index)
 	local fraction = getOverallTimelineGridFraction(index, timelineYAxisTickCount)
 	local range = overallTimelineMaxValue - overallTimelineMinValue
 	if range <= 0 then
-		return string.format("%.1f", overallTimelineMaxValue)
+		return overallTimelineMaxValue
 	end
 	local value = overallTimelineMinValue + (range * (1 - fraction))
-	return string.format("%.1f", value)
+	return value
 end
 
 function getOverallTimelineXAxisDisplay(index)
@@ -425,17 +425,11 @@ function getOverallTimelineRatingMinMax(days)
 	if minRating == math.huge or maxRating == -math.huge then
 		return nil, nil
 	end
-	local range = maxRating - minRating
-	local padding = range * 0.1
-	if padding == 0 then
-		padding = math.max(1, maxRating * 0.05)
+	if maxRating <= minRating then
+		local padding = math.max(0.2, math.abs(minRating) * 0.05)
+		return minRating - padding, maxRating + padding
 	end
-	local lower = math.max(0, minRating - padding)
-	local upper = maxRating + padding
-	if upper <= lower then
-		upper = lower + 1
-	end
-	return lower, upper
+	return minRating, maxRating
 end
 
 function setOverallTimelineRatingBounds()
@@ -672,9 +666,9 @@ function formatWeekLabel(weekStartT)
 	local em = os.date("%b", weekEndT)
 	local ey = os.date("%Y", weekEndT)
 	if sm == em then
-		return string.format("%s\xe2\x80\x93%s %s %s", sd, ed, em, ey)
+		return string.format("%s-%s %s %s", sd, ed, em, ey)
 	else
-		return string.format("%s %s \xe2\x80\x93 %s %s %s", sd, sm, ed, em, ey)
+		return string.format("%s %s - %s %s %s", sd, sm, ed, em, ey)
 	end
 end
 
@@ -920,7 +914,7 @@ function refreshOverallDerivedData()
 	overallMostPlayedChartsForDisplay, overallMostPlayedFoldersForDisplay = buildOverallMostPlayed(overallLocalScoreEntries)
 	overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
 	if overallSubviewTab == overallSubviewTabs.WifeTimeline then
-		overallTimelineMinValue = 0
+		overallTimelineMinValue = 80
 		overallTimelineMaxValue = 100
 		overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
 	elseif overallSubviewTab == overallSubviewTabs.Rating then
@@ -1012,14 +1006,14 @@ function refreshLeaderboardData()
 			rank = i,
 			name = song and song:GetDisplayMainTitle() or score:GetChartKey(),
 			metric = formatPercent(score),
-			activity = string.format("%s • %s • %.2f", formatChartMeter(steps), formatRate(score), score:GetSkillsetSSR("Overall") or 0),
+			activity = string.format("%s - %s - %.2f", formatChartMeter(steps), formatRate(score), score:GetSkillsetSSR("Overall") or 0),
 			gradeColor = getGradeColor(score:GetWifeGrade())
 		}
 	end
 	leaderboardStatus = {
 		state = "ready",
 		title = string.format("%s scores", breakdownSelectedJudge),
-		detail = string.format("%d scores • %.2f%% average", #selected.scores, selected.total / math.max(1, #selected.scores))
+		detail = string.format("%d scores - %.2f%% average", #selected.scores, selected.total / math.max(1, #selected.scores))
 	}
 end
 
@@ -1604,7 +1598,7 @@ function sessionRow(i)
 			local meta = song and song:GetDisplayArtist() or "Unknown Artist"
 			local subtitle = song and song:GetDisplaySubTitle() or ""
 			if subtitle ~= "" then
-				meta = meta .. " • " .. subtitle
+				meta = meta .. " - " .. subtitle
 			end
 			self:visible(true)
 			self:GetChild("Title"):settext(song and song:GetDisplayMainTitle() or chartKey)
@@ -2214,13 +2208,16 @@ function overallTimelineYAxisLabel(i)
 			self:halign(1):valign(0.5):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
-			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0
+			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0 and i <= timelineYAxisTickCount
 			self:visible(active)
 			if not active then return end
 			self:xy(timelineGraphLeft - 6, getOverallTimelineGridY(i, timelineYAxisTickCount))
-			local label = getOverallTimelineYAxisLabel(i)
+			local labelValue = getOverallTimelineYAxisLabel(i)
+			local label
 			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
-				label = string.format("%.0f%%", label)
+				label = string.format("%.0f%%", labelValue)
+			else
+				label = string.format("%.2f", labelValue)
 			end
 			self:settext(label)
 		end,
@@ -2748,12 +2745,10 @@ local statsOverlay = Def.ActorFrame {
 			if overallSubviewTab == overallSubviewTabs.WifeTimeline then
 				overallTimelineDaysForDisplay = overallWifeTimelineDaysForDisplay
 				overallTimelineMaxValue = 100
-				overallTimelineMinValue = 0
+				overallTimelineMinValue = 80
 			elseif overallSubviewTab == overallSubviewTabs.Rating then
 				overallTimelineDaysForDisplay = overallRatingTimelineDaysForDisplay
-				local minRating, maxRating = getProfileRatingMinMax()
-				overallTimelineMinValue = minRating
-				overallTimelineMaxValue = maxRating
+				setOverallTimelineRatingBounds()
 			end
 			overallBestScoresForDisplay = getOverallBestScores()
 			local rightPaneOverall = self:GetChild("RightPaneOverall")
@@ -2763,6 +2758,18 @@ local statsOverlay = Def.ActorFrame {
 			rightPaneOverall:GetChild("OverallTimelineHoverLine"):playcommand("Set")
 			rightPaneOverall:GetChild("OverallTimelineHoverDate"):playcommand("Set")
 			rightPaneOverall:GetChild("OverallTimelineEmpty"):playcommand("Set")
+			for i = 1, math.max(timelineYAxisTickCount, 11) do
+				local horizontal = self:GetChild("OverallTimelineHorizontalGridline" .. i)
+				if horizontal then horizontal:playcommand("Set") end
+				local yLabel = self:GetChild("OverallTimelineYAxisLabel" .. i)
+				if yLabel then yLabel:playcommand("Set") end
+			end
+			for i = 1, timelineXAxisTickCount do
+				local vertical = self:GetChild("OverallTimelineVerticalGridline" .. i)
+				if vertical then vertical:playcommand("Set") end
+				local xLabel = self:GetChild("OverallTimelineXAxisLabel" .. i)
+				if xLabel then xLabel:playcommand("Set") end
+			end
 -- for i = 1, overviewRowCount do
 -- 	self:GetChild("OverallOverviewRow" .. i):playcommand("Set")
 -- end
@@ -3367,7 +3374,7 @@ for i = 1, math.max(timelineYAxisTickCount, 11) do
 	statsOverlay[#statsOverlay + 1] = overallTimelineYAxisLabel(i)
 end
 
-for i = 1, timelineYAxisTickCount do
+for i = 1, timelineXAxisTickCount do
 	statsOverlay[#statsOverlay + 1] = overallTimelineVerticalGridline(i)
 end
 
