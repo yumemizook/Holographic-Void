@@ -450,6 +450,7 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		JudgmentMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
+			if msg.HoldNoteScore then return end -- Skip holds, handled in HoldNoteScoreMessageCommand
 			if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
 				if msg.TapNoteOffset then
 					self.currWifePoints = self.currWifePoints + wife3(math.abs(msg.TapNoteOffset) * 1000, HV_JudgeScale, "Wife3")
@@ -457,6 +458,8 @@ t[#t + 1] = Def.ActorFrame {
 					self.currWifePoints = self.currWifePoints - 5.5
 				elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 					self.currWifePoints = self.currWifePoints - 7.0
+				elseif msg.TapNoteScore ~= "TapNoteScore_None" then
+					self.currWifePoints = self.currWifePoints + 2.0
 				end
 			end
 			self:queuecommand("Update")
@@ -483,17 +486,8 @@ t[#t + 1] = Def.ActorFrame {
 			local scoreMode = ThemePrefs.Get("HV_ScoreDisplayMode") or "Normal"
 			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 			local ps = GAMESTATE:GetPlayerState(pn)
-			local isAuto = false
-			if getAutoplay and getAutoplay() ~= 0 then
-				isAuto = true
-			elseif ps then
-				local modStr = ps:GetPlayerOptionsString("ModsLevel_Current"):lower()
-				isAuto = modStr:find("autoplay") ~= nil
-			end
 			
-			if isAuto and pss then
-				wifePct = 0 -- Actual penaltied score for AutoPlay/Practice is 0%
-			elseif scoreMode == "Subtractive" then
+			if scoreMode == "Subtractive" then
 				wifePct = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
 			else
 				if pss then
@@ -621,6 +615,7 @@ t[#t + 1] = Def.ActorFrame {
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
+				if msg.HoldNoteScore then return end -- Skip holds, handled in HoldNoteScoreMessageCommand
 				if self.statType == "J4" then
 					if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
 						local ts = ms.JudgeScalers[4] or 1.0
@@ -630,6 +625,8 @@ t[#t + 1] = Def.ActorFrame {
 							self.currWifePoints = self.currWifePoints - 5.5
 						elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 							self.currWifePoints = self.currWifePoints - 7.0
+						elseif msg.TapNoteScore ~= "TapNoteScore_None" then
+							self.currWifePoints = self.currWifePoints + 2.0
 						end
 					end
 				end
@@ -657,17 +654,8 @@ t[#t + 1] = Def.ActorFrame {
 				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 				if not pss then return end
 				local ps = GAMESTATE:GetPlayerState(pn)
-				local isAuto = false
-				if getAutoplay and getAutoplay() ~= 0 then
-					isAuto = true
-				elseif ps then
-					local modStr = ps:GetPlayerOptionsString("ModsLevel_Current"):lower()
-					isAuto = modStr:find("autoplay") ~= nil or modStr:find("practice") ~= nil
-				end
 
-				if isAuto then
-					self:settext("0.0000%")
-				elseif self.statType == "J4" then
+				if self.statType == "J4" then
 					local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
 									   pss:GetTapNoteScores("TapNoteScore_W2") +
 									   pss:GetTapNoteScores("TapNoteScore_W3") +
@@ -1239,6 +1227,14 @@ t[#t + 1] = Def.ActorFrame {
 			end,
 			JudgmentMessageCommand = function(self, msg)
 				-- Only process tap-related judgments.
+				if msg.HoldNoteScore or msg.RollNoteScore then
+					if msg.HoldNoteScore == "HoldNoteScore_LetGo" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
+						self.currWifePoints = self.currWifePoints - 4.5
+						self:queuecommand("Update")
+					end
+					return
+				end
+
 				if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
 					local ts = ms.JudgeScalers[4] or 1.0 -- J4 rescaling always uses J4 (Index 4)
 					if msg.TapNoteOffset then
@@ -1247,9 +1243,9 @@ t[#t + 1] = Def.ActorFrame {
 						self.currWifePoints = self.currWifePoints - 5.5
 					elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 						self.currWifePoints = self.currWifePoints - 7.0
+					elseif msg.TapNoteScore ~= "TapNoteScore_None" then
+						self.currWifePoints = self.currWifePoints + 2.0
 					end
-				elseif msg.HoldNoteScore == "HoldNoteScore_LetGo" then
-					self.currWifePoints = self.currWifePoints - 4.5
 				end
 				self:queuecommand("Update")
 			end,

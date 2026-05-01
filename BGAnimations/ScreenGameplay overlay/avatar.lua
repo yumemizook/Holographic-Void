@@ -37,6 +37,13 @@ local actual_dp = 0
 local total_max = 0
 
 local function updateDPFromJudgment(msg)
+	if msg.HoldNoteScore or msg.RollNoteScore then
+		if msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
+			actual_dp = actual_dp - 4.5
+		end
+		return
+	end
+
 	if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
 		if msg.TapNoteOffset then
 			local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
@@ -45,9 +52,9 @@ local function updateDPFromJudgment(msg)
 			actual_dp = actual_dp - 5.5
 		elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 			actual_dp = actual_dp - 7.0
+		elseif msg.TapNoteScore ~= "TapNoteScore_None" then
+			actual_dp = actual_dp + 2.0
 		end
-	elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
-		actual_dp = actual_dp - 4.5
 	end
 end
 

@@ -321,6 +321,17 @@ t[#t + 1] = Def.ActorFrame {
 			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
 			if not pss then return end
 			local wife = pss:GetWifeScore() * 100
+			
+			local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
+							   pss:GetTapNoteScores("TapNoteScore_W2") +
+							   pss:GetTapNoteScores("TapNoteScore_W3") +
+							   pss:GetTapNoteScores("TapNoteScore_W4") +
+							   pss:GetTapNoteScores("TapNoteScore_W5") +
+							   pss:GetTapNoteScores("TapNoteScore_Miss")
+			if notesPassed == 0 then
+				wife = 100.0000
+			end
+			
 			if wife >= 99.7 then self:settextf("%.4f%%", wife)
 			else self:settextf("%.2f%%", wife) end
 			local g = GetGradeStr(wife)
