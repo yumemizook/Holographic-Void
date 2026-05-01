@@ -71,16 +71,19 @@ local function pauseAtCurrentPos()
 	end
 end
 
-local function getGraphHitbox()
-	local top = getTop()
-	if not top then return nil end
-	local overlay = top:GetChild("ChartPreview")
-	return overlay and overlay:GetChild("Hitbox") or nil
-end
+-- Direct reference to the graph Hitbox, set once actors are ready
+local graphHitboxRef = nil
 
-local function isMouseOverGraphHitbox()
-	local hitbox = getGraphHitbox()
-	return hitbox and isOver(hitbox) or false
+local function isMouseOverGraph()
+	local hitbox = graphHitboxRef
+	if not hitbox then return false end
+	local width = hitbox:GetZoomedWidth()
+	local height = hitbox:GetZoomedHeight()
+	local left = hitbox:GetTrueX() - (width * hitbox:GetHAlign())
+	local topY = hitbox:GetTrueY() - (height * hitbox:GetVAlign())
+	local mouseX = INPUTFILTER:GetMouseX()
+	local mouseY = INPUTFILTER:GetMouseY()
+	return mouseX >= left and mouseX <= left + width and mouseY >= topY and mouseY <= topY + height
 end
 
 local function setNativeLoopRegion()
@@ -225,7 +228,7 @@ end
 local function duminput(event)
 	if event.type == "InputEventType_FirstPress" then
 		if event.DeviceInput and event.DeviceInput.button == "DeviceButton_right mouse button" then
-			if not isMouseOverGraphHitbox() then
+			if not isMouseOverGraph() then
 				pauseAtCurrentPos()
 				return true
 			end
@@ -251,6 +254,23 @@ local function UpdatePreviewPos(self)
 	local pos = getSongPos() / musicratio * prevZoom
 	local marker = self:GetChild("CurrentPos")
 	if marker then marker:x(pos) end
+
+	local hoverMarker = self:GetChild("HoverMarker")
+	local hitbox = self:GetChild("Hitbox")
+	if hoverMarker and hitbox then
+		local width = hitbox:GetZoomedWidth()
+		local height = hitbox:GetZoomedHeight()
+		local left = hitbox:GetTrueX() - (width * hitbox:GetHAlign())
+		local topY = hitbox:GetTrueY() - (height * hitbox:GetVAlign())
+		local mouseX = INPUTFILTER:GetMouseX()
+		local mouseY = INPUTFILTER:GetMouseY()
+
+		if mouseX >= left and mouseX <= left + width and mouseY >= topY and mouseY <= topY + height then
+			hoverMarker:visible(true):x(mouseX - left)
+		else
+			hoverMarker:visible(false)
+		end
+	end
 end
 
 local pm = Def.ActorFrame {
@@ -266,7 +286,7 @@ local pm = Def.ActorFrame {
 		local cdg = self:GetChild("ChordDensityGraph")
 		if cdg then
 			local seekMarker = cdg:GetChild("SeekMarker")
-			if seekMarker then seekMarker:visible(false) end
+			if seekMarker then seekMarker:diffusealpha(0) end
 		end
 	end,
 	BeginCommand = function(self)
@@ -275,6 +295,8 @@ local pm = Def.ActorFrame {
 			musicratio = steps:GetLastSecond() / wodth
 			if musicratio <= 0 then musicratio = 1 end
 		end
+		-- Store direct reference to Hitbox for input hit-testing
+		graphHitboxRef = self:GetChild("Hitbox")
 		local top = getTop()
 		if top and top.AddInputCallback then
 			top:AddInputCallback(duminput)
@@ -359,28 +381,6 @@ local pm = Def.ActorFrame {
 		Name = "HoverMarker",
 		InitCommand = function(self)
 			self:zoomto(1, hidth * prevZoom):diffuse(color("1,1,1,0.5")):halign(0.5):valign(1):visible(false):draworder(1100)
-		end,
-		OnCommand = function(self)
-			self:SetUpdateFunction(function(self)
-				local hitbox = self:GetParent():GetChild("Hitbox")
-				if not hitbox then
-					self:visible(false)
-					return
-				end
-
-				local width = hitbox:GetZoomedWidth()
-				local height = hitbox:GetZoomedHeight()
-				local left = hitbox:GetTrueX() - (width * hitbox:GetHAlign())
-				local top = hitbox:GetTrueY() - (height * hitbox:GetVAlign())
-				local mouseX = INPUTFILTER:GetMouseX()
-				local mouseY = INPUTFILTER:GetMouseY()
-
-				if mouseX >= left and mouseX <= left + width and mouseY >= top and mouseY <= top + height then
-					self:visible(true):x(mouseX - left)
-				else
-					self:visible(false)
-				end
-			end)
 		end
 	}
 }

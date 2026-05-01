@@ -79,6 +79,11 @@ local main_af = Def.ActorFrame {
 		
 		-- Always default Practice Mode to Off when entering song select
 		GAMESTATE:SetPracticeMode(false)
+		
+		-- Refresh EtternaOnline user data upon entering Select Music (e.g. after finishing a song)
+		if DLMAN:IsLoggedIn() and DLMAN.RefreshUserData then
+			DLMAN:RefreshUserData()
+		end
 
 		self:sleep(0.01):queuecommand("OpenPendingStatsScore")
 	end,
@@ -881,6 +886,14 @@ local profileOverlay = Def.ActorFrame {
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:y(40):zoom(0.4):diffuse(brightText) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
+					local p = profileOverlayActor
+					if p and not p.isOnlineMode then
+						local prof = PROFILEMAN:GetProfile(PLAYER_1)
+						if prof then
+							self:settext(prof:GetDisplayName())
+							return
+						end
+					end
 					self:settext(HV.GetPlayerName())
 				end
 			},

@@ -53,7 +53,8 @@ local function cyclePref(name)
 		local active = ThemePrefs.Get("HV_AlarmActive")
 		if (active == "true" or active == true) and ThemePrefs.Get("HV_AlarmType") == "Timer" then
 			local duration = tonumber(ThemePrefs.Get("HV_AlarmTimerDuration")) or 5
-			HV.AlarmTimerEndTime = os.clock() + (duration * 60)
+			HV.AlarmTimerDuration = duration * 60
+			HV.AlarmTimerStartTime = GetTimeSinceStart()
 			HV.AlarmTimerSeconds = duration * 60
 		end
 	elseif name == "HV_AlarmType" then
@@ -61,7 +62,8 @@ local function cyclePref(name)
 		local active = ThemePrefs.Get("HV_AlarmActive")
 		if (active == "true" or active == true) and ThemePrefs.Get("HV_AlarmType") == "Timer" then
 			local duration = tonumber(ThemePrefs.Get("HV_AlarmTimerDuration")) or 5
-			HV.AlarmTimerEndTime = os.clock() + (duration * 60)
+			HV.AlarmTimerDuration = duration * 60
+			HV.AlarmTimerStartTime = GetTimeSinceStart()
 			HV.AlarmTimerSeconds = duration * 60
 		end
 	end
@@ -1239,7 +1241,6 @@ t[#t + 1] = Def.ActorFrame {
 									ThemePrefs.Set("HV_AlarmTimerDuration", m)
 									ThemePrefs.Set("HV_AlarmActive", false) -- Reset active so user has to turn it back on to start
 									ThemePrefs.Save()
-									HV.AlarmTimerEndTime = 0
 									HV.AlarmTimerSeconds = m * 60
 								end
 							end)

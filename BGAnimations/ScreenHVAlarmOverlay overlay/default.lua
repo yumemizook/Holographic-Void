@@ -6,6 +6,8 @@
 local lastMinute = -1
 local triggeredThisSession = false
 HV.AlarmTimerSeconds = HV.AlarmTimerSeconds or 0
+HV.AlarmTimerDuration = HV.AlarmTimerDuration or 0
+HV.AlarmTimerStartTime = HV.AlarmTimerStartTime or 0
 local alarmActive = false
 
 -- Audio/Visual constants
@@ -18,7 +20,8 @@ local function resetAlarm()
 	ThemePrefs.Save()
 	MESSAGEMAN:Broadcast("ThemePrefChanged", {Name = "HV_AlarmActive"})
 	HV.AlarmTimerSeconds = 0
-	HV.AlarmTimerEndTime = 0
+	HV.AlarmTimerDuration = 0
+	HV.AlarmTimerStartTime = 0
 	alarmActive = false
 	triggeredThisSession = false
 end
@@ -54,14 +57,11 @@ local t = Def.ActorFrame {
 			
 			-- Timer-based Alarm
 			elseif alarmType == "Timer" then
-				if HV.AlarmTimerEndTime > 0 then
-					local now = os.clock()
-					local remaining = HV.AlarmTimerEndTime - now
-					HV.AlarmTimerSeconds = math.max(0, remaining) -- Sync for UI
-					
-					if remaining <= 0 then
-						HV.AlarmTimerEndTime = 0
-						HV.AlarmTimerSeconds = 0
+				if HV.AlarmTimerDuration > 0 and HV.AlarmTimerStartTime > 0 then
+					local elapsed = GetTimeSinceStart() - HV.AlarmTimerStartTime
+					HV.AlarmTimerSeconds = math.max(0, HV.AlarmTimerDuration - elapsed)
+					if HV.AlarmTimerSeconds <= 0 then
+						HV.AlarmTimerDuration = 0
 						af:playcommand("Trigger")
 					end
 				end
@@ -95,14 +95,26 @@ local t = Def.ActorFrame {
 				:decelerate(0.3):y(SCREEN_TOP + 40):diffusealpha(1)
 				:sleep(5):accelerate(0.3):y(SCREEN_TOP - 100):diffusealpha(0)
 				:queuecommand("Finish")
+			
+			-- Register a raw input callback on the current top screen so a
+			-- left-click anywhere always dismisses the alert.
+			local topScreen = SCREENMAN:GetTopScreen()
+			if topScreen then
+				local dismissed = false
+				topScreen:AddInputCallback(function(event)
+					if dismissed then return end
+					if event.type == "InputEventType_FirstPress"
+					and event.DeviceInput.button == "DeviceButton_left mouse button" then
+						dismissed = true
+						self:stoptweening()
+							:accelerate(0.2):y(SCREEN_TOP - 100):diffusealpha(0)
+							:queuecommand("Finish")
+					end
+				end)
+			end
 		end,
 		FinishCommand = function(self)
 			resetAlarm()
-		end,
-		MouseDownCommand = function(self, params)
-			if params.event == "DeviceButton_left mouse button" then
-				self:stoptweening():accelerate(0.2):y(SCREEN_TOP - 100):diffusealpha(0):queuecommand("Finish")
-			end
 		end,
 		
 		Def.Quad {
@@ -116,14 +128,6 @@ local t = Def.ActorFrame {
 			Text = "Click to dismiss",
 			InitCommand = function(self) self:zoom(0.3):diffuse(subText):y(12) end
 		},
-		UIElements.QuadButton(1) .. {
-			InitCommand = function(self) self:zoomto(300, 50):diffusealpha(0) end,
-			MouseDownCommand = function(self, params)
-				if params.event == "DeviceButton_left mouse button" then
-					self:GetParent():stoptweening():accelerate(0.2):y(SCREEN_TOP - 100):diffusealpha(0):queuecommand("Finish")
-				end
-			end
-		}
 	},
 	
 	-- Non-Intrusive Gameplay Alert
