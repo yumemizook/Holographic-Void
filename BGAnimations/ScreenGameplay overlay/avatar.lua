@@ -102,8 +102,34 @@ local t = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
 			self:xy(avatarSize + 6, 5):zoom(fontZoom):halign(0):maxwidth(130 / fontZoom)
-			self:settext(HV.GetPlayerName())
 			self:diffuse(color("1,1,1,1"))
+			self.cycleState = 0
+			self:playcommand("CycleName")
+		end,
+		CycleNameCommand = function(self)
+			self:stoptweening()
+			local pn = PLAYER_1
+			local onlineName = (DLMAN:IsLoggedIn()) and DLMAN:GetUsername() or ""
+			local localName = ""
+			local profile = PROFILEMAN:GetProfile(pn)
+			if profile then localName = profile:GetDisplayName() end
+			if localName == "" then localName = "Player 1" end
+			
+			if onlineName ~= "" and onlineName ~= localName then
+				if self.cycleState == 0 then
+					self:settext(onlineName)
+				else
+					self:settext(localName)
+				end
+				self.cycleState = 1 - self.cycleState
+				
+				self:diffusealpha(0):linear(0.25):diffusealpha(1)
+				self:sleep(2.5):linear(0.25):diffusealpha(0):queuecommand("CycleName")
+			else
+				self:diffusealpha(1)
+				self:settext(onlineName ~= "" and onlineName or localName)
+				self:sleep(3):queuecommand("CycleName")
+			end
 		end
 	},
 	
