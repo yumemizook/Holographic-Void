@@ -40,16 +40,10 @@ local function formatGoalPercent(pct)
 	elseif p < 99.7 then
 		return string.format("%.2f%%", p)
 	elseif p < 99.955 then
-		-- Hitting AAA threshold exactly
-		if math.abs(p - 99.7) < 0.00001 then return "99.700% (AAA)" end
 		return string.format("%.3f%%", p)
 	elseif p < 99.9935 then
-		-- Hitting AAAA threshold exactly
-		if math.abs(p - 99.955) < 0.00001 then return "99.955% (AAAA)" end
 		return string.format("%.4f%%", p)
 	else
-		-- Hitting AAAAA threshold exactly
-		if math.abs(p - 99.9935) < 0.00001 then return "99.9935% (AAAAA)" end
 		return string.format("%.5f%%", p)
 	end
 end
@@ -463,10 +457,14 @@ t[#t + 1] = Def.ActorFrame {
 
 							-- Target % (The request: Direct overlay entry)
 							if hx >= 410 and hx <= 510 then
-								easyInputStringOKCancel(THEME:GetString("Goals", "TargetLabel"), 8, false, function(answer)
+								easyInputStringOKCancel(THEME:GetString("Goals", "TargetLabel"), 10, false, function(answer)
 									local p = tonumber((answer:gsub("%%", "")))
 									if p then
-										pcall(function() sg:SetPercent(math.max(0, math.min(100.0, p)) / 100) end)
+										-- Fix: Round to 6 decimal places before storing to avoid floating-point truncation issues
+										-- This ensures values like 99.35% don't get corrupted by FP representation errors
+										local clamped = math.max(0, math.min(100.0, p))
+										local rounded = notShit.round(clamped, 6) / 100
+										pcall(function() sg:SetPercent(rounded) end)
 										goalsActor:playcommand("GoalTableRefresh")
 									end
 								end)

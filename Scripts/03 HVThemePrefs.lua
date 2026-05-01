@@ -218,6 +218,34 @@ end
 -- Preference definitions: each key maps to a table with a Default value.
 -- These are registered with the _Fallback ThemePrefs.Init system.
 local HVPrefs = {
+	-- Offset Graph: Hover mode (Point or Slice)
+	HV_OffsetGraphHoverMode = {
+		Default = "point",
+		Choices = {"Point", "Slice"},
+		Values = {"point", "slice"}
+	},
+
+	-- Offset Graph: Slice width percent (1-100)
+	HV_OffsetGraphSlicePercent = {
+		Default = 25,
+		Choices = (function() local c={}; for i=1,100 do c[i]=tostring(i).."%" end return c end)(),
+		Values = (function() local v={}; for i=1,100 do v[i]=i end return v end)()
+	},
+
+	-- Offset Graph: Trend metric mode
+	HV_OffsetGraphTrendMetric = {
+		Default = "wife",
+		Choices = {"Wife%", "Grade", "Clear Type", "Mean", "Std Dev", "MA", "PA"},
+		Values = {"wife", "grade", "clear", "mean", "sd", "ma", "pa"}
+	},
+
+	-- Offset Graph: Trend color mode
+	HV_OffsetGraphTrendColor = {
+		Default = "none",
+		Choices = {"None", "Grade", "Clear Type"},
+		Values = {"none", "grade", "clear"}
+	},
+
 	-- Visual: Background animation intensity (0 = off, 1 = subtle, 2 = full)
 	HV_BGAnimIntensity = {
 		Default = 1,

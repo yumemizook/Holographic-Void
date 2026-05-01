@@ -79,15 +79,42 @@ local trendColorModes = {
 	{id = "grade", label = "Grade"},
 	{id = "clear", label = "Clear Type"},
 }
-local trendMetricIndex = 1
-local trendColorModeIndex = 1
 
-local selectingSlice = false
-local selectStartX = nil
-local selectCurrentX = nil
+-- Load saved preferences or use defaults
+local function getSavedOrDefault(prefName, defaultVal)
+	if ThemePrefs and ThemePrefs.Get then
+		local val = ThemePrefs.Get(prefName)
+		if val ~= nil then return val end
+	end
+	return defaultVal
+end
+
+local savedMetricId = getSavedOrDefault("HV_OffsetGraphTrendMetric", "wife")
+local trendMetricIndex = 1
+for i, mode in ipairs(trendMetricModes) do
+	if mode.id == savedMetricId then trendMetricIndex = i break end
+end
+
+local savedColorId = getSavedOrDefault("HV_OffsetGraphTrendColor", "none")
+local trendColorModeIndex = 1
+for i, mode in ipairs(trendColorModes) do
+	if mode.id == savedColorId then trendColorModeIndex = i break end
+end
+
 local selectedSliceX1 = nil
 local selectedSliceX2 = nil
 local selectedSliceStats = nil
+local slicePercent = getSavedOrDefault("HV_OffsetGraphSlicePercent", 25)
+local hoverModeOptions = {
+	{id = "point", label = "Point"},
+	{id = "slice", label = "Slice"},
+}
+local savedHoverId = getSavedOrDefault("HV_OffsetGraphHoverMode", "point")
+local hoverModeIndex = 1
+for i, mode in ipairs(hoverModeOptions) do
+	if mode.id == savedHoverId then hoverModeIndex = i break end
+end
+local setSliceByCenterX
 local fitX
 
 local function clampValue(v, lo, hi)
@@ -99,6 +126,41 @@ end
 local function getMouseLocalX(bg)
 	if not bg then return 0 end
 	return clampValue(INPUTFILTER:GetMouseX() - bg:GetTrueX(), 0, setWidth)
+end
+
+local function getCurrentSlicePercent()
+	return slicePercent
+end
+
+-- Forward declaration (defined later after trend indices are set up)
+local saveGraphPrefs
+
+local function adjustSlicePercent(delta)
+	delta = delta or 0
+	slicePercent = clampValue((slicePercent or 25) + delta, 1, 100)
+	if selectedSliceX1 and selectedSliceX2 then
+		setSliceByCenterX((selectedSliceX1 + selectedSliceX2) / 2, {width = setWidth, nrv = nrv, dvt = dvt})
+	end
+	if saveGraphPrefs then saveGraphPrefs() end
+	MESSAGEMAN:Broadcast("JudgeDisplayChanged")
+end
+
+local function getCurrentHoverModeId()
+	return hoverModeOptions[hoverModeIndex].id
+end
+
+local function cycleHoverMode(step)
+	step = step or 1
+	hoverModeIndex = hoverModeIndex + step
+	if hoverModeIndex > #hoverModeOptions then hoverModeIndex = 1 end
+	if hoverModeIndex < 1 then hoverModeIndex = #hoverModeOptions end
+	if getCurrentHoverModeId() == "point" then
+		selectedSliceX1 = nil
+		selectedSliceX2 = nil
+		selectedSliceStats = nil
+	end
+	if saveGraphPrefs then saveGraphPrefs() end
+	MESSAGEMAN:Broadcast("JudgeDisplayChanged")
 end
 
 local function getJudgeWindows()
@@ -185,11 +247,21 @@ local function getCurrentTrendColorModeId()
 	return trendColorModes[trendColorModeIndex].id
 end
 
+saveGraphPrefs = function()
+	if ThemePrefs and ThemePrefs.Set then
+		ThemePrefs.Set("HV_OffsetGraphTrendMetric", trendMetricModes[trendMetricIndex].id)
+		ThemePrefs.Set("HV_OffsetGraphTrendColor", trendColorModes[trendColorModeIndex].id)
+		ThemePrefs.Set("HV_OffsetGraphSlicePercent", slicePercent)
+		ThemePrefs.Set("HV_OffsetGraphHoverMode", hoverModeOptions[hoverModeIndex].id)
+	end
+end
+
 local function cycleTrendMetric(step)
 	step = step or 1
 	trendMetricIndex = trendMetricIndex + step
 	if trendMetricIndex > #trendMetricModes then trendMetricIndex = 1 end
 	if trendMetricIndex < 1 then trendMetricIndex = #trendMetricModes end
+	if saveGraphPrefs then saveGraphPrefs() end
 	MESSAGEMAN:Broadcast("JudgeDisplayChanged")
 end
 
@@ -198,6 +270,7 @@ local function cycleTrendColorMode(step)
 	trendColorModeIndex = trendColorModeIndex + step
 	if trendColorModeIndex > #trendColorModes then trendColorModeIndex = 1 end
 	if trendColorModeIndex < 1 then trendColorModeIndex = #trendColorModes end
+	if saveGraphPrefs then saveGraphPrefs() end
 	MESSAGEMAN:Broadcast("JudgeDisplayChanged")
 end
 
@@ -264,8 +337,7 @@ local function calculateSliceStats(x1, x2, params)
 			wife = 0,
 			mean = 0,
 			sd = 0,
-			ma = 0,
-			pa = 0,
+			judgments = {W1 = 0, W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0},
 			startTime = leftX / math.max(setWidth, 1) * finalSecond,
 			endTime = rightX / math.max(setWidth, 1) * finalSecond,
 		}
@@ -278,8 +350,7 @@ local function calculateSliceStats(x1, x2, params)
 		wife = wifePct,
 		mean = mean,
 		sd = sd,
-		ma = judgments.W1 or 0,
-		pa = judgments.W2 or 0,
+		judgments = judgments,
 		startTime = firstTime or 0,
 		endTime = lastTime or 0,
 	}
@@ -291,6 +362,37 @@ local function refreshSliceStats(params)
 	else
 		selectedSliceStats = nil
 	end
+end
+
+setSliceByCenterX = function(centerX, params)
+	params = params or {width = setWidth, nrv = nrv, dvt = dvt}
+	local width = params.width or setWidth
+	if not width or width <= 0 then return end
+
+	local pct = getCurrentSlicePercent()
+	local sliceWidth = clampValue(width * (pct / 100), 1, width)
+	local half = sliceWidth / 2
+	local x1 = centerX - half
+	local x2 = centerX + half
+
+	if x1 < 0 then
+		x2 = x2 - x1
+		x1 = 0
+	end
+	if x2 > width then
+		x1 = x1 - (x2 - width)
+		x2 = width
+	end
+
+	x1 = clampValue(x1, 0, width)
+	x2 = clampValue(x2, 0, width)
+	if x2 <= x1 then
+		x2 = math.min(width, x1 + 1)
+	end
+
+	selectedSliceX1 = x1
+	selectedSliceX2 = x2
+	refreshSliceStats(params)
 end
 
 fitX = function(x)
@@ -353,19 +455,44 @@ local t = Def.ActorFrame{
 	BeginCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		if not screen then return end
-		screen:AddInputCallback(function(event)
+			screen:AddInputCallback(function(event)
 			if not event or not event.DeviceInput then return false end
 			local btn = event.DeviceInput.button
 
 			if event.type == "InputEventType_FirstPress" and btn == "DeviceButton_left mouse button" then
 				local metricLabel = self:GetChild("TrendMetricLabel")
+				local metricBg = self:GetChild("TrendMetricBg")
 				local colorLabel = self:GetChild("TrendColorLabel")
-				if metricLabel and isOver(metricLabel) then
+				local colorBg = self:GetChild("TrendColorBg")
+				local hoverModeLabel = self:GetChild("HoverModeLabel")
+				local hoverModeBg = self:GetChild("HoverModeBg")
+				local sliceMinusLabel = self:GetChild("SliceMinusLabel")
+				local sliceMinusBg = self:GetChild("SliceMinusBg")
+				local slicePercentLabel = self:GetChild("SlicePercentLabel")
+				local slicePercentBg = self:GetChild("SlicePercentBg")
+				local slicePlusLabel = self:GetChild("SlicePlusLabel")
+				local slicePlusBg = self:GetChild("SlicePlusBg")
+				if (metricLabel and isOver(metricLabel)) or (metricBg and isOver(metricBg)) then
 					cycleTrendMetric(1)
 					return true
 				end
-				if colorLabel and isOver(colorLabel) then
+				if (colorLabel and isOver(colorLabel)) or (colorBg and isOver(colorBg)) then
 					cycleTrendColorMode(1)
+					return true
+				end
+				if (hoverModeLabel and isOver(hoverModeLabel)) or (hoverModeBg and isOver(hoverModeBg)) then
+					cycleHoverMode(1)
+					return true
+				end
+				if ((sliceMinusLabel and isOver(sliceMinusLabel)) or (sliceMinusBg and isOver(sliceMinusBg))) and getCurrentHoverModeId() == "slice" then
+					adjustSlicePercent(-1)
+					return true
+				end
+				if (slicePercentLabel and isOver(slicePercentLabel)) or (slicePercentBg and isOver(slicePercentBg)) then
+					return true
+				end
+				if ((slicePlusLabel and isOver(slicePlusLabel)) or (slicePlusBg and isOver(slicePlusBg))) and getCurrentHoverModeId() == "slice" then
+					adjustSlicePercent(1)
 					return true
 				end
 			end
@@ -380,23 +507,11 @@ local t = Def.ActorFrame{
 				setPlotScale(plotScale + 5)
 				return true
 			elseif event.type == "InputEventType_FirstPress" and btn == "DeviceButton_left mouse button" then
-				selectingSlice = true
-				selectStartX = getMouseLocalX(bg)
-				selectCurrentX = selectStartX
-				MESSAGEMAN:Broadcast("JudgeDisplayChanged")
-				return true
-			elseif event.type == "InputEventType_Release" and btn == "DeviceButton_left mouse button" and selectingSlice then
-				local endX = getMouseLocalX(bg)
-				local dragDistance = math.abs((selectStartX or endX) - endX)
-				selectingSlice = false
-				selectCurrentX = nil
-				if dragDistance < 3 then
-					setPlotScaleToWorstHit()
-				else
-					selectedSliceX1 = math.min(selectStartX or endX, endX)
-					selectedSliceX2 = math.max(selectStartX or endX, endX)
-					refreshSliceStats({width = setWidth, nrv = nrv, dvt = dvt})
+				if getCurrentHoverModeId() == "slice" then
+					setSliceByCenterX(getMouseLocalX(bg), {width = setWidth, nrv = nrv, dvt = dvt})
 					MESSAGEMAN:Broadcast("JudgeDisplayChanged")
+				else
+					setPlotScaleToWorstHit()
 				end
 				return true
 			elseif event.type == "InputEventType_FirstPress" and btn == "DeviceButton_right mouse button" then
@@ -417,6 +532,9 @@ local t = Def.ActorFrame{
 				return true
 			elseif event.type == "InputEventType_FirstPress" and btn == "DeviceButton_x2 mouse button" then
 				cycleTrendColorMode(-1)
+				return true
+			elseif event.type == "InputEventType_FirstPress" and btn == "DeviceButton_left ctrl" then
+				adjustSlicePercent(1)
 				return true
 			end
 			return false
@@ -539,16 +657,8 @@ t[#t+1] = Def.Quad{
 		local ha = self.GetHAlign and self:GetHAlign() or 0
 		local va = self.GetVAlign and self:GetVAlign() or 0
 		
-		if selectingSlice then
-			selectCurrentX = clampValue(INPUTFILTER:GetMouseX() - self:GetTrueX(), 0, w)
-		end
-
 		local activeX1 = selectedSliceX1
 		local activeX2 = selectedSliceX2
-		if selectingSlice and selectStartX and selectCurrentX then
-			activeX1 = math.min(selectStartX, selectCurrentX)
-			activeX2 = math.max(selectStartX, selectCurrentX)
-		end
 
 		local sliceQuad = self:GetParent():GetChild("SliceSelection")
 		local sliceLeftLine = self:GetParent():GetChild("SliceLeftLine")
@@ -573,6 +683,9 @@ t[#t+1] = Def.Quad{
 
 		if mx >= x - w * ha and mx <= x + w * (1 - ha) and my >= y - h * va and my <= y + h * (1 - va) then
 			local xpos = INPUTFILTER:GetMouseX() - self:GetTrueX()
+			if getCurrentHoverModeId() == "slice" then
+				setSliceByCenterX(xpos, {width = setWidth, nrv = nrv, dvt = dvt})
+			end
 			bar:visible(true)
 			txt:visible(true)
 			bg:visible(true)
@@ -581,30 +694,54 @@ t[#t+1] = Def.Quad{
 			txt:y(100)
 			bg:x(xpos)
 			bg:y(100)
-			bg:zoomto(txt:GetZoomedWidth() + 4, txt:GetZoomedHeight() + 4)
 
-			local row = convertXToRow(xpos)
-			local ok, replay = pcall(function() return REPLAYS:GetActiveReplay() end)
-			if ok and replay and replay.GetReplaySnapshotForNoterow then
-				local sok, snapshot = pcall(function() return replay:GetReplaySnapshotForNoterow(row) end)
-				if sok and snapshot then
-					local judgments = snapshot:GetJudgments()
-					local wifescore = snapshot:GetWifePercent() * 100
-					local mean = snapshot:GetMean()
-					local sd = snapshot:GetStandardDeviation()
-					local timebro = td:GetElapsedTimeFromNoteRow(row) / getCurRateValue()
-					txt:settextf("%.2f%%\nMarv: %d\nPerf: %d\nGreat: %d\nGood: %d\nBad: %d\nMiss: %d\nSD: %.2fms\nMean: %.2fms\nTime: %.2fs",
-						wifescore,
-						judgments["W1"] or 0, judgments["W2"] or 0,
-						judgments["W3"] or 0, judgments["W4"] or 0,
-						judgments["W5"] or 0, judgments["Miss"] or 0,
-						sd or 0, mean or 0, timebro or 0)
+			if getCurrentHoverModeId() == "slice" and selectedSliceStats and selectedSliceX1 and selectedSliceX2 then
+				local j = selectedSliceStats.judgments or {W1 = 0, W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0}
+				txt:settextf("Slice (%d%%) | %.2fs-%.2fs\n%.2f%% | SD: %.2fms | Mean: %.2fms\nMarv: %d | Perf: %d | Great: %d\nGood: %d | Bad: %d | Miss: %d | Notes: %d",
+					getCurrentSlicePercent(),
+					selectedSliceStats.startTime or 0,
+					selectedSliceStats.endTime or 0,
+					selectedSliceStats.wife or 0,
+					selectedSliceStats.sd or 0,
+					selectedSliceStats.mean or 0,
+					j.W1 or 0, j.W2 or 0, j.W3 or 0,
+					j.W4 or 0, j.W5 or 0, j.Miss or 0,
+					selectedSliceStats.notes or 0)
+			else
+				local row = convertXToRow(xpos)
+				local ok, replay = pcall(function() return REPLAYS:GetActiveReplay() end)
+				if ok and replay and replay.GetReplaySnapshotForNoterow then
+					local sok, snapshot = pcall(function() return replay:GetReplaySnapshotForNoterow(row) end)
+					if sok and snapshot then
+						local judgments = snapshot:GetJudgments()
+						local wifescore = snapshot:GetWifePercent() * 100
+						local mean = snapshot:GetMean()
+						local sd = snapshot:GetStandardDeviation()
+						local timebro = td:GetElapsedTimeFromNoteRow(row) / getCurRateValue()
+						txt:settextf("%.2f%%\nMarv: %d\nPerf: %d\nGreat: %d\nGood: %d\nBad: %d\nMiss: %d\nSD: %.2fms\nMean: %.2fms\nTime: %.2fs",
+							wifescore,
+							judgments["W1"] or 0, judgments["W2"] or 0,
+							judgments["W3"] or 0, judgments["W4"] or 0,
+							judgments["W5"] or 0, judgments["Miss"] or 0,
+							sd or 0, mean or 0, timebro or 0)
+					else
+						txt:settext("")
+					end
+				else
+					txt:settext("")
 				end
 			end
+
+			bg:zoomto(txt:GetZoomedWidth() + 4, txt:GetZoomedHeight() + 4)
 		else
 			bar:visible(false)
 			txt:visible(false)
 			bg:visible(false)
+			if getCurrentHoverModeId() == "slice" then
+				selectedSliceX1 = nil
+				selectedSliceX2 = nil
+				selectedSliceStats = nil
+			end
 		end
 	end
 }
@@ -622,13 +759,103 @@ t[#t+1] = Def.Quad {
 		if selectedSliceX1 and selectedSliceX2 then
 			local x1 = math.min(selectedSliceX1, selectedSliceX2)
 			local x2 = math.max(selectedSliceX1, selectedSliceX2)
-			if x2 - x1 >= 1 then
+			if getCurrentHoverModeId() == "slice" and x2 - x1 >= 1 then
 				self:visible(true):x(x1):zoomto(x2 - x1, params.height)
 			else
 				self:visible(false)
 			end
 		else
 			self:visible(false)
+		end
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+-- Button background helper (defined here so it's available for all control actors below)
+local function buttonBg(name, xFunc, yOffset, width, hAlign)
+	return Def.Quad {
+		Name = name .. "Bg",
+		InitCommand = function(self)
+			self:halign(hAlign or 0):valign(0):diffuse(color("#2A2A2A")):diffusealpha(0.9)
+		end,
+		UpdateCommand = function(self, params)
+			params = checkParams(params)
+			self:xy(xFunc(params), params.height + yOffset)
+			self:zoomto(width or 70, 18)
+		end,
+		JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+	}
+end
+
+t[#t+1] = buttonBg("HoverMode", function(p) return 5 end, 28, 65, 0)
+
+t[#t+1] = LoadFont("Common Normal") .. {
+	Name = "HoverModeLabel",
+	InitCommand = function(self)
+		self:halign(0):valign(0.5):zoom(0.35):diffuse(brightText)
+	end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(8, params.height + 35)
+		self:settextf("Hover: %s", hoverModeOptions[hoverModeIndex].label)
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+t[#t+1] = buttonBg("SliceMinus", function(p) return p.width - 105 end, 28, 20, 0)
+
+t[#t+1] = LoadFont("Common Normal") .. {
+	Name = "SliceMinusLabel",
+	InitCommand = function(self)
+		self:halign(0.5):valign(0.5):zoom(0.40):diffuse(brightText):settext("-")
+	end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 95, params.height + 37)
+		if getCurrentHoverModeId() == "slice" then
+			self:diffusealpha(1)
+		else
+			self:diffusealpha(0.45)
+		end
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+t[#t+1] = buttonBg("SlicePercent", function(p) return p.width - 63 end, 28, 40, 0)
+
+t[#t+1] = LoadFont("Common Normal") .. {
+	Name = "SlicePercentLabel",
+	InitCommand = function(self)
+		self:halign(0.5):valign(0.5):zoom(0.35):diffuse(brightText)
+	end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 43, params.height + 37)
+		if getCurrentHoverModeId() == "slice" then
+			self:diffusealpha(1)
+			self:settextf("%d%%", getCurrentSlicePercent())
+		else
+			self:diffusealpha(0.45)
+			self:settext("--")
+		end
+	end,
+	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
+}
+
+t[#t+1] = buttonBg("SlicePlus", function(p) return p.width - 20 end, 28, 20, 0)
+
+t[#t+1] = LoadFont("Common Normal") .. {
+	Name = "SlicePlusLabel",
+	InitCommand = function(self)
+		self:halign(0.5):valign(0.5):zoom(0.40):diffuse(brightText):settext("+")
+	end,
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(params.width - 10, params.height + 37)
+		if getCurrentHoverModeId() == "slice" then
+			self:diffusealpha(1)
+		else
+			self:diffusealpha(0.45)
 		end
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
@@ -644,7 +871,7 @@ t[#t+1] = Def.Quad {
 		if selectedSliceX1 and selectedSliceX2 then
 			local x1 = math.min(selectedSliceX1, selectedSliceX2)
 			local x2 = math.max(selectedSliceX1, selectedSliceX2)
-			if x2 - x1 >= 1 then
+			if getCurrentHoverModeId() == "slice" and x2 - x1 >= 1 then
 				self:visible(true):x(x1):zoomto(1, params.height)
 			else
 				self:visible(false)
@@ -666,7 +893,7 @@ t[#t+1] = Def.Quad {
 		if selectedSliceX1 and selectedSliceX2 then
 			local x1 = math.min(selectedSliceX1, selectedSliceX2)
 			local x2 = math.max(selectedSliceX1, selectedSliceX2)
-			if x2 - x1 >= 1 then
+			if getCurrentHoverModeId() == "slice" and x2 - x1 >= 1 then
 				self:visible(true):x(x2):zoomto(1, params.height)
 			else
 				self:visible(false)
@@ -688,7 +915,7 @@ t[#t+1] = Def.ActorMultiVertex{
 		if params.song == nil or params.steps == nil or params.nrv == nil or params.dvt == nil
 			or #params.nrv == 0 or #params.dvt == 0 then
 			self:SetVertices(verts)
-			self:SetDrawState{Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+			self:SetDrawState{Mode = "DrawMode_Quads", First = 1, Num = 0}
 			return
 		end
 
@@ -738,13 +965,13 @@ t[#t+1] = Def.ActorMultiVertex{
 
 		if #points < 2 then
 			self:SetVertices(verts)
-			self:SetDrawState{Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+			self:SetDrawState{Mode = "DrawMode_Quads", First = 1, Num = 0}
 			return
 		end
 
 		if minVal == math.huge or maxVal == -math.huge then
 			self:SetVertices(verts)
-			self:SetDrawState{Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+			self:SetDrawState{Mode = "DrawMode_Quads", First = 1, Num = 0}
 			return
 		end
 
@@ -752,23 +979,35 @@ t[#t+1] = Def.ActorMultiVertex{
 			maxVal = minVal + 1
 		end
 
-		for i = 1, #points do
-			local p = points[i]
-			local normalized = (p.value - minVal) / (maxVal - minVal)
-			local y = params.height - (normalized * params.height)
-			local c = {accentColor[1], accentColor[2], accentColor[3], 0.92}
-			if colorModeId == "grade" then
-				local gc = HVColor.GetGradeColor(p.grade)
-				c = {gc[1], gc[2], gc[3], 0.92}
-			elseif colorModeId == "clear" then
-				local cc = getClearTypeColor and getClearTypeColor(p.clearType) or accentColor
-				c = {cc[1], cc[2], cc[3], 0.92}
+		local lineThickness = 0.8
+		for i = 2, #points do
+			local p1 = points[i - 1]
+			local p2 = points[i]
+			local y1 = params.height - (((p1.value - minVal) / (maxVal - minVal)) * params.height)
+			local y2 = params.height - (((p2.value - minVal) / (maxVal - minVal)) * params.height)
+			local dx = p2.x - p1.x
+			local dy = y2 - y1
+			local len = math.sqrt(dx * dx + dy * dy)
+			if len > 0.0001 then
+				local nx = -dy / len * lineThickness
+				local ny = dx / len * lineThickness
+				local c = {accentColor[1], accentColor[2], accentColor[3], 0.92}
+				if colorModeId == "grade" then
+					local gc = HVColor.GetGradeColor(p2.grade)
+					c = {gc[1], gc[2], gc[3], 0.92}
+				elseif colorModeId == "clear" then
+					local cc = getClearTypeColor and getClearTypeColor(p2.clearType) or accentColor
+					c = {cc[1], cc[2], cc[3], 0.92}
+				end
+				verts[#verts + 1] = {{p1.x - nx, y1 - ny, 0}, c}
+				verts[#verts + 1] = {{p1.x + nx, y1 + ny, 0}, c}
+				verts[#verts + 1] = {{p2.x + nx, y2 + ny, 0}, c}
+				verts[#verts + 1] = {{p2.x - nx, y2 - ny, 0}, c}
 			end
-			verts[#verts + 1] = {{p.x, y, 0}, c}
 		end
 
 		self:SetVertices(verts)
-		self:SetDrawState{Mode = "DrawMode_LineStrip", First = 1, Num = #verts}
+		self:SetDrawState{Mode = "DrawMode_Quads", First = 1, Num = #verts}
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
@@ -864,58 +1103,32 @@ t[#t+1] = LoadFont("Common Normal")..{
 }
 
 -- Trend line control labels
+t[#t+1] = buttonBg("TrendMetric", function(p) return 5 end, 12, 80, 0)
+
 t[#t+1] = LoadFont("Common Normal") .. {
 	Name = "TrendMetricLabel",
 	InitCommand = function(self)
-		self:halign(0):valign(1):xy(5, -18):zoom(0.3):diffuse(brightText)
+		self:halign(0):valign(0.5):zoom(0.35):diffuse(brightText)
 	end,
-	UpdateCommand = function(self)
+	UpdateCommand = function(self, params)
+		params = checkParams(params)
+		self:xy(8, params.height + 20)
 		self:settextf("Trend: %s", trendMetricModes[trendMetricIndex].label)
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
 
+t[#t+1] = buttonBg("TrendColor", function(p) return p.width - 5 end, 12, 80, 1)
+
 t[#t+1] = LoadFont("Common Normal") .. {
 	Name = "TrendColorLabel",
 	InitCommand = function(self)
-		self:halign(1):valign(1):zoom(0.3):diffuse(brightText)
+		self:halign(1):valign(0.5):zoom(0.35):diffuse(brightText)
 	end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
-		self:xy(params.width - 5, -18)
+		self:xy(params.width - 8, params.height + 20)
 		self:settextf("Color: %s", trendColorModes[trendColorModeIndex].label)
-	end,
-	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
-}
-
--- Slice summary
-t[#t+1] = LoadFont("Common Normal") .. {
-	Name = "SliceInfo",
-	InitCommand = function(self)
-		self:halign(0):valign(0):xy(5, 4):zoom(0.28):diffuse(brightText)
-	end,
-	UpdateCommand = function(self)
-		if selectingSlice and selectStartX and selectCurrentX then
-			local params = {width = setWidth, nrv = nrv, dvt = dvt}
-			local live = calculateSliceStats(selectStartX, selectCurrentX, params)
-			if live and live.notes > 0 then
-				self:settextf("Slice %.2fs-%.2fs | Notes: %d | Wife: %.2f%% | Mean: %.2fms | SD: %.2fms | MA: %d | PA: %d",
-					live.startTime or 0, live.endTime or 0, live.notes or 0,
-					live.wife or 0, live.mean or 0, live.sd or 0,
-					live.ma or 0, live.pa or 0)
-			else
-				self:settext("Slice selecting...")
-			end
-		elseif selectedSliceStats and selectedSliceStats.notes and selectedSliceStats.notes > 0 then
-			self:settextf("Slice %.2fs-%.2fs | Notes: %d | Wife: %.2f%% | Mean: %.2fms | SD: %.2fms | MA: %d | PA: %d",
-				selectedSliceStats.startTime or 0, selectedSliceStats.endTime or 0, selectedSliceStats.notes or 0,
-				selectedSliceStats.wife or 0, selectedSliceStats.mean or 0, selectedSliceStats.sd or 0,
-				selectedSliceStats.ma or 0, selectedSliceStats.pa or 0)
-		elseif selectedSliceX1 and selectedSliceX2 then
-			self:settext("Slice contains no notes")
-		else
-			self:settext("LMB drag: select slice | MMB: cycle trend | RMB: clear slice/reset scale")
-		end
 	end,
 	JudgeDisplayChangedMessageCommand = function(self) self:queuecommand("Update") end
 }
