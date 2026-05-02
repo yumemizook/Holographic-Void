@@ -72,17 +72,18 @@ local t = Def.ActorFrame {
 	OnCommand = function(self)
 		-- Double check mods on OnCommand just in case
 		if isSync then
-			for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
-				local ps = GAMESTATE:GetPlayerState(pn)
+			for _, pn_loop in ipairs(GAMESTATE:GetEnabledPlayers()) do
+				local ps = GAMESTATE:GetPlayerState(pn_loop)
 				ps:GetPlayerOptions("ModsLevel_Current"):CMod(400)
 				ps:GetPlayerOptions("ModsLevel_Current"):Reverse(0)
 			end
 		end
 
-		-- Input Callback for Ghost Tapping feedback
-		local screen = SCREENMAN:GetTopScreen()
-		if screen then
-			screen:AddInputCallback(function(event)
+		-- Notefield Customization
+		local top = SCREENMAN:GetTopScreen()
+		if top then
+			-- Input Callback for Ghost Tapping feedback
+			top:AddInputCallback(function(event)
 				if event.type == "InputEventType_Release" then return end
 				if event.type == "InputEventType_FirstPress" then
 					local b = event.button
@@ -94,6 +95,36 @@ local t = Def.ActorFrame {
 					end
 				end
 			end)
+
+			local player = top:GetChild("PlayerP1")
+			if player then
+				local notefield = player:GetChild("NoteField")
+				if notefield then
+					local nfX = gameplayCoord("NotefieldX")
+					local nfY = gameplayCoord("NotefieldY")
+					local usingReverse = GAMESTATE:GetPlayerState():GetCurrentPlayerOptions():UsingReverse()
+					
+					notefield:addx(nfX)
+					notefield:addy(nfY * (usingReverse and 1 or -1))
+					
+					local cols = notefield:get_column_actors()
+					local nfW = gameplaySize("NotefieldWidth")
+					local nfH = gameplaySize("NotefieldHeight")
+					local nfS = gameplaySize("NotefieldSpacing")
+					
+					for _, col in ipairs(cols) do
+						col:zoomtowidth(nfW)
+						col:zoomtoheight(nfH)
+					end
+					
+					if setMovableNotefield then
+						setMovableNotefield(notefield, cols)
+						if spaceNotefieldCols then
+							spaceNotefieldCols(nfS)
+						end
+					end
+				end
+			end
 		end
 	end,
 	
@@ -951,7 +982,8 @@ t[#t + 1] = LoadActor("replayscrolling.lua")
 -- ============================================================
 -- ERROR BAR (TIMING BAR)
 -- ============================================================
-local ebW = 240
+local baseEBW = 240
+local ebW = baseEBW * gameplaySize("ErrorBarScale")
 local ebH = 2
 local ebCenterY = SCREEN_CENTER_Y + SCREEN_HEIGHT * 0.15 - 40
 local maxOffset = 180 -- ms
@@ -971,7 +1003,12 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 			self:xy(gameplayCoord("ErrorBarX"), gameplayCoord("ErrorBarY")):visible(ebMode ~= "Off" and not isSync)
 		end,
 		OnCommand = function(self)
-			setMovableActor({"DeviceButton_5"}, self, self:GetChild("Border"))
+			setMovableActor({"DeviceButton_5", "DeviceButton_6"}, self, self:GetChild("Border"))
+		end,
+		UpdateEBScaleCommand = function(self, params)
+			ebW = baseEBW * params.scale
+			self:GetChild("Border"):playcommand("ChangeWidth", {val = ebW})
+			self:playcommand("UpdateChildrenEBWidth", {width = ebW})
 		end,
 
 	-- Background line
@@ -986,7 +1023,41 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		Name = "CenterLine",
 		InitCommand = function(self)
 			self:zoomto(1, ebH + 8):diffuse(color("1,1,1,0.3"))
+		end,
+		UpdateChildrenEBWidthCommand = function(self, params)
+			-- center line doesn't change size usually but we can react if needed
 		end
+	},
+	
+	-- Judgement window highlights (only visible when resizing)
+	Def.ActorFrame {
+		Name = "Highlights",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		MovableUpdatedMessageCommand = function(self, params)
+			local ebMode = ThemePrefs.Get("HV_ErrorBarMode") or "Standard"
+			local isVisible = params and (params.button == "DeviceButton_6") and (ebMode ~= "Off")
+			self:visible(isVisible or false)
+		end,
+		(function()
+			local g = Def.ActorFrame{}
+			local windows = {180, 135, 90, 45, 22.5}
+			local colors = {judgmentColors[5], judgmentColors[4], judgmentColors[3], judgmentColors[2], judgmentColors[1]}
+			for i=1, 5 do
+				g[#g+1] = Def.Quad {
+					InitCommand = function(self)
+						local w = (windows[i] / maxOffset) * ebW
+						self:zoomto(w, ebH + 16):diffuse(colors[i]):diffusealpha(0.35)
+					end,
+					UpdateChildrenEBWidthCommand = function(self, params)
+						local w = (windows[i] / maxOffset) * params.width
+						self:zoomto(w, ebH + 16)
+					end
+				}
+			end
+			return g
+		end)()
 	},
 	
 	-- Early Indicator (Left)
@@ -997,6 +1068,9 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		end,
 		OnCommand = function(self)
 			self:sleep(0.5):linear(0.2):diffusealpha(0.6):sleep(1.2):linear(0.2):diffusealpha(0)
+		end,
+		UpdateChildrenEBWidthCommand = function(self, params)
+			self:x(-params.width/2 - 5)
 		end
 	},
 	-- Late Indicator (Right)
@@ -1007,6 +1081,9 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		end,
 		OnCommand = function(self)
 			self:sleep(0.5):linear(0.2):diffusealpha(0.6):sleep(1.2):linear(0.2):diffusealpha(0)
+		end,
+		UpdateChildrenEBWidthCommand = function(self, params)
+			self:x(params.width/2 + 5)
 		end
 	},
 
@@ -1019,6 +1096,9 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 			local offset = params.offset
 			ewmaValue = (1 - ewmaAlpha) * ewmaValue + ewmaAlpha * offset
 			self:x((ewmaValue / maxOffset) * (ebW / 2))
+		end,
+		UpdateChildrenEBWidthCommand = function(self, params)
+			self:x((ewmaValue / maxOffset) * (params.width / 2))
 		end
 	},
 

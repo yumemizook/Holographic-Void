@@ -65,6 +65,7 @@ return Def.ActorFrame {
 				"3: "..transStr("ComboPosition"),
 				"4: "..transStr("ComboSize"),
 				"5: "..transStr("ErrorBarPosition"),
+				"6: "..transStr("ErrorBarSize"),
 				"7: "..transStr("TargetTrackerPosition"),
 				"8: "..transStr("TargetTrackerSize"),
 				"9: "..transStr("FullProgressBarPosition"),
@@ -87,6 +88,9 @@ return Def.ActorFrame {
 				",: "..transStr("MeanSize"),
 				".: "..transStr("DPDisplayPosition"),
 				"/: "..transStr("DPDisplaySize"),
+				"r: "..transStr("NotefieldPosition"),
+				"t: "..transStr("NotefieldSize"),
+				"n: "..transStr("NotefieldSpacing"),
 			}
 			if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).LaneCover ~= 0 then
 				local selectStr = THEME:GetString("GameButton", "Select")

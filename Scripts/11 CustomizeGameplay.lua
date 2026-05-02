@@ -72,6 +72,12 @@ local function loadValuesTable()
 	MovableValues.DPDisplayX = coord("DPDisplayX")
 	MovableValues.DPDisplayY = coord("DPDisplayY")
 	MovableValues.DPDisplayZoom = size("DPDisplayZoom")
+	MovableValues.NotefieldX = coord("NotefieldX")
+	MovableValues.NotefieldY = coord("NotefieldY")
+	MovableValues.NotefieldWidth = size("NotefieldWidth")
+	MovableValues.NotefieldHeight = size("NotefieldHeight")
+	MovableValues.NotefieldSpacing = size("NotefieldSpacing")
+	MovableValues.ErrorBarScale = size("ErrorBarScale")
 
 	-- Apply widescreen offsets
 	if GetScreenAspectRatio() > 1.7 then
@@ -115,6 +121,29 @@ function setMovableActor(buttons, actor, border)
 	end
 end
 
+local noteColumns = {}
+function spaceNotefieldCols(inc)
+	if inc == nil then inc = 0 end
+	local hCols = math.floor(#noteColumns / 2)
+	for i, col in ipairs(noteColumns) do
+		if col and col.addx then
+			col:addx((i - hCols - 1) * inc)
+		end
+	end
+end
+
+function setMovableNotefield(notefield, columns)
+	if not allowedCustomization then return end
+	noteColumns = columns or {}
+	Movable.DeviceButton_r.element = notefield
+	Movable.DeviceButton_r.condition = true
+	Movable.DeviceButton_t.element = noteColumns
+	Movable.DeviceButton_t.condition = true
+	Movable.DeviceButton_n.condition = true
+	Movable.DeviceButton_n.DeviceButton_up.arbitraryFunction = spaceNotefieldCols
+	Movable.DeviceButton_n.DeviceButton_down.arbitraryFunction = spaceNotefieldCols
+end
+
 local propsFunctions = {
 	X = Actor.x,
 	Y = Actor.y,
@@ -123,6 +152,9 @@ local propsFunctions = {
 	Width = Actor.zoomtowidth,
 	AddX = Actor.addx,
 	AddY = Actor.addy,
+	Scale = function(self, val)
+		self:playcommand("UpdateEBScale", {scale = val})
+	end,
 	Rotation = Actor.rotationz,
 }
 
@@ -221,7 +253,7 @@ Movable = {
 	DeviceButton_5 = {
 		name = "ErrorBar",
 		textHeader = "Error Bar Position:",
-		element = {}, -- initialized later
+		element = {},
 		properties = {"X", "Y"},
 		children = {"Center", "WeightedBar", "Border"},
 		elementTree = "GameplayXYCoordinates",
@@ -240,6 +272,29 @@ Movable = {
 		DeviceButton_right = {
 			property = "AddX",
 			inc = 5
+		}
+	},
+	DeviceButton_6 = {
+		name = "ErrorBar",
+		textHeader = "Error Bar Scale:",
+		element = {},
+		properties = {"Scale"},
+		elementTree = "GameplaySizes",
+		DeviceButton_up = {
+			property = "Scale",
+			inc = 0.05
+		},
+		DeviceButton_down = {
+			property = "Scale",
+			inc = -0.05
+		},
+		DeviceButton_left = {
+			property = "Scale",
+			inc = -0.05
+		},
+		DeviceButton_right = {
+			property = "Scale",
+			inc = 0.05
 		}
 	},
 	DeviceButton_7 = {
@@ -341,6 +396,74 @@ Movable = {
 			property = "Zoom",
 			inc = -0.01
 		}
+	},
+	DeviceButton_r = {
+		name = "Notefield",
+		textHeader = "Notefield Position:",
+		element = {},
+		properties = {"X", "Y"},
+		elementTree = "GameplayXYCoordinates",
+		noBorder = true,
+		DeviceButton_up = {
+			notefieldY = true,
+			property = "AddY",
+			inc = -3
+		},
+		DeviceButton_down = {
+			notefieldY = true,
+			property = "AddY",
+			inc = 3
+		},
+		DeviceButton_left = {
+			property = "AddX",
+			inc = -3
+		},
+		DeviceButton_right = {
+			property = "AddX",
+			inc = 3
+		}
+	},
+	DeviceButton_t = {
+		name = "Notefield",
+		textHeader = "Notefield Size:",
+		element = {},
+		elementList = true, -- god bless the notefield
+		properties = {"Width", "Height"},
+		elementTree = "GameplaySizes",
+		noBorder = true,
+		DeviceButton_up = {
+			property = "Height",
+			inc = 0.01
+		},
+		DeviceButton_down = {
+			property = "Height",
+			inc = -0.01
+		},
+		DeviceButton_left = {
+			property = "Width",
+			inc = -0.01
+		},
+		DeviceButton_right = {
+			property = "Width",
+			inc = 0.01
+		}
+	},
+	DeviceButton_n = {
+		name = "Notefield",
+		textHeader = "Notefield Columns:",
+		properties = {"Spacing"},
+		elementTree = "GameplaySizes",
+		noBorder = true,
+		DeviceButton_up = {
+			arbitraryInc = true,
+			property = "Spacing",
+			inc = 1
+		},
+		DeviceButton_down = {
+			arbitraryInc = true,
+			property = "Spacing",
+			inc = -1
+		},
 	},
 	DeviceButton_y = {
 		name = "NPSDisplay",
@@ -709,10 +832,16 @@ local function updatetext(button)
 	local text = {Movable[button].textHeader}
 	for _, prop in ipairs(Movable[button].properties) do
 		local fullProp = Movable[button].name .. prop
-		text[#text + 1] = prop .. ": " .. tostring(MovableValues[fullProp])
+		local val = MovableValues[fullProp]
+		if type(val) == "number" then
+			val = string.format("%.2f", val)
+		end
+		table.insert(text, prop .. ": " .. (val or "nil"))
 	end
+	Movable.current = button
 	Movable.message:settext(table.concat(text, "\n"))
 	Movable.message:visible(Movable.pressed)
+	MESSAGEMAN:Broadcast("MovableUpdated", {button = button})
 end
 
 local function charToDeviceButton(ch)
@@ -912,6 +1041,9 @@ function MovableInput(event)
 				end
 			else
 				newVal = (MovableValues[prop] or 0) + (curKey.inc * ((curKey.notefieldY and not usingReverse) and -1 or 1))
+				if prop == "ErrorBarScale" then
+					newVal = math.max(0, newVal)
+				end
 			end
 			
 			MovableValues[prop] = newVal
@@ -1073,6 +1205,9 @@ function MovableBorder(width, height, bw, x, y)
 				self:visible(false)
 				self:SetUpdateFunction(nil)
 			end
+		end,
+		UpdateEBWidthCommand=function(self, params)
+			self:playcommand("ChangeWidth", {val = params.width})
 		end,
 		ChangeWidthCommand=function(self, params)
 			self:GetChild("xbar"):zoomx(params.val)

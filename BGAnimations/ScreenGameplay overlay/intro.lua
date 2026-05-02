@@ -242,4 +242,79 @@ t[#t+1] = LoadFont("Common Normal") .. {
 	end
 }
 
+-- ============================================================
+-- TARGET GOAL & AUTO-FAIL DISPLAY (above banner)
+-- ============================================================
+t[#t+1] = Def.ActorFrame{
+	Name = "IntroBannerExtra",
+	CurrentSongChangedMessageCommand = function(self)
+		local targetActor = self:GetChild("TargetGoal")
+		local failActor = self:GetChild("AutoFail")
+		local bg = self:GetChild("ExtraBG")
+		
+		-- Target Goal
+		local showGoal = ThemePrefs.Get("HV_ShowGoalTracker")
+		if showGoal then
+			local goal = ThemePrefs.Get("HV_PacemakerTargetGoal") or 93
+			targetActor:settext(string.format("Target: %.2f%%", goal))
+			targetActor:visible(true)
+		else
+			targetActor:visible(false)
+		end
+		
+		-- Auto-Fail
+		local failMode = ThemePrefs.Get("HV_AutoFailMode")
+		local hasFail = failMode and failMode ~= "Off"
+		if hasFail then
+			local condition = ThemePrefs.Get("HV_AutoFailCondition")
+			local threshold = ""
+			if condition == "Wife Percent" then
+				threshold = string.format("< %.2f%%", ThemePrefs.Get("HV_AutoFailThreshold_Wife") or 93)
+			elseif condition == "Judgement Count" then
+				local judge = ThemePrefs.Get("HV_AutoFailJudgement") or "Miss"
+				local judgeName = THEME:GetString("TapNoteScore", judge)
+				threshold = string.format(">= %d %s", ThemePrefs.Get("HV_AutoFailThreshold_Count") or 10, judgeName)
+			elseif condition == "Personal Best" then
+				local best = GetDisplayScore()
+				local pbStr = ""
+				if best then
+					pbStr = string.format(" (%.2f%%)", getJ4NormalizedPercentage(best))
+				end
+				threshold = "PB" .. pbStr
+			end
+			failActor:settext(string.format("Auto-Fail: %s (%s)", failMode, threshold))
+			failActor:visible(true)
+		else
+			failActor:visible(false)
+		end
+
+		-- Background visibility
+		bg:visible(showGoal or hasFail)
+	end,
+
+	Def.Quad{
+		Name = "ExtraBG",
+		InitCommand = function(self)
+			self:y(-48):zoomto(totalW + 20, 26)
+			self:diffuse(color("#000000")):diffusealpha(0.5)
+			self:fadeleft(0.4):faderight(0.4)
+		end
+	},
+
+	LoadFont("Common Normal") .. {
+		Name = "TargetGoal",
+		InitCommand = function(self)
+			self:y(-42):zoom(0.35):diffuse(color("#FFFFFF")):diffusealpha(0.8)
+			self:shadowlength(1):shadowcolor(color("0,0,0,0.5"))
+		end
+	},
+	LoadFont("Common Normal") .. {
+		Name = "AutoFail",
+		InitCommand = function(self)
+			self:y(-54):zoom(0.35):diffuse(color("#FF8888")):diffusealpha(0.8)
+			self:shadowlength(1):shadowcolor(color("0,0,0,0.5"))
+		end
+	}
+}
+
 return t

@@ -99,6 +99,93 @@ local function refreshRescoredPercentage()
 	rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 end
 
+local function calculateCustomWindowScore(configName, rst)
+	if not customWindowsConfig or not rst then return 0 end
+	local config = customWindowsConfig:get_data().customWindowConfigs[configName]
+	if not config then return 0 end
+	
+	local pts = 0
+	local dvt = rst.dvt
+	
+	local curveFunc = config.customWindowCurveFunction
+	local worths = config.customWindowWorths
+	local windows = config.customWindowWindows
+	
+	local function getCurveWorth(offset)
+		if curveFunc then return curveFunc(offset / 1000) end
+		if worths and windows then
+			local ms = math.abs(offset)
+			if ms <= (windows.W1 or 22.5) then return worths.W1 or 2
+			elseif ms <= (windows.W2 or 45) then return worths.W2 or 2
+			elseif ms <= (windows.W3 or 90) then return worths.W3 or 1
+			elseif ms <= (windows.W4 or 135) then return worths.W4 or 0
+			elseif ms <= (windows.W5 or 180) then return worths.W5 or -4
+			else return worths.Miss or -8 end
+		end
+		return 0
+	end
+	
+	-- Calculate tap/hit points
+	if dvt then
+		for i=1, #dvt do
+			pts = pts + getCurveWorth(dvt[i])
+		end
+	end
+	
+	-- Penalty for unplayed notes
+	local missWorth = 0
+	if worths and worths.Miss then missWorth = worths.Miss
+	elseif curveFunc then missWorth = curveFunc(1.000) end
+	if not missWorth or missWorth == 0 then missWorth = -8 end
+	
+	local maxNotes = math.max(0, tonumber(rst.totalNotes) or 0)
+	maxNotes = math.max(maxNotes, tonumber(rst.notesPassed) or 0)
+	local unplayed = math.max(0, maxNotes - (tonumber(rst.notesPassed) or 0))
+	pts = pts + (unplayed * missWorth)
+	
+	-- Hold/Roll scoring
+	local holdWorths = config.customWindowHoldWorths or {}
+	local heldWorth = holdWorths.Held or 0
+	local letGoWorth = holdWorths.LetGo or -4.5
+	local missedHoldWorth = holdWorths.Missed or -4.5
+	
+	local totalHolds = rst.totalHolds or 0
+	local totalRolls = rst.totalRolls or 0
+	local totalLongNotes = totalHolds + totalRolls
+	local longNotesMissed = (rst.holdsMissed or 0) + (rst.rollsMissed or 0)
+	
+	-- Penalize missed long notes
+	pts = pts + (longNotesMissed * missedHoldWorth)
+	-- Reward successfully held long notes
+	pts = pts + (totalLongNotes - longNotesMissed) * heldWorth
+	
+	-- Mine penalties
+	local mineHitWorth = config.customWindowMineHitWorth or -2
+	pts = pts + (rst.minesHit or 0) * mineHitWorth
+	
+	-- Max points calculation
+	local tapTypeWorths = config.customWindowTapNoteTypeWorths or {}
+	local tapWorth = tapTypeWorths.Tap or 2
+	local holdHeadWorth = tapTypeWorths.HoldHead or 2
+	local liftWorth = tapTypeWorths.Lift or tapWorth
+	local mineWorth = tapTypeWorths.Mine or 0
+	
+	-- RadarCategory_Notes = Taps + HoldHeads + RollHeads + Lifts
+	-- We approximate RollHeads as using HoldHead worth
+	local others = maxNotes - totalLongNotes
+	if others < 0 then others = 0 end
+	
+	local maxPts = (others * tapWorth) + (totalLongNotes * holdHeadWorth)
+	-- Plus completion points for every long note
+	maxPts = maxPts + (totalLongNotes * heldWorth)
+	-- Plus mine points if hit (usually 0)
+	local totalMines = rst.totalMines or 0
+	maxPts = maxPts + (totalMines * mineWorth)
+	
+	if maxPts <= 0 then return 0 end
+	return math.max(0, math.min(100, (pts / maxPts) * 100))
+end
+
 local function updateVectors()
 	local replay = curScore and curScore:GetReplay() or nil
 	local hasReplay = replay and replay:LoadAllData()
@@ -1066,6 +1153,25 @@ local function scoreBoard(pn)
 				end,
 				ScoreChangedMessageCommand = function(self) self:playcommand("On") end
 			},
+			
+			-- Hover detection for Tooltip
+			Def.ActorFrame {
+				OnCommand = function(self)
+					self:SetUpdateFunction(function(self)
+						local wrapper = self:GetParent()
+						local label = wrapper and wrapper:GetChild("WifeScoreLabel")
+						if isOver(label) then
+							MESSAGEMAN:Broadcast("ShowScoreTooltip")
+						else
+							MESSAGEMAN:Broadcast("HideScoreTooltip")
+						end
+					end)
+				end,
+				ResetJudgeMessageCommand = function(self)
+					self:SetUpdateFunction(nil)
+					self:playcommand("On")
+				end
+			}
 		},
 
 		-- Chart Progress (Percentage completion on fail)
@@ -1879,5 +1985,105 @@ end
 
 t[#t + 1] = scoreboardFrame
 t[#t + 1] = LoadActor("../_cursor")
+
+t[#t + 1] = Def.ActorFrame {
+	Name = "GlobalScoreTooltip",
+	InitCommand = function(self) self:diffusealpha(0):z(100) end,
+	ShowScoreTooltipMessageCommand = function(self)
+		self:diffusealpha(1)
+		self:playcommand("UpdateScores")
+		local mx = INPUTFILTER:GetMouseX()
+		local my = INPUTFILTER:GetMouseY()
+		
+		local bg = self:GetChild("BG")
+		local w = bg and bg:GetZoomedWidth() or 260
+		local h = bg and bg:GetZoomedHeight() or 120
+		local cx = mx + 15
+		local cy = my + 15
+		if cx + w > SCREEN_WIDTH then cx = mx - w - 5 end
+		if cy + h > SCREEN_HEIGHT then cy = my - h - 5 end
+		
+		self:xy(cx, cy)
+	end,
+	HideScoreTooltipMessageCommand = function(self) self:diffusealpha(0) end,
+	SetJudgeMessageCommand = function(self) self:playcommand("UpdateScores") end,
+	ScoreChangedMessageCommand = function(self) self:playcommand("UpdateScores") end,
+	UpdateScoresCommand = function(self)
+		if self:GetDiffuseAlpha() == 0 then return end
+		local rst = getRescoreElements(pss, curScore)
+		if rst then rst.dvt = getFilteredDvt() end
+		
+		local numCustoms = customWindowsConfig and #customWindowsConfig:get_data().customWindowOrder or 0
+		local rows = math.max(6, numCustoms)
+		local bg = self:GetChild("BG")
+		if bg then
+			bg:zoomto(260, rows * 16 + 12)
+		end
+		
+		self:RunCommandsOnChildren(function(child)
+			child:playcommand("UpdateData", {rst = rst})
+		end)
+	end,
+	Def.Quad {
+		Name = "Border",
+		InitCommand = function(self) self:halign(0):valign(0):diffuse(color("0.3,0.3,0.3,1")):diffusealpha(0.8) end,
+		UpdateDataCommand = function(self)
+			local bg = self:GetParent():GetChild("BG")
+			if bg then self:zoomto(bg:GetZoomedWidth()+2, bg:GetZoomedHeight()+2):xy(-1, -1) end
+		end
+	},
+	Def.Quad {
+		Name = "BG",
+		InitCommand = function(self) self:halign(0):valign(0):diffuse(color("0.05,0.05,0.05,0.95")) end
+	},
+	(function()
+		local col = Def.ActorFrame { Name = "LeftCol", InitCommand = function(self) self:xy(8, 8) end }
+		for i = 4, 9 do
+			local yOff = (i - 4) * 16
+			col[#col+1] = LoadFont("Common Normal") .. {
+				InitCommand = function(self) self:halign(0):valign(0):xy(0, yOff):zoom(0.35):settext("J"..i..":") end
+			}
+			col[#col+1] = LoadFont("Common Normal") .. {
+				InitCommand = function(self) self:halign(1):valign(0):xy(100, yOff):zoom(0.35) end,
+				UpdateDataCommand = function(self, params)
+					local pct = params.rst and getRescoredWife3Judge(3, i, params.rst) or 0
+					self:settext(formatWifePercent(pct))
+				end
+			}
+		end
+		return col
+	end)(),
+	(function()
+		local col = Def.ActorFrame { Name = "RightCol", InitCommand = function(self) self:xy(120, 8) end }
+		for i = 1, 15 do
+			local yOff = (i - 1) * 16
+			col[#col+1] = LoadFont("Common Normal") .. {
+				InitCommand = function(self) self:halign(0):valign(0):xy(0, yOff):zoom(0.35) end,
+				UpdateDataCommand = function(self, params)
+					if not customWindowsConfig then self:settext(""); return end
+					local order = customWindowsConfig:get_data().customWindowOrder
+					local configName = order[i]
+					if not configName then self:settext(""); return end
+					local conf = customWindowsConfig:get_data().customWindowConfigs[configName]
+					local dispName = conf and conf.displayName or configName
+					if dispName:len() > 16 then dispName = dispName:sub(1,15).."." end
+					self:settext(dispName..":")
+				end
+			}
+			col[#col+1] = LoadFont("Common Normal") .. {
+				InitCommand = function(self) self:halign(1):valign(0):xy(130, yOff):zoom(0.35) end,
+				UpdateDataCommand = function(self, params)
+					if not customWindowsConfig then self:settext(""); return end
+					local order = customWindowsConfig:get_data().customWindowOrder
+					local configName = order[i]
+					if not configName then self:settext(""); return end
+					local pct = params.rst and calculateCustomWindowScore(configName, params.rst) or 0
+					self:settext(formatWifePercent(pct))
+				end
+			}
+		end
+		return col
+	end)()
+}
 
 return t
