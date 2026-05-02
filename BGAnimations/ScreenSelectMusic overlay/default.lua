@@ -1352,11 +1352,7 @@ local profileOverlay = Def.ActorFrame {
 					wife = score.wife or 0
 					ssr = score.ssr or 0
 					
-					-- For online tables, we can still determine Soft Invalid from the percentage
 					local ct = "Clear"
-					if wife * 100 < 83 then
-						ct = "SoftInvalid"
-					end
 					
 					-- If judgments are available in the table, show them
 					if score.w1 then

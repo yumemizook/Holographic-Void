@@ -1480,8 +1480,6 @@ t[#t + 1] = Def.ActorFrame {
 						local pct = getRescoredWife3Judge(3, 4, rst) or 0
 						if pct <= 0 then
 							ct = "Failed"
-						elseif pct < 83 then
-							ct = "SoftInvalid"
 						else
 							local cb = miss + w5 + w4
 							if cb > 0 then

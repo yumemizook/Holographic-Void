@@ -203,7 +203,6 @@ local function getClearTypeFromCounts(judgments, wifePct)
 	if cb > 0 then
 		if cb == 1 then return "ClearType_MF" end
 		if cb < 10 then return "ClearType_SDCB" end
-		if (wifePct or 0) < 83 then return "ClearType_SoftInvalid" end
 		return "ClearType_Clear"
 	end
 

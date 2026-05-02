@@ -440,12 +440,6 @@ function getClearLevel(pn, steps, score)
 	elseif missCount < 10 then return 9   -- SDCB
 	end
 
-	-- Soft Invalid check (< 83% J4)
-	-- This is checked last among successful clears to avoid overwriting 
-	-- combo-based status (FC/SDCB) and to prevent it appearing at 0% score during gameplay.
-	local j4Pct = getJ4NormalizedPercentage(score)
-	if j4Pct < 83 then return 19 end
-
 	return 12 -- Clear
 end
 
@@ -487,6 +481,7 @@ end
 function getDetailedClearType(obj)
 	if not obj then return "Failed" end
 	local miss, w5, w4, w3, w2 = 0, 0, 0, 0, 0
+	local missedHolds = 0
 	local grade = "Grade_None"
 	local wifeScore = 0
 
@@ -496,6 +491,7 @@ function getDetailedClearType(obj)
 		w4 = obj:GetTapNoteScores("TapNoteScore_W4")
 		w3 = obj:GetTapNoteScores("TapNoteScore_W3")
 		w2 = obj:GetTapNoteScores("TapNoteScore_W2")
+		missedHolds = obj:GetHoldNoteScores("HoldNoteScore_LetGo") + obj:GetHoldNoteScores("HoldNoteScore_MissedHold")
 		grade = obj:GetGrade()
 		wifeScore = obj:GetWifeScore()
 	elseif obj.GetTapNoteScore then -- HighScore
@@ -504,6 +500,7 @@ function getDetailedClearType(obj)
 		w4 = obj:GetTapNoteScore("TapNoteScore_W4")
 		w3 = obj:GetTapNoteScore("TapNoteScore_W3")
 		w2 = obj:GetTapNoteScore("TapNoteScore_W2")
+		missedHolds = obj:GetHoldNoteScore("HoldNoteScore_LetGo") + obj:GetHoldNoteScore("HoldNoteScore_MissedHold")
 		grade = obj:GetGrade()
 		wifeScore = obj:GetWifeScore()
 	end
@@ -514,7 +511,7 @@ function getDetailedClearType(obj)
 		return "Failed"
 	end
 
-	local cb = miss + w5 + w4
+	local cb = miss + w5 + w4 + missedHolds
 	if cb > 0 then
 		if cb == 1 then return "MF"
 		elseif cb < 10 then return "SDCB"
@@ -532,12 +529,6 @@ function getDetailedClearType(obj)
 		end
 		return "MFC"
 	end
-
-	-- Soft Invalid check (< 83% J4)
-	-- Priority: Failed > Invalid > MF/SDCB/FC > Soft Invalid > Clear
-	-- This is only reached if cb >= 10.
-	local j4Pct = getJ4NormalizedPercentage(obj)
-	if j4Pct < 83 then return "SoftInvalid" end
 
 	return "Clear"
 end
