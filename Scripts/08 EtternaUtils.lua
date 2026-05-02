@@ -942,6 +942,7 @@ function getRescoredWife3Judge(version, judgeScale, rst, useCurrent)
 		maxNotes = math.max(0, tonumber(rst["notesPassed"]) or 0)
 	else
 		maxNotes = math.max(0, tonumber(rst["totalNotes"]) or 0)
+		maxNotes = math.max(maxNotes, tonumber(rst["notesPassed"]) or 0)
 		-- For evaluation, we must penalize unplayed notes (from failing early) as misses.
 		local unplayed = math.max(0, maxNotes - (tonumber(rst["notesPassed"]) or 0))
 		totalPoints = totalPoints - (unplayed * 5.5) -- unhit notes are unhit
@@ -999,7 +1000,7 @@ function getRescoreElements(pss, score)
 		local ok, offsets = pcall(function() return pss:GetOffsetVector() end)
 		o["dvt"] = ok and type(offsets) == "table" and offsets or {}
 		o["misses"] = hvTapCount(pss, "TapNoteScore_Miss")
-		o["holdsMissed"] = hvHoldCount(pss, "HoldNoteScore_LetGo")
+		o["holdsMissed"] = hvHoldCount(pss, "HoldNoteScore_LetGo") + hvHoldCount(pss, "HoldNoteScore_MissedHold")
 		o["rollsMissed"] = 0
 		o["minesHit"] = hvTapCount(pss, "TapNoteScore_HitMine")
 		
@@ -1055,7 +1056,7 @@ function getRescoreElementsFromScore(score)
 	o["dvt"] = dvt
 	
 	o["misses"] = hvTapCount(score, "TapNoteScore_Miss")
-	o["holdsMissed"] = hvHoldCount(score, "HoldNoteScore_LetGo")
+	o["holdsMissed"] = hvHoldCount(score, "HoldNoteScore_LetGo") + hvHoldCount(score, "HoldNoteScore_MissedHold")
 	o["rollsMissed"] = 0
 	o["minesHit"] = hvTapCount(score, "TapNoteScore_HitMine")
 	

@@ -143,6 +143,7 @@ local t = Def.ActorFrame {
 
 	HoldNoteScoreMessageCommand = function(self, params)
 		if params.Player ~= PLAYER_1 then return end
+		-- The engine applies the hold penalty even if the head was completely missed
 		if params.HoldNoteScore == "HoldNoteScore_LetGo" or params.HoldNoteScore == "HoldNoteScore_MissedHold" then
 			HV_PointsLost = HV_PointsLost + 4.5
 			MESSAGEMAN:Broadcast("HV_PointsUpdate")
@@ -466,6 +467,7 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		HoldNoteScoreMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
+			-- The engine applies the hold penalty even if the head was completely missed
 			if msg.HoldNoteScore == "HoldNoteScore_LetGo" or msg.HoldNoteScore == "HoldNoteScore_MissedHold" then
 				self.currWifePoints = self.currWifePoints - 4.5
 				self:queuecommand("Update")
@@ -635,6 +637,7 @@ t[#t + 1] = Def.ActorFrame {
 			HoldNoteScoreMessageCommand = function(self, msg)
 				if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
 				if self.statType == "J4" then
+					-- The engine applies the hold penalty even if the head was completely missed
 					if msg.HoldNoteScore == "HoldNoteScore_LetGo" or msg.HoldNoteScore == "HoldNoteScore_MissedHold" then
 						self.currWifePoints = self.currWifePoints - 4.5
 					end

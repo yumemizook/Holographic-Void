@@ -71,13 +71,31 @@ local function setDPTextActors(wholeActor, decimalActor, dp, precision)
 	end
 end
 
+-- Filter the module-level dvt by tap note type, mirroring getRescoreElementsFromScore.
+-- Without this, mine-hit offsets pass through wife3() giving ~+2 pts each while
+-- minesHit*-7 is ALSO applied, netting -5 per mine instead of the correct -7.
+local function getFilteredDvt()
+	if not dvt then return {} end
+	if ntt and #ntt == #dvt then
+		local out = {}
+		for i = 1, #dvt do
+			local ty = ntt[i]
+			if ty == "TapNoteType_Tap" or ty == "TapNoteType_HoldHead" or ty == "TapNoteType_Lift" then
+				out[#out + 1] = dvt[i]
+			end
+		end
+		return out
+	end
+	return dvt -- no type vector: return as-is (PSS path, already clean)
+end
+
 local function refreshRescoredPercentage()
 	local rst = getRescoreElements(pss, curScore)
 	if not rst then
 		rescoredPercentage = nil
 		return
 	end
-	rst.dvt = dvt
+	rst.dvt = getFilteredDvt()
 	rescoredPercentage = getRescoredWife3Judge(3, judge, rst)
 end
 
@@ -1004,7 +1022,7 @@ local function scoreBoard(pn)
 						local rst = getRescoreElements(pss, curScore)
 						local j4Pct = nil
 						if rst then
-							rst.dvt = dvt
+							rst.dvt = getFilteredDvt()
 							j4Pct = getRescoredWife3Judge(3, 4, rst)
 						end
 						if j4Pct then
