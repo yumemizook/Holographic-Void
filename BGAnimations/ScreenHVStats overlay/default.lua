@@ -37,11 +37,26 @@ quickMenuItemGap = 14
 sessionRowCount = 12
 overallBestScoreRowCount = 16
 leaderboardRowCount = 16
+leaderboardScrollStep = 4
+skillPredictionPointCount = 0
+skillPredictionAxisTickCount = 9
+overallMostPlayedRowsPerColumn = math.floor(overallBestScoreRowCount / 2)
+overallMostPlayedColumnGap = 18
+breakdownJudgeBarLeft = 16
+breakdownJudgeBarTop = 280
+breakdownJudgeBarStepY = 24
+breakdownJudgeBarWidth = 272
+breakdownJudgeBarHeight = 20
 sessionPanelX = 280
 sessionPanelY = 56
 sessionPanelWidth = SCREEN_WIDTH - 280
 sessionPanelHeight = SCREEN_HEIGHT - 56
 sessionCardWidth = SCREEN_WIDTH - 280 - 32
+skillPredictionGraphLeft = sessionPanelX + 36
+skillPredictionGraphTop = sessionPanelY + 108
+skillPredictionGraphWidth = sessionPanelWidth - 72
+skillPredictionGraphHeight = 290
+overallMostPlayedColumnWidth = math.floor((sessionCardWidth - overallMostPlayedColumnGap) / 2)
 overlayCloseButtonX = SCREEN_WIDTH - 24
 overlayCloseButtonY = 28
 overlayCloseButtonHalfWidth = 14
@@ -82,11 +97,19 @@ overallProfileSummary = nil
 leaderboardStatus = {state = "loading", title = "", detail = ""}
 sessionScoreOffset = 0
 overallBestScoreOffset = 0
+leaderboardScoreOffset = 0
+leaderboardSelectedScoreCount = 0
+breakdownAaCounter = {state = "loading", title = "", detail = ""}
+skillPredictionSsrPointsForDisplay = {}
+skillPredictionAaPointsForDisplay = {}
+skillPredictionMaxMsd = 1
+skillPredictionMaxSsr = 1
 overallTimelineHoveredIndex = nil
 overallTimelineMaxValue = 1
 overallTimelineMinValue = 0
 overallLocalScoreEntries = nil
 overallDerivedDataDirty = true
+sessionChartLengthSecondsCache = {}
 lastSessionDisplayKey = nil
 statsOverlayTabs = {
 	Sessions = 1,
@@ -99,8 +122,18 @@ overallSubviewTabs = {
 	MsdGrade = 3,
 	MostPlayed = 4
 }
+breakdownSubviewTabs = {
+	JudgeBreakdown = 1,
+	SkillPrediction = 2
+}
+skillPredictionModes = {
+	Ssr = 1,
+	AaProbability = 2
+}
 statsOverlayTab = statsOverlayTabs.Sessions
 overallSubviewTab = overallSubviewTabs.WifeTimeline
+breakdownSubviewTab = breakdownSubviewTabs.JudgeBreakdown
+skillPredictionMode = skillPredictionModes.Ssr
 statsOverlayTabTop = 0
 statsOverlayTabHeight = 56
 statsOverlayTabButtons = {
@@ -130,6 +163,14 @@ overallSubviewButtons = {
 	{tab = overallSubviewTabs.Rating, left = 16, top = SCREEN_CENTER_Y + 38, width = 240, label = "Rating"},
 	{tab = overallSubviewTabs.MsdGrade, left = 16, top = SCREEN_CENTER_Y + 66, width = 240, label = "MSD/Grade distribution"},
 	{tab = overallSubviewTabs.MostPlayed, left = 16, top = SCREEN_CENTER_Y + 94, width = 240, label = "Most played charts/folders"}
+}
+breakdownSubviewButtons = {
+	{tab = breakdownSubviewTabs.JudgeBreakdown, left = 16, top = 88, width = 240, label = "Judge Breakdown"},
+	{tab = breakdownSubviewTabs.SkillPrediction, left = 16, top = 116, width = 240, label = "Skill Prediction"}
+}
+skillPredictionModeButtons = {
+	{mode = skillPredictionModes.Ssr, left = sessionPanelX + 16, top = sessionPanelY + 46, width = 132, label = "SSR vs MSD"},
+	{mode = skillPredictionModes.AaProbability, left = sessionPanelX + 164, top = sessionPanelY + 46, width = 220, label = "AA Probability vs MSD"}
 }
 musicWheelDisplayOptions = {
 	{key = "OnlyShowGrades", label = "Only show grades:"},
@@ -209,6 +250,10 @@ function isStatsOverlayOverallSubview(tab)
 	return statsOverlayTab == statsOverlayTabs.Overall and overallSubviewTab == tab
 end
 
+function isStatsOverlayBreakdownSubview(tab)
+	return statsOverlayTab == statsOverlayTabs.Leaderboards and breakdownSubviewTab == tab
+end
+
 function isStatsOverlayOverallTimelineSubview()
 	return isStatsOverlayOverallSubview(overallSubviewTabs.Rating) or isStatsOverlayOverallSubview(overallSubviewTabs.WifeTimeline)
 end
@@ -218,6 +263,26 @@ function getOverallSubviewTabAtPosition(mouseX, mouseY)
 	for _, button in ipairs(overallSubviewButtons) do
 		if pointInRect(mouseX, mouseY, button.left, button.top, button.width, 24) then
 			return button.tab
+		end
+	end
+	return nil
+end
+
+function getBreakdownSubviewTabAtPosition(mouseX, mouseY)
+	if not isStatsOverlayLeaderboardsTab() then return nil end
+	for _, button in ipairs(breakdownSubviewButtons) do
+		if pointInRect(mouseX, mouseY, button.left, button.top, button.width, 24) then
+			return button.tab
+		end
+	end
+	return nil
+end
+
+function getSkillPredictionModeAtPosition(mouseX, mouseY)
+	if not isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction) then return nil end
+	for _, button in ipairs(skillPredictionModeButtons) do
+		if pointInRect(mouseX, mouseY, button.left, button.top, button.width, 24) then
+			return button.mode
 		end
 	end
 	return nil
@@ -282,6 +347,87 @@ function setOverallSubviewTab(tab)
 	end
 	MESSAGEMAN:Broadcast("StatsOverlayOverallSubviewChanged", {tab = tab})
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+function setBreakdownSubviewTab(tab)
+	if not tab then return end
+	if breakdownSubviewTab == tab then return end
+	breakdownSubviewTab = tab
+	MESSAGEMAN:Broadcast("StatsOverlayBreakdownSubviewChanged", {tab = tab})
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+function setSkillPredictionMode(mode)
+	if not mode then return end
+	if skillPredictionMode == mode then return end
+	skillPredictionMode = mode
+	MESSAGEMAN:Broadcast("StatsOverlaySkillPredictionModeChanged", {mode = mode})
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+function getSkillPredictionYMax()
+	if skillPredictionMode == skillPredictionModes.AaProbability then
+		return 100
+	end
+	return math.max(1, skillPredictionMaxSsr)
+end
+
+function mapSkillPredictionX(msd)
+	local maxMsd = math.max(0.5, skillPredictionMaxMsd)
+	local clamped = math.max(0, math.min(msd or 0, maxMsd))
+	return skillPredictionGraphLeft + ((clamped / maxMsd) * skillPredictionGraphWidth)
+end
+
+function mapSkillPredictionY(value)
+	local maxY = getSkillPredictionYMax()
+	if maxY <= 0 then
+		return skillPredictionGraphTop + skillPredictionGraphHeight
+	end
+	local clamped = math.max(0, math.min(value or 0, maxY))
+	return skillPredictionGraphTop + skillPredictionGraphHeight - ((clamped / maxY) * skillPredictionGraphHeight)
+end
+
+function getSkillPredictionProfileRating()
+	if overallProfileSummary and (overallProfileSummary.rating or 0) > 0 then
+		return overallProfileSummary.rating
+	end
+	local profile = GetPlayerOrMachineProfile(PLAYER_1)
+	if profile and profile.GetPlayerRating then
+		return profile:GetPlayerRating() or 0
+	end
+	return 0
+end
+
+function getExpectedAaChanceFromRating(profileRating, chartMsd)
+	local diff = (chartMsd or 0) - (profileRating or 0)
+	local chance = 100 / (1 + math.exp(diff * 2.2))
+	return math.max(2, math.min(98, chance))
+end
+
+function smoothSkillPredictionPoints(points, radius)
+	radius = radius or 1
+	if not points or #points <= 2 or radius <= 0 then
+		return points or {}
+	end
+	local smoothed = {}
+	for i = 1, #points do
+		local weightedTotal = 0
+		local totalWeight = 0
+		local startIndex = math.max(1, i - radius)
+		local endIndex = math.min(#points, i + radius)
+		for j = startIndex, endIndex do
+			local distance = math.abs(i - j)
+			local weight = (radius - distance) + 1
+			weightedTotal = weightedTotal + ((points[j].y or 0) * weight)
+			totalWeight = totalWeight + weight
+		end
+		smoothed[#smoothed + 1] = {
+			x = points[i].x,
+			y = weightedTotal / math.max(1, totalWeight),
+			count = points[i].count
+		}
+	end
+	return smoothed
 end
 
 function formatInteger(value)
@@ -600,6 +746,16 @@ function getOverallTimelinePBMetric(score)
 	return tonumber(score:GetWifeScore() or 0) or 0
 end
 
+function getOverallMsdGradeChartMSD(entry, score)
+	if not entry or not entry.steps then return 0 end
+	local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
+	local okMsd, msd = pcall(function() return entry.steps:GetMSD(rate, 1) end)
+	if okMsd and msd then
+		return tonumber(msd) or 0
+	end
+	return 0
+end
+
 function isOverallTimelineRatingEntry(entry)
 	if not entry or not entry.score or not entry.steps then return false end
 	local okStepsType, stepsType = pcall(function() return entry.steps:GetStepsType() end)
@@ -806,6 +962,28 @@ function buildOverallTimelineData(entries)
 	return days, maxValue
 end
 
+function getEstimatedSessionRatingGain(scores)
+	if not scores or #scores == 0 then return 0 end
+	local profileRating = getSkillPredictionProfileRating()
+	local positiveDeltaSum = 0
+	for _, score in ipairs(scores) do
+		local ssr = score and score.GetSkillsetSSR and (score:GetSkillsetSSR("Overall") or 0) or 0
+		if ssr > profileRating then
+			positiveDeltaSum = positiveDeltaSum + (ssr - profileRating)
+		end
+	end
+	local normalizedDelta = positiveDeltaSum / math.max(1, #scores)
+	local gain = normalizedDelta * 0.02
+	if gain < 0 then gain = 0 end
+	if gain > 0.35 then gain = 0.35 end
+	return gain
+end
+
+function formatEstimatedSessionRatingGain(scores)
+	local gain = getEstimatedSessionRatingGain(scores)
+	return string.format("+%.3f", gain)
+end
+
 function buildOverallWifeTimelineData(entries)
 	local buckets = {}
 	local totalWife = 0
@@ -845,18 +1023,38 @@ end
 
 function buildOverallMsdGradePoints(entries)
 	local points = {}
+	local bestByChart = {}
 	for _, entry in ipairs(entries) do
 		local score = entry.score
-		if score and isScoreValidForOverallDerivedData(score) then
-			local ssr = score:GetSkillsetSSR("Overall") or 0
-			if ssr > 0 then
-				points[#points + 1] = {
-					x = ssr,
-					y = (score:GetWifeScore() or 0) * 100,
-					color = getGradeColor(score:GetWifeGrade()),
-					songName = entry.song and entry.song:GetDisplayMainTitle() or "Unknown"
-				}
+		if score and entry and isScoreValidForOverallDerivedData(score) then
+			local chartKey = entry.chartKey or ""
+			if chartKey == "" then
+				chartKey = tostring(entry.steps or "")
 			end
+			if chartKey ~= "" then
+				local metric = tonumber(score:GetWifeScore() or 0) or 0
+				local previousBest = bestByChart[chartKey]
+				if not previousBest or metric > previousBest.metric then
+					bestByChart[chartKey] = {
+						entry = entry,
+						score = score,
+						metric = metric
+					}
+				end
+			end
+		end
+	end
+	for _, best in pairs(bestByChart) do
+		local score = best.score
+		local entry = best.entry
+		local chartMSD = getOverallMsdGradeChartMSD(entry, score)
+		if chartMSD > 0 then
+			points[#points + 1] = {
+				x = chartMSD,
+				y = (score:GetWifeScore() or 0) * 100,
+				grade = score:GetWifeGrade(),
+				songName = entry.song and entry.song:GetDisplayMainTitle() or "Unknown"
+			}
 		end
 	end
 	table.sort(points, function(a, b)
@@ -955,19 +1153,120 @@ end
 
 function refreshLeaderboardData()
 	leaderboardEntriesForDisplay = {}
+	leaderboardSelectedScoreCount = 0
+	skillPredictionSsrPointsForDisplay = {}
+	skillPredictionAaPointsForDisplay = {}
+	skillPredictionMaxMsd = 1
+	skillPredictionMaxSsr = 1
+	breakdownAaCounter = {
+		state = "empty",
+		title = "No MSD probability data",
+		detail = "Play local scores to calculate weighted AA chance by 0.5 MSD interval."
+	}
 	refreshOverallDerivedData()
+	local profileRating = getSkillPredictionProfileRating()
 	local buckets = {}
+	local ssrMsdBuckets = {}
 	for _, entry in ipairs(overallLocalScoreEntries or {}) do
 		local score = entry.score
+		local steps = entry.steps
 		local judge = formatJudge(score)
+		local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
+		local chartMsd = steps and steps.GetMSD and steps:GetMSD(rate, 1) or 0
+		local ssr = score and score.GetSkillsetSSR and (score:GetSkillsetSSR("Overall") or 0) or 0
+		if chartMsd and chartMsd > 0 then
+			skillPredictionMaxMsd = math.max(skillPredictionMaxMsd, chartMsd)
+			if ssr and ssr > 0 then
+				local intervalStart = math.floor(chartMsd / 0.5) * 0.5
+				local key = string.format("%.1f", intervalStart)
+				if not ssrMsdBuckets[key] then
+					ssrMsdBuckets[key] = {start = intervalStart, total = 0, count = 0}
+				end
+				ssrMsdBuckets[key].total = ssrMsdBuckets[key].total + ssr
+				ssrMsdBuckets[key].count = ssrMsdBuckets[key].count + 1
+			end
+		end
 		if score and judge ~= "" then
 			if not buckets[judge] then
-				buckets[judge] = {judge = judge, scores = {}, total = 0}
+				buckets[judge] = {judge = judge, scores = {}, total = 0, msdBuckets = {}}
 			end
 			buckets[judge].scores[#buckets[judge].scores + 1] = entry
-			buckets[judge].total = buckets[judge].total + ((score:GetWifeScore() or 0) * 100)
+			local wife = score:GetWifeScore() or 0
+			buckets[judge].total = buckets[judge].total + (wife * 100)
+			if chartMsd and chartMsd > 0 then
+				local intervalStart = math.floor(chartMsd / 0.5) * 0.5
+				local key = string.format("%.1f", intervalStart)
+				if not buckets[judge].msdBuckets[key] then
+					buckets[judge].msdBuckets[key] = {start = intervalStart, count = 0, aa = 0}
+				end
+				local msdBucket = buckets[judge].msdBuckets[key]
+				msdBucket.count = msdBucket.count + 1
+				if wife >= 0.93 then
+					msdBucket.aa = msdBucket.aa + 1
+				end
+			end
 		end
 	end
+	local allMsdBuckets = {}
+	for _, entry in ipairs(overallLocalScoreEntries or {}) do
+		local score = entry.score
+		local steps = entry.steps
+		local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
+		local chartMsd = steps and steps.GetMSD and steps:GetMSD(rate, 1) or 0
+		if chartMsd and chartMsd > 0 and score then
+			local intervalStart = math.floor(chartMsd / 0.5) * 0.5
+			local key = string.format("%.1f", intervalStart)
+			if not allMsdBuckets[key] then
+				allMsdBuckets[key] = {start = intervalStart, count = 0, aa = 0}
+			end
+			allMsdBuckets[key].count = allMsdBuckets[key].count + 1
+			if (score:GetWifeScore() or 0) >= 0.93 then
+				allMsdBuckets[key].aa = allMsdBuckets[key].aa + 1
+			end
+		end
+	end
+	for _, bucket in pairs(ssrMsdBuckets) do
+		if bucket.count > 0 then
+			local averageSsr = bucket.total / bucket.count
+			skillPredictionMaxSsr = math.max(skillPredictionMaxSsr, averageSsr)
+			skillPredictionSsrPointsForDisplay[#skillPredictionSsrPointsForDisplay + 1] = {
+				x = bucket.start + 0.25,
+				y = averageSsr,
+				count = bucket.count
+			}
+		end
+	end
+	for _, bucket in pairs(allMsdBuckets) do
+		if bucket.count > 0 then
+			local midMsd = bucket.start + 0.25
+			local aaChance = (bucket.aa / bucket.count) * 100
+			if profileRating > 0 then
+				local expectedChance = getExpectedAaChanceFromRating(profileRating, midMsd)
+				local sampleWeight = bucket.count / (bucket.count + 12)
+				aaChance = (aaChance * sampleWeight) + (expectedChance * (1 - sampleWeight))
+			end
+			skillPredictionAaPointsForDisplay[#skillPredictionAaPointsForDisplay + 1] = {
+				x = midMsd,
+				y = aaChance,
+				count = bucket.count
+			}
+		end
+	end
+	table.sort(skillPredictionSsrPointsForDisplay, function(a, b)
+		if a.x == b.x then return a.y > b.y end
+		return a.x < b.x
+	end)
+	table.sort(skillPredictionAaPointsForDisplay, function(a, b)
+		return a.x < b.x
+	end)
+	skillPredictionSsrPointsForDisplay = smoothSkillPredictionPoints(skillPredictionSsrPointsForDisplay, 1)
+	skillPredictionAaPointsForDisplay = smoothSkillPredictionPoints(skillPredictionAaPointsForDisplay, 1)
+	skillPredictionMaxSsr = 1
+	for _, point in ipairs(skillPredictionSsrPointsForDisplay) do
+		skillPredictionMaxSsr = math.max(skillPredictionMaxSsr, point.y or 0)
+	end
+	skillPredictionMaxMsd = math.max(1, math.ceil(skillPredictionMaxMsd * 2) / 2)
+	skillPredictionMaxSsr = math.max(1, math.ceil(skillPredictionMaxSsr * 2) / 2)
 	breakdownJudgeRowsForDisplay = {}
 	for _, bucket in pairs(buckets) do
 		breakdownJudgeRowsForDisplay[#breakdownJudgeRowsForDisplay + 1] = {
@@ -991,6 +1290,8 @@ function refreshLeaderboardData()
 		}
 		return
 	end
+	leaderboardSelectedScoreCount = #selected.scores
+	clampLeaderboardScoreOffset()
 	table.sort(selected.scores, function(a, b)
 		local aw = a.score and a.score:GetWifeScore() or 0
 		local bw = b.score and b.score:GetWifeScore() or 0
@@ -999,23 +1300,263 @@ function refreshLeaderboardData()
 		end
 		return aw > bw
 	end)
-	for i = 1, math.min(#selected.scores, leaderboardRowCount) do
-		local entry = selected.scores[i]
+	for i = 1, math.min(#selected.scores - leaderboardScoreOffset, leaderboardRowCount) do
+		local sourceIndex = leaderboardScoreOffset + i
+		local entry = selected.scores[sourceIndex]
 		local score = entry.score
 		local song = entry.song
 		local steps = entry.steps
 		leaderboardEntriesForDisplay[#leaderboardEntriesForDisplay + 1] = {
-			rank = i,
+			rank = sourceIndex,
 			name = song and song:GetDisplayMainTitle() or score:GetChartKey(),
 			metric = formatPercent(score),
 			activity = string.format("%s - %s - %.2f", formatChartMeter(steps), formatRate(score), score:GetSkillsetSSR("Overall") or 0),
 			gradeColor = getGradeColor(score:GetWifeGrade())
 		}
 	end
+	local bestCounterBucket = nil
+	for _, msdBucket in pairs(selected.msdBuckets or {}) do
+		if msdBucket.count > 0 then
+			local rawChance = msdBucket.aa / msdBucket.count
+			local sampleWeight = msdBucket.count / (msdBucket.count + 6)
+			local weightedChance = rawChance * sampleWeight
+			if not bestCounterBucket
+				or weightedChance > bestCounterBucket.weightedChance
+				or (weightedChance == bestCounterBucket.weightedChance and msdBucket.count > bestCounterBucket.count) then
+				bestCounterBucket = {
+					start = msdBucket.start,
+					count = msdBucket.count,
+					rawChance = rawChance,
+					weightedChance = weightedChance
+				}
+			end
+		end
+	end
+	if bestCounterBucket then
+		breakdownAaCounter = {
+			state = "ready",
+			title = string.format("%s  %.1f-%.1f MSD", breakdownSelectedJudge, bestCounterBucket.start, bestCounterBucket.start + 0.5),
+			detail = string.format("Weighted AA chance %.1f%% (raw %.1f%% from %d scores)", bestCounterBucket.weightedChance * 100, bestCounterBucket.rawChance * 100, bestCounterBucket.count)
+		}
+	end
+	local firstVisible = #selected.scores > 0 and (leaderboardScoreOffset + 1) or 0
+	local lastVisible = math.min(#selected.scores, leaderboardScoreOffset + leaderboardRowCount)
 	leaderboardStatus = {
 		state = "ready",
 		title = string.format("%s scores", breakdownSelectedJudge),
-		detail = string.format("%d scores - %.2f%% average", #selected.scores, selected.total / math.max(1, #selected.scores))
+		detail = string.format("%d scores - %.2f%% average - showing %d to %d", #selected.scores, selected.total / math.max(1, #selected.scores), firstVisible, lastVisible)
+	}
+end
+
+function skillPredictionModeButton(button)
+	return Def.ActorFrame {
+		Name = "SkillPredictionModeButton" .. tostring(button.mode),
+		InitCommand = function(self)
+			self:xy(button.left, button.top):visible(false)
+		end,
+		SetCommand = function(self)
+			local activeTab = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+			local activeMode = skillPredictionMode == button.mode
+			self:visible(activeTab)
+			self:GetChild("BG"):diffusealpha(activeMode and 0.26 or 0.1)
+			self:GetChild("Border"):diffusealpha(activeMode and 0.55 or 0.2)
+			self:GetChild("Label"):diffuse(activeMode and color("#FFFFFF") or color("#B8B8B8"))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			Name = "BG",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(button.width, 24):diffuse(getMainColor("highlight")):diffusealpha(0.1)
+			end
+		},
+		Def.Quad {
+			Name = "Border",
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(button.width, 1):diffuse(getMainColor("highlight")):diffusealpha(0.2)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(8, 12):halign(0):valign(0.5):zoom(0.28):settext(button.label)
+			end
+		}
+	}
+end
+
+function skillPredictionHorizontalGridline(i)
+	return Def.Quad {
+		Name = "SkillPredictionHorizontalGridline" .. i,
+		InitCommand = function(self)
+			self:halign(0):valign(0.5):zoomto(skillPredictionGraphWidth, 1):diffuse(color("#FFFFFF")):diffusealpha(0.08):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+			self:visible(active)
+			if not active then return end
+			local fraction = (i - 1) / math.max(1, skillPredictionAxisTickCount - 1)
+			self:xy(skillPredictionGraphLeft, skillPredictionGraphTop + (skillPredictionGraphHeight * fraction))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function skillPredictionVerticalGridline(i)
+	return Def.Quad {
+		Name = "SkillPredictionVerticalGridline" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0):zoomto(1, skillPredictionGraphHeight):diffuse(color("#FFFFFF")):diffusealpha(0.06):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+			self:visible(active)
+			if not active then return end
+			local fraction = (i - 1) / math.max(1, skillPredictionAxisTickCount - 1)
+			self:xy(skillPredictionGraphLeft + (skillPredictionGraphWidth * fraction), skillPredictionGraphTop)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function skillPredictionYAxisLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "SkillPredictionYAxisLabel" .. i,
+		InitCommand = function(self)
+			self:halign(1):valign(0.5):zoom(0.3):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+			self:visible(active)
+			if not active then return end
+			local fraction = (i - 1) / math.max(1, skillPredictionAxisTickCount - 1)
+			local yValue = getSkillPredictionYMax() * (1 - fraction)
+			self:xy(skillPredictionGraphLeft - 8, skillPredictionGraphTop + (skillPredictionGraphHeight * fraction))
+			if skillPredictionMode == skillPredictionModes.AaProbability then
+				self:settext(string.format("%.0f%%", yValue))
+			else
+				self:settext(string.format("%.1f", yValue))
+			end
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function skillPredictionXAxisLabel(i)
+	return LoadFont("Common Normal") .. {
+		Name = "SkillPredictionXAxisLabel" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0):zoom(0.3):diffuse(color("#9A9A9A")):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+			self:visible(active)
+			if not active then return end
+			local fraction = (i - 1) / math.max(1, skillPredictionAxisTickCount - 1)
+			local xValue = skillPredictionMaxMsd * fraction
+			self:xy(skillPredictionGraphLeft + (skillPredictionGraphWidth * fraction), skillPredictionGraphTop + skillPredictionGraphHeight + 8)
+			self:settext(string.format("%.1f", xValue))
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function skillPredictionPoint(i)
+	return Def.Quad {
+		Name = "SkillPredictionPoint" .. i,
+		InitCommand = function(self)
+			self:halign(0.5):valign(0.5):zoomto(4, 4):visible(false)
+		end,
+		SetCommand = function(self)
+			self:visible(false)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
+	}
+end
+
+function skillPredictionCurveLine()
+	return Def.ActorMultiVertex {
+		Name = "SkillPredictionCurveLine",
+		InitCommand = function(self)
+			self:visible(false)
+		end,
+		SetCommand = function(self)
+			local points = skillPredictionMode == skillPredictionModes.AaProbability and skillPredictionAaPointsForDisplay or skillPredictionSsrPointsForDisplay
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction) and #points > 1
+			if not active then
+				self:visible(false)
+				self:SetVertices({})
+				self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = 0}
+				return
+			end
+			local verts = {}
+			for _, point in ipairs(points) do
+				local lineColor = skillPredictionMode == skillPredictionModes.Ssr and color("#7CE0FF") or getMainColor("highlight")
+				verts[#verts + 1] = {{mapSkillPredictionX(point.x), mapSkillPredictionY(point.y), 0}, lineColor}
+			end
+			self:visible(true)
+			self:SetVertices(verts)
+			self:SetDrawState {Mode = "DrawMode_LineStrip", First = 1, Num = #verts}
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
 	}
 end
 
@@ -1026,6 +1567,10 @@ function setStatsOverlayTab(tab)
 	hoveredActivityDay = nil
 	if tab == statsOverlayTabs.Overall then
 		overallBestScoreOffset = 0
+	elseif tab == statsOverlayTabs.Leaderboards then
+		leaderboardScoreOffset = 0
+		breakdownSubviewTab = breakdownSubviewTabs.JudgeBreakdown
+		skillPredictionMode = skillPredictionModes.Ssr
 	end
 	MESSAGEMAN:Broadcast("StatsOverlayTabChanged", {tab = tab})
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
@@ -1179,10 +1724,41 @@ function getSelectedMonthActivity()
 end
 
 function getSelectedSessionSeconds(scores)
-	local displayDay = hoveredActivityDay or selectedDay
-	local todayYear, todayMonth, todayDay = getTodayDateParts()
-	if selectedYear == todayYear and selectedMonth == todayMonth and displayDay == todayDay then
-		return GAMESTATE:GetSessionTime()
+	if not scores or #scores == 0 then return 0 end
+	local getChartLengthSeconds = function(chartKey)
+		if not chartKey or chartKey == "" then return 0 end
+		if sessionChartLengthSecondsCache[chartKey] ~= nil then
+			return sessionChartLengthSecondsCache[chartKey]
+		end
+		local seconds = 0
+		local song = SONGMAN:GetSongByChartKey(chartKey)
+		if song then
+			local okLastSecond, lastSecond = pcall(function() return song:GetLastSecond() end)
+			if okLastSecond and lastSecond and tonumber(lastSecond) and tonumber(lastSecond) > 0 then
+				seconds = tonumber(lastSecond)
+			end
+			if seconds <= 0 then
+				local okMusicLength, musicLength = pcall(function() return song:GetMusicLengthSeconds() end)
+				if okMusicLength and musicLength and tonumber(musicLength) and tonumber(musicLength) > 0 then
+					seconds = tonumber(musicLength)
+				end
+			end
+		end
+		sessionChartLengthSecondsCache[chartKey] = seconds
+		return seconds
+	end
+	local totalPlaySeconds = 0
+	for _, score in ipairs(scores) do
+		local chartKey = score and score.GetChartKey and score:GetChartKey() or ""
+		local chartLength = getChartLengthSeconds(chartKey)
+		if chartLength > 0 then
+			local rate = score and score.GetMusicRate and score:GetMusicRate() or 1
+			if not rate or rate <= 0 then rate = 1 end
+			totalPlaySeconds = totalPlaySeconds + (chartLength / rate)
+		end
+	end
+	if totalPlaySeconds > 0 then
+		return math.floor(totalPlaySeconds + 0.5)
 	end
 	local earliest = nil
 	local latest = nil
@@ -1268,6 +1844,21 @@ function isOverOverallBestScoresPanel(mouseX, mouseY)
 	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY + 72, sessionPanelWidth, sessionPanelHeight - 90)
 end
 
+function isOverLeaderboardScoresPanel(mouseX, mouseY)
+	if not isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) then return false end
+	return pointInRect(mouseX, mouseY, sessionPanelX, sessionPanelY + 72, sessionPanelWidth, sessionPanelHeight - 90)
+end
+
+function getBreakdownJudgeAtPosition(mouseX, mouseY)
+	if not isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) then return nil end
+	for i, entry in ipairs(breakdownJudgeRowsForDisplay) do
+		if entry and pointInRect(mouseX, mouseY, breakdownJudgeBarLeft, breakdownJudgeBarTop + ((i - 1) * breakdownJudgeBarStepY), breakdownJudgeBarWidth, breakdownJudgeBarHeight) then
+			return entry.judge
+		end
+	end
+	return nil
+end
+
 function clampSessionScoreOffset()
 	local maxOffset = math.max(0, #selectedScoresForDisplay - sessionRowCount)
 	if sessionScoreOffset < 0 then
@@ -1289,6 +1880,15 @@ function clampOverallBestScoreOffset()
 	end
 end
 
+function clampLeaderboardScoreOffset()
+	local maxOffset = math.max(0, leaderboardSelectedScoreCount - leaderboardRowCount)
+	if leaderboardScoreOffset < 0 then
+		leaderboardScoreOffset = 0
+	elseif leaderboardScoreOffset > maxOffset then
+		leaderboardScoreOffset = maxOffset
+	end
+end
+
 function pageOverallBestScores(direction)
 	local nextOffset = overallBestScoreOffset + (direction * overallBestScoreRowCount)
 	if nextOffset < 0 then
@@ -1306,6 +1906,12 @@ function pageOverallBestScores(direction)
 	end
 	overallBestScoreOffset = nextOffset
 	clampOverallBestScoreOffset()
+	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+end
+
+function pageLeaderboardScores(direction)
+	leaderboardScoreOffset = leaderboardScoreOffset + (direction * leaderboardScrollStep)
+	clampLeaderboardScoreOffset()
 	MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
 end
 
@@ -1342,6 +1948,8 @@ function setStatsOverlayActive(active)
 		hoveredActivityDay = nil
 		sessionScoreOffset = 0
 		overallBestScoreOffset = 0
+		leaderboardScoreOffset = 0
+		leaderboardSelectedScoreCount = 0
 		overallTimelineHoveredIndex = nil
 		overallLocalScoreEntries = nil
 		overallOverviewRowsForDisplay = {}
@@ -1350,18 +1958,24 @@ function setStatsOverlayActive(active)
 		lastSessionDisplayKey = nil
 		statsOverlayTab = statsOverlayTabs.Sessions
 		overallSubviewTab = overallSubviewTabs.WifeTimeline
+		breakdownSubviewTab = breakdownSubviewTabs.JudgeBreakdown
+		skillPredictionMode = skillPredictionModes.Ssr
 		statsOverlayInputRedirect = SCREENMAN:get_input_redirected(PLAYER_1)
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
 	else
 		hoveredActivityDay = nil
 		sessionScoreOffset = 0
 		overallBestScoreOffset = 0
+		leaderboardScoreOffset = 0
+		leaderboardSelectedScoreCount = 0
 		overallTimelineHoveredIndex = nil
 		overallLocalScoreEntries = nil
 		overallOverviewRowsForDisplay = {}
 		overallTimelineDaysForDisplay = {}
 		overallDerivedDataDirty = true
 		lastSessionDisplayKey = nil
+		breakdownSubviewTab = breakdownSubviewTabs.JudgeBreakdown
+		skillPredictionMode = skillPredictionModes.Ssr
 		SCREENMAN:set_input_redirected(PLAYER_1, statsOverlayInputRedirect)
 	end
 	MESSAGEMAN:Broadcast("StatsOverlayStateChanged", {active = active})
@@ -1525,6 +2139,23 @@ function input(event)
 						setOverallSubviewTab(subviewTab)
 					elseif pointInRect(mouseX, mouseY, 225, 162, 80, 24) then
 						SCREENMAN:SetNewScreen("ScreenAssetSettings")
+					end
+				elseif isStatsOverlayLeaderboardsTab() then
+					local breakdownSubview = getBreakdownSubviewTabAtPosition(mouseX, mouseY)
+					if breakdownSubview then
+						setBreakdownSubviewTab(breakdownSubview)
+					else
+						local predictionMode = getSkillPredictionModeAtPosition(mouseX, mouseY)
+						if predictionMode then
+							setSkillPredictionMode(predictionMode)
+						else
+							local selectedJudge = getBreakdownJudgeAtPosition(mouseX, mouseY)
+							if selectedJudge and selectedJudge ~= breakdownSelectedJudge then
+								breakdownSelectedJudge = selectedJudge
+								leaderboardScoreOffset = 0
+								MESSAGEMAN:Broadcast("StatsOverlayDataChanged")
+							end
+						end
 					end
 				elseif isStatsOverlaySessionTab() and pointInRect(mouseX, mouseY, activityPrevButtonX, activityPrevButtonY, activityButtonWidth, activityButtonHeight) then
 					shiftSelectedMonth(-1)
@@ -1730,7 +2361,45 @@ function overallSubviewButton(button)
 		LoadFont("Common Normal") .. {
 			Name = "Label",
 			InitCommand = function(self)
-				self:xy(0, 12):halign(0):valign(0.5):zoom(0.28):settext(button.label)
+				self:xy(0, 12):halign(0):valign(0.5):zoom(0.392):settext(button.label)
+			end
+		},
+		Def.Quad {
+			Name = "Underline",
+			InitCommand = function(self)
+				self:xy(0, 24):halign(0):valign(1):zoomto(button.width, 2):diffuse(color("#FFFFFF")):visible(false)
+			end
+		}
+	}
+end
+
+function breakdownSubviewButton(button)
+	return Def.ActorFrame {
+		Name = "BreakdownSubviewButton" .. tostring(button.tab),
+		InitCommand = function(self)
+			self:xy(button.left, button.top):visible(false)
+		end,
+		SetCommand = function(self)
+			local active = isStatsOverlayBreakdownSubview(button.tab)
+			self:visible(isStatsOverlayLeaderboardsTab())
+			self:GetChild("Label"):diffuse(active and color("#FFFFFF") or color("#AFAFAF"))
+			self:GetChild("Underline"):visible(active)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:halign(0):valign(0):zoomto(button.width, 24):diffusealpha(0)
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "Label",
+			InitCommand = function(self)
+				self:xy(0, 12):halign(0):valign(0.5):zoom(0.392):settext(button.label)
 			end
 		},
 		Def.Quad {
@@ -1780,25 +2449,26 @@ function overallSkillsetRow(i)
 end
 
 function overallBestScoreRow(i)
+	local isChartColumn = i <= overallMostPlayedRowsPerColumn
+	local rowIndex = isChartColumn and i or (i - overallMostPlayedRowsPerColumn)
+	local columnOffsetX = isChartColumn and 0 or (overallMostPlayedColumnWidth + overallMostPlayedColumnGap)
 	return Def.ActorFrame {
 		Name = "OverallBestScoreRow" .. i,
 		InitCommand = function(self)
-			self:xy(sessionPanelX + 16, sessionPanelY + 80 + ((i - 1) * 38))
+			self:xy(sessionPanelX + 16 + columnOffsetX, sessionPanelY + 104 + ((rowIndex - 1) * 38))
 			self:visible(false)
 		end,
 		SetCommand = function(self)
-			local entry = i <= 7 and overallMostPlayedChartsForDisplay[i] or overallMostPlayedFoldersForDisplay[i - 7]
+			local entry = isChartColumn and overallMostPlayedChartsForDisplay[rowIndex] or overallMostPlayedFoldersForDisplay[rowIndex]
 			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed)
 			self:visible(active and entry ~= nil)
 			if not entry then return end
-			self:GetChild("Rank"):settext(i <= 4 and string.format("C%d", i) or string.format("F%d", i - 4))
+			self:GetChild("Rank"):settext(string.format("%s%d", isChartColumn and "C" or "F", rowIndex))
 			self:GetChild("Title"):settext(entry.title)
 			self:GetChild("Meta"):settext(entry.meta or "")
 			self:GetChild("Percent"):settext(formatInteger(entry.count or 0))
 			self:GetChild("Percent"):diffuse(color("#FFFFFF"))
 			self:GetChild("Rate"):settext("plays")
-			self:GetChild("SSR"):settext("")
-			self:GetChild("Clear"):settext("")
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -1808,51 +2478,60 @@ function overallBestScoreRow(i)
 		end,
 		Def.Quad {
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(sessionCardWidth, 28):diffuse(color("#111111")):diffusealpha(0.82)
+				self:halign(0):valign(0):zoomto(overallMostPlayedColumnWidth, 28):diffuse(color("#111111")):diffusealpha(0.82)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Rank",
 			InitCommand = function(self)
-				self:xy(6, 6):halign(0):valign(0):zoom(0.24):diffuse(color("#BBBBBB"))
+				self:xy(6, 6):halign(0):valign(0):zoom(0.336):diffuse(color("#BBBBBB"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Title",
 			InitCommand = function(self)
-				self:xy(40, 3):halign(0):valign(0):zoom(0.24):maxwidth(700)
+				self:xy(40, 3):halign(0):valign(0):zoom(0.336):maxwidth(560)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Meta",
 			InitCommand = function(self)
-				self:xy(40, 17):halign(0):valign(0):zoom(0.18):diffuse(color("#AFAFAF")):maxwidth(860)
+				self:xy(40, 17):halign(0):valign(0):zoom(0.252):diffuse(color("#AFAFAF")):maxwidth(760)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Percent",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 160, 6):halign(1):valign(0):zoom(0.22)
+				self:xy(overallMostPlayedColumnWidth - 56, 6):halign(1):valign(0):zoom(0.308)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Rate",
 			InitCommand = function(self)
-				self:xy(sessionCardWidth - 118, 6):halign(1):valign(0):zoom(0.2):diffuse(color("#DDDDDD"))
-			end
-		},
-		LoadFont("Common Normal") .. {
-			Name = "SSR",
-			InitCommand = function(self)
-				self:xy(sessionCardWidth - 66, 6):halign(1):valign(0):zoom(0.22)
-			end
-		},
-		LoadFont("Common Normal") .. {
-			Name = "Clear",
-			InitCommand = function(self)
-				self:xy(sessionCardWidth - 6, 6):halign(1):valign(0):zoom(0.2)
+				self:xy(overallMostPlayedColumnWidth - 10, 6):halign(1):valign(0):zoom(0.28):diffuse(color("#DDDDDD"))
 			end
 		}
+	}
+end
+
+function overallMostPlayedHeader(label, alignLeft)
+	local columnOffsetX = alignLeft and 0 or (overallMostPlayedColumnWidth + overallMostPlayedColumnGap)
+	return LoadFont("Common Normal") .. {
+		Name = "OverallMostPlayedHeader" .. label,
+		InitCommand = function(self)
+			self:xy(sessionPanelX + 16 + columnOffsetX, sessionPanelY + 84):halign(0):valign(0):zoom(0.364)
+			self:diffuse(color("#DADADA"))
+		end,
+		SetCommand = function(self)
+			self:visible(isStatsOverlayOverallSubview(overallSubviewTabs.MostPlayed))
+			self:settext(label)
+		end,
+		StatsOverlayTabChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		StatsOverlayOverallSubviewChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end
 	}
 end
 
@@ -2045,7 +2724,7 @@ function overallTimelineLegend(i)
 		InitCommand = function(self)
 			local column = math.floor((i - 1) / 4)
 			local row = (i - 1) % 4
-			self:xy(timelineGraphLeft + (column * 210), timelineGraphTop + timelineGraphHeight + 22 + (row * 18))
+			self:xy(timelineGraphLeft + (column * 210), timelineGraphTop + timelineGraphHeight + 52 + (row * 18))
 			self:visible(false)
 		end,
 		SetCommand = function(self)
@@ -2096,19 +2775,19 @@ function overallTimelineLegend(i)
 		Def.Quad {
 			Name = "Swatch",
 			InitCommand = function(self)
-				self:halign(0):valign(0):zoomto(10, 10)
+				self:halign(0):valign(0):zoomto(13, 13)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Label",
 			InitCommand = function(self)
-				self:xy(16, 0):halign(0):valign(0):zoom(0.30):maxwidth(240)
+				self:xy(20, 0):halign(0):valign(0):zoom(0.39):maxwidth(240)
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Value",
 			InitCommand = function(self)
-				self:xy(148, 0):halign(1):valign(0):zoom(0.30)
+				self:xy(178, 0):halign(1):valign(0):zoom(0.39)
 			end
 		}
 	}
@@ -2207,7 +2886,7 @@ function overallTimelineYAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineYAxisLabel" .. i,
 		InitCommand = function(self)
-			self:halign(1):valign(0.5):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+			self:halign(1):valign(0.5):zoom(0.29):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local active = isStatsOverlayOverallTimelineSubview() and #overallTimelineDaysForDisplay > 0 and i <= timelineYAxisTickCount
@@ -2239,7 +2918,7 @@ function overallTimelineXAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallTimelineXAxisLabel" .. i,
 		InitCommand = function(self)
-			self:valign(0):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+			self:valign(0):zoom(0.29):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local x, day, fraction = getOverallTimelineXAxisDisplay(i)
@@ -2272,7 +2951,7 @@ function overallMsdGradeLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallMsdGradeLabel" .. i,
 		InitCommand = function(self)
-			self:halign(1):valign(0.5):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+			self:halign(1):valign(0.5):zoom(0.36):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
@@ -2304,12 +2983,12 @@ function overallMsdGradeLabel(i)
 				self:xy(timelineGraphLeft - 6, yPositions[i])
 				self:settext(labels[i])
 				self:diffuse(color("#DDDDDD"))
-				self:zoom(0.24)
+				self:zoom(0.36)
 			elseif i <= 12 then
 				self:xy(timelineGraphLeft - 6, midYPositions[i - 5])
 				self:settext(midLabels[i - 5])
 				self:diffuse(color("#888888"))
-				self:zoom(0.18)
+				self:zoom(0.26)
 			else
 				self:visible(false)
 			end
@@ -2330,7 +3009,7 @@ function overallMsdGradePoint(i)
 	return Def.Quad {
 		Name = "OverallMsdGradePoint" .. i,
 		InitCommand = function(self)
-			self:halign(0.5):valign(0.5):zoomto(4, 4):visible(false)
+			self:halign(0.5):valign(0.5):zoomto(2, 2):visible(false)
 		end,
 		SetCommand = function(self)
 			local point = overallMsdGradePointsForDisplay[i]
@@ -2367,7 +3046,7 @@ function overallMsdGradePoint(i)
 			yPosition = math.max(timelineGraphTop, math.min(timelineGraphTop + timelineGraphHeight, yPosition))
 			self:visible(true)
 			self:xy(timelineGraphLeft + ((point.x or 0) / maxX * timelineGraphWidth), yPosition)
-			self:diffuse(point.color or color("#FFFFFF"))
+			self:diffuse(getGradeColor(point.grade))
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:playcommand("Set")
@@ -2384,7 +3063,7 @@ function overallMsdGradeXAxisLabel(i)
 	return LoadFont("Common Normal") .. {
 		Name = "OverallMsdGradeXAxisLabel" .. i,
 		InitCommand = function(self)
-			self:valign(0):zoom(0.24):diffuse(color("#9A9A9A")):visible(false)
+			self:valign(0):zoom(0.36):diffuse(color("#9A9A9A")):visible(false)
 		end,
 		SetCommand = function(self)
 			local active = isStatsOverlayOverallSubview(overallSubviewTabs.MsdGrade) and #overallMsdGradePointsForDisplay > 0
@@ -2488,7 +3167,7 @@ function overallMsdGradeTooltip()
 			
 			if hoveredPoint then
 				self:visible(true)
-				self:xy(hoveredPoint.px, hoveredPoint.py - 24)
+				self:xy(hoveredPoint.px, hoveredPoint.py - 30)
 				
 				local songText = hoveredPoint.songName or "Unknown"
 				local scoreText = string.format("%.2f%% (%.2f MSD)", hoveredPoint.y, hoveredPoint.x or 0)
@@ -2499,7 +3178,7 @@ function overallMsdGradeTooltip()
 				local songWidth = self:GetChild("SongName"):GetZoomedWidth()
 				local scoreWidth = self:GetChild("Score"):GetZoomedWidth()
 				local w = math.max(songWidth, scoreWidth) + 16
-				local h = 32
+				local h = 42
 				
 				self:GetChild("BG"):zoomto(w, h)
 				
@@ -2523,13 +3202,13 @@ function overallMsdGradeTooltip()
 		LoadFont("Common Normal") .. {
 			Name = "SongName",
 			InitCommand = function(self)
-				self:y(-6):zoom(0.24):diffuse(color("#FFFFFF"))
+				self:y(-9):zoom(0.33):diffuse(color("#FFFFFF"))
 			end
 		},
 		LoadFont("Common Normal") .. {
 			Name = "Score",
 			InitCommand = function(self)
-				self:y(6):zoom(0.22):diffuse(getMainColor("highlight"))
+				self:y(9):zoom(0.29):diffuse(getMainColor("highlight"))
 			end
 		}
 	}
@@ -2538,11 +3217,11 @@ function breakdownJudgeBar(i)
 	return Def.ActorFrame {
 		Name = "BreakdownJudgeBar" .. i,
 		InitCommand = function(self)
-			self:xy(16, 280 + ((i - 1) * 24)):visible(false)
+			self:xy(breakdownJudgeBarLeft, breakdownJudgeBarTop + ((i - 1) * breakdownJudgeBarStepY)):visible(false)
 		end,
 		SetCommand = function(self)
 			local entry = breakdownJudgeRowsForDisplay[i]
-			local active = isStatsOverlayLeaderboardsTab() and entry ~= nil
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) and entry ~= nil
 			self:visible(active)
 			if not entry then return end
 			local maxCount = 1
@@ -2551,6 +3230,8 @@ function breakdownJudgeBar(i)
 			end
 			self:GetChild("Label"):settext(entry.judge)
 			self:GetChild("Bar"):zoomto(180 * ((entry.count or 0) / maxCount), 12)
+			self:GetChild("Label"):diffuse(entry.judge == breakdownSelectedJudge and getMainColor("highlight") or color("#DDDDDD"))
+			self:GetChild("Bar"):diffusealpha(entry.judge == breakdownSelectedJudge and 0.9 or 0.6)
 			self:GetChild("Count"):settext(string.format("%d", entry.count or 0))
 			self:GetChild("Average"):settext(string.format("%.2f%%", entry.average or 0))
 		end,
@@ -2595,7 +3276,7 @@ function leaderboardRow(i)
 		end,
 		SetCommand = function(self)
 			local entry = leaderboardEntriesForDisplay[i]
-			local active = isStatsOverlayLeaderboardsTab() and leaderboardStatus.state == "ready"
+			local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) and leaderboardStatus.state == "ready"
 			self:visible(active and entry ~= nil)
 			if not entry then return end
 			self:GetChild("Rank"):settext(string.format("#%d", entry.rank))
@@ -2703,6 +3384,16 @@ local statsOverlay = Def.ActorFrame {
 			self:queuecommand("Update")
 		end
 	end,
+	StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
+	StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+		if statsOverlayActive then
+			self:queuecommand("Update")
+		end
+	end,
 	CurrentRateChangedMessageCommand = function(self)
 		if statsOverlayActive then
 			self:queuecommand("Update")
@@ -2725,6 +3416,13 @@ local statsOverlay = Def.ActorFrame {
 				pageOverallBestScores(-1)
 			elseif params and params.direction == "down" then
 				pageOverallBestScores(1)
+			end
+		elseif isStatsOverlayLeaderboardsTab() then
+			if not isOverLeaderboardScoresPanel(mouseX, mouseY) then return end
+			if params and params.direction == "up" then
+				pageLeaderboardScores(-1)
+			elseif params and params.direction == "down" then
+				pageLeaderboardScores(1)
 			end
 		end
 	end,
@@ -2786,6 +3484,31 @@ local statsOverlay = Def.ActorFrame {
 		elseif isStatsOverlayLeaderboardsTab() then
 			refreshLeaderboardData()
 			self:GetChild("LeftPaneLeaderboards"):playcommand("Set")
+			local rightPaneLeaderboards = self:GetChild("RightPaneLeaderboards")
+			rightPaneLeaderboards:GetChild("LeaderboardHeader"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("LeaderboardStatusTitle"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("LeaderboardStatusDetail"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("PredictionHeader"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("SkillPredictionGraphBackdrop"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("SkillPredictionYAxisTitle"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("SkillPredictionXAxisTitle"):playcommand("Set")
+			rightPaneLeaderboards:GetChild("SkillPredictionEmpty"):playcommand("Set")
+			for i = 1, #skillPredictionModeButtons do
+				rightPaneLeaderboards:GetChild("SkillPredictionModeButton" .. tostring(skillPredictionModeButtons[i].mode)):playcommand("Set")
+			end
+			for i = 1, skillPredictionAxisTickCount do
+				self:GetChild("SkillPredictionHorizontalGridline" .. i):playcommand("Set")
+				self:GetChild("SkillPredictionVerticalGridline" .. i):playcommand("Set")
+				self:GetChild("SkillPredictionYAxisLabel" .. i):playcommand("Set")
+				self:GetChild("SkillPredictionXAxisLabel" .. i):playcommand("Set")
+			end
+			self:GetChild("SkillPredictionCurveLine"):playcommand("Set")
+			for i = 1, skillPredictionPointCount do
+				self:GetChild("SkillPredictionPoint" .. i):playcommand("Set")
+			end
+			for i = 1, 12 do
+				self:GetChild("BreakdownJudgeBar" .. i):playcommand("Set")
+			end
 			for i = 1, leaderboardRowCount do
 				self:GetChild("LeaderboardRow" .. i):playcommand("Set")
 			end
@@ -2817,8 +3540,8 @@ local statsOverlay = Def.ActorFrame {
 		self:GetChild("Title"):settext("Session on " .. os.date("%d/%m/%Y", selectedDateTime))
 		self:GetChild("MonthLabel"):settext(os.date("%B %Y", os.time({year = selectedYear, month = selectedMonth, day = 1, hour = 0, min = 0, sec = 0})))
 		self:GetChild("SelectedDateLabel"):settext(os.date("%A, %d %B %Y", selectedDateTime))
-		self:GetChild("SessionTime"):settext("Session time: " .. SecondsToHHMMSS(getSelectedSessionSeconds(selectedScoresForDisplay)))
-		self:GetChild("SongsPlayed"):settext("Songs played: " .. #selectedScoresForDisplay)
+		self:GetChild("SessionTime"):settext("Session time: " .. SecondsToHHMMSS(getSelectedSessionSeconds(selectedScoresForDisplay)) .. "\nCharts played: " .. #selectedScoresForDisplay .. "\nEst. rating gained: " .. formatEstimatedSessionRatingGain(selectedScoresForDisplay))
+		self:GetChild("SongsPlayed"):settext("")
 		self:GetChild("EmptyState"):visible(#selectedScoresForDisplay == 0)
 		for i = 1, sessionRowCount do
 			self:GetChild("Row" .. i):playcommand("Update")
@@ -3034,7 +3757,7 @@ local statsOverlay = Def.ActorFrame {
 		LoadFont("Common Normal") .. {
 			Name = "OverallTimelineHoverDate",
 			InitCommand = function(self)
-				self:xy(timelineGraphLeft, timelineGraphTop + timelineGraphHeight + 10):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
+				self:xy(timelineGraphLeft, timelineGraphTop + timelineGraphHeight + 40):halign(0):zoom(0.28):diffuse(color("#DDDDDD"))
 			end,
 			SetCommand = function(self)
 				local day = overallTimelineDaysForDisplay[overallTimelineHoveredIndex or 0]
@@ -3085,8 +3808,15 @@ local statsOverlay = Def.ActorFrame {
 			end
 		},
 		LoadFont("Common Large") .. {
+			Name = "LeaderboardHeader",
 			InitCommand = function(self)
 				self:xy(sessionPanelX + 16, sessionPanelY + 18):halign(0):zoom(0.34):settext("Scores per judge difficulty")
+			end,
+			SetCommand = function(self)
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown))
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
 			end
 		},
 		LoadFont("Common Normal") .. {
@@ -3096,9 +3826,12 @@ local statsOverlay = Def.ActorFrame {
 			end,
 			SetCommand = function(self)
 				self:settext(leaderboardStatus.title or "")
-				self:visible((leaderboardStatus.state or "") ~= "ready")
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) and (leaderboardStatus.state or "") ~= "ready")
 			end,
 			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
 				self:queuecommand("Set")
 			end
 		},
@@ -3109,9 +3842,109 @@ local statsOverlay = Def.ActorFrame {
 			end,
 			SetCommand = function(self)
 				self:settext(leaderboardStatus.detail or "")
-				self:visible((leaderboardStatus.state or "") ~= "ready")
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown) and (leaderboardStatus.state or "") ~= "ready")
 			end,
 			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "PredictionHeader",
+			InitCommand = function(self)
+				self:xy(sessionPanelX + 16, sessionPanelY + 18):halign(0):zoom(0.34)
+			end,
+			SetCommand = function(self)
+				self:settext("Skill Prediction")
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction))
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end
+		},
+		skillPredictionModeButton(skillPredictionModeButtons[1]),
+		skillPredictionModeButton(skillPredictionModeButtons[2]),
+		Def.Quad {
+			Name = "SkillPredictionGraphBackdrop",
+			InitCommand = function(self)
+				self:xy(skillPredictionGraphLeft, skillPredictionGraphTop):halign(0):valign(0):zoomto(skillPredictionGraphWidth, skillPredictionGraphHeight):diffuse(color("#101010")):diffusealpha(0.9):visible(false)
+			end,
+			SetCommand = function(self)
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction))
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SkillPredictionYAxisTitle",
+			InitCommand = function(self)
+				self:xy(skillPredictionGraphLeft - 28, skillPredictionGraphTop - 22):halign(0):zoom(0.32):diffuse(color("#B8B8B8")):visible(false)
+			end,
+			SetCommand = function(self)
+				if not isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction) then
+					self:visible(false)
+					return
+				end
+				self:visible(true)
+				self:settext(skillPredictionMode == skillPredictionModes.AaProbability and "AA chance" or "SSR")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SkillPredictionXAxisTitle",
+			InitCommand = function(self)
+				self:xy(skillPredictionGraphLeft + skillPredictionGraphWidth, skillPredictionGraphTop + skillPredictionGraphHeight + 38):halign(1):zoom(0.32):diffuse(color("#B8B8B8")):settext("Chart MSD"):visible(false)
+			end,
+			SetCommand = function(self)
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction))
+			end,
+			StatsOverlayTabChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:playcommand("Set")
+			end
+		},
+		LoadFont("Common Normal") .. {
+			Name = "SkillPredictionEmpty",
+			InitCommand = function(self)
+				self:xy(skillPredictionGraphLeft + (skillPredictionGraphWidth / 2), skillPredictionGraphTop + (skillPredictionGraphHeight / 2)):halign(0.5):zoom(0.3):diffuse(color("#AFAFAF")):visible(false)
+			end,
+			SetCommand = function(self)
+				local active = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction)
+				if not active then
+					self:visible(false)
+					return
+				end
+				local empty = (skillPredictionMode == skillPredictionModes.AaProbability and #skillPredictionAaPointsForDisplay == 0)
+					or (skillPredictionMode == skillPredictionModes.Ssr and #skillPredictionSsrPointsForDisplay == 0)
+				self:visible(empty)
+				self:settext(empty and "Not enough local data for this mode" or "")
+			end,
+			StatsOverlayDataChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:queuecommand("Set")
+			end,
+			StatsOverlaySkillPredictionModeChangedMessageCommand = function(self)
 				self:queuecommand("Set")
 			end
 		}
@@ -3168,7 +4001,7 @@ local statsOverlay = Def.ActorFrame {
 		},
 		LoadFont("Common Normal") .. {
 			InitCommand = function(self)
-				self:xy(16, SCREEN_CENTER_Y - 20):halign(0):zoom(0.32):settext("OVERVIEW MODES"):diffusealpha(0.6)
+				self:xy(16, SCREEN_CENTER_Y - 20):halign(0):zoom(0.448):settext("OVERVIEW MODES"):diffusealpha(0.6)
 			end
 		}
 	},
@@ -3178,42 +4011,73 @@ local statsOverlay = Def.ActorFrame {
 			self:visible(false)
 		end,
 		SetCommand = function(self)
-			local isLoggedIn = DLMAN and DLMAN.IsLoggedIn and DLMAN:IsLoggedIn()
-			local username = isLoggedIn and DLMAN:GetUsername() or "Offline"
-			local rating = isLoggedIn and DLMAN:GetSkillsetRating("Overall") or 0
-			self:GetChild("LeaderboardUser"):settext(username)
-			self:GetChild("LeaderboardRating"):settext(isLoggedIn and string.format("%05.2f overall", rating) or "Not logged in")
-			self:GetChild("LeaderboardHint"):settext(leaderboardStatus.detail or "")
+			self:GetChild("BreakdownSelectedJudge"):settext(leaderboardStatus.title or "")
+			self:GetChild("BreakdownSummary"):settext(leaderboardStatus.detail or "")
+			self:GetChild("ProbabilityTitle"):settext("")
+			self:GetChild("ProbabilityDetail"):settext("All values are estimate.")
+			local judgeMode = isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown)
+			self:GetChild("JudgeSectionHeader"):visible(judgeMode)
+			self:GetChild("BreakdownSelectedJudge"):visible(judgeMode)
+			self:GetChild("BreakdownSummary"):visible(judgeMode)
+			self:GetChild("PredictionSectionHeader"):visible(not judgeMode)
+			self:GetChild("ProbabilityTitle"):visible(not judgeMode)
+			self:GetChild("ProbabilityDetail"):visible(not judgeMode)
 		end,
 		StatsOverlayTabChangedMessageCommand = function(self)
 			self:visible(isStatsOverlayLeaderboardsTab())
 		end,
+		StatsOverlayDataChangedMessageCommand = function(self)
+			if isStatsOverlayLeaderboardsTab() then
+				self:playcommand("Set")
+			end
+		end,
+		StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+			if isStatsOverlayLeaderboardsTab() then
+				self:playcommand("Set")
+			end
+		end,
+		breakdownSubviewButton(breakdownSubviewButtons[1]),
+		breakdownSubviewButton(breakdownSubviewButtons[2]),
 		LoadFont("Common Large") .. {
+			Name = "JudgeSectionHeader",
 			InitCommand = function(self)
-				self:xy(16, 88):halign(0):zoom(0.36):settext("LEADERBOARD STATUS"):diffusealpha(0.6)
+				self:xy(16, 164):halign(0):zoom(0.34):settext("JUDGE BREAKDOWN"):diffusealpha(0.6)
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.JudgeBreakdown))
 			end
 		},
 		LoadFont("Common Large") .. {
-			Name = "LeaderboardUser",
+			Name = "BreakdownSelectedJudge",
 			InitCommand = function(self)
-				self:xy(16, 126):halign(0):zoom(0.42):maxwidth(640)
+				self:xy(16, 198):halign(0):zoom(0.42):maxwidth(640)
 			end
 		},
 		LoadFont("Common Normal") .. {
-			Name = "LeaderboardRating",
+			Name = "BreakdownSummary",
 			InitCommand = function(self)
-				self:xy(16, 164):halign(0):zoom(0.34):diffuse(color("#DDDDDD"))
+				self:xy(16, 236):halign(0):zoom(0.29):diffuse(color("#DDDDDD")):maxwidth(900)
+			end
+		},
+		LoadFont("Common Large") .. {
+			Name = "PredictionSectionHeader",
+			InitCommand = function(self)
+				self:xy(16, 164):halign(0):zoom(0.34):settext("SKILL PREDICTION"):diffusealpha(0.6)
+			end,
+			StatsOverlayBreakdownSubviewChangedMessageCommand = function(self)
+				self:visible(isStatsOverlayBreakdownSubview(breakdownSubviewTabs.SkillPrediction))
 			end
 		},
 		LoadFont("Common Normal") .. {
-			Name = "LeaderboardHint",
+			Name = "ProbabilityTitle",
 			InitCommand = function(self)
-				self:xy(16, 210):halign(0):zoom(0.28):diffuse(color("#AFAFAF")):maxwidth(700)
+				self:xy(16, 202):halign(0):zoom(0.32):diffuse(getMainColor("highlight")):maxwidth(900)
 			end
 		},
 		LoadFont("Common Normal") .. {
+			Name = "ProbabilityDetail",
 			InitCommand = function(self)
-				self:xy(16, 254):halign(0):zoom(0.3):settext("JUDGE BREAKDOWN"):diffusealpha(0.6)
+				self:xy(16, 238):halign(0):zoom(0.26):diffuse(color("#AFAFAF")):maxwidth(900)
 			end
 		}
 	},
@@ -3390,6 +4254,9 @@ for i = 1, getOverallTimelineSkillsetCount() do
 	statsOverlay[#statsOverlay + 1] = overallTimelineLegend(i)
 end
 
+statsOverlay[#statsOverlay + 1] = overallMostPlayedHeader("Charts", true)
+statsOverlay[#statsOverlay + 1] = overallMostPlayedHeader("Folders", false)
+
 for i = 1, overallBestScoreRowCount do
 	statsOverlay[#statsOverlay + 1] = overallBestScoreRow(i)
 end
@@ -3414,6 +4281,19 @@ end
 
 for i = 1, leaderboardRowCount do
 	statsOverlay[#statsOverlay + 1] = leaderboardRow(i)
+end
+
+for i = 1, skillPredictionAxisTickCount do
+	statsOverlay[#statsOverlay + 1] = skillPredictionHorizontalGridline(i)
+	statsOverlay[#statsOverlay + 1] = skillPredictionVerticalGridline(i)
+	statsOverlay[#statsOverlay + 1] = skillPredictionYAxisLabel(i)
+	statsOverlay[#statsOverlay + 1] = skillPredictionXAxisLabel(i)
+end
+
+statsOverlay[#statsOverlay + 1] = skillPredictionCurveLine()
+
+for i = 1, skillPredictionPointCount do
+	statsOverlay[#statsOverlay + 1] = skillPredictionPoint(i)
 end
 
 local t = Def.ActorFrame {

@@ -50,6 +50,18 @@ local wheelLockTime = 0.05
 local tabs = {"PROFILE", "SCORES", "PLAYLISTS", "FILTERS", "TAGS", "GOALS", "RANDOM"}
 local tabW = 80
 local footerH = 40
+local footerOverlayTabs = {
+	PROFILE = true,
+	SCORES = true,
+	PLAYLISTS = true,
+	FILTERS = true,
+	TAGS = true,
+	GOALS = true,
+}
+
+local function PlayWhooshOverlayOpen()
+	SOUND:PlayOnce(THEME:GetPathS("", "whoosh"))
+end
 
 local main_af = Def.ActorFrame {
 	InitCommand = function(self)
@@ -188,6 +200,90 @@ local function resetRate()
 	end
 end
 
+local function getSongFavoriteState(song)
+	if not song then return nil end
+
+	local getters = {"IsFavorited", "IsFavorite", "GetFavorited", "GetIsFavorited"}
+	for _, fn in ipairs(getters) do
+		local method = song[fn]
+		if type(method) == "function" then
+			local ok, result = pcall(method, song)
+			if ok then
+				return result and true or false
+			end
+		end
+	end
+
+	return nil
+end
+
+local function toggleCurrentSongFavorite()
+	local song = GAMESTATE:GetCurrentSong()
+	if not song then return false end
+
+	local profile = PROFILEMAN and PROFILEMAN:GetProfile(PLAYER_1)
+	local currentState = getSongFavoriteState(song)
+
+	local songToggles = {
+		"ToggleFavorited",
+		"ToggleFavorite",
+	}
+	for _, fn in ipairs(songToggles) do
+		local method = song[fn]
+		if type(method) == "function" then
+			local ok = pcall(method, song)
+			if ok then
+				MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
+				return true
+			end
+		end
+	end
+
+	local songSetters = {"SetFavorited", "SetFavorite"}
+	if currentState ~= nil then
+		for _, fn in ipairs(songSetters) do
+			local method = song[fn]
+			if type(method) == "function" then
+				local ok = pcall(method, song, not currentState)
+				if ok then
+					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
+					return true
+				end
+			end
+		end
+	end
+
+	if profile then
+		local profileToggles = {
+			"ToggleSongFavorite",
+			"ToggleFavorite",
+		}
+		for _, fn in ipairs(profileToggles) do
+			local method = profile[fn]
+			if type(method) == "function" then
+				local ok = pcall(method, profile, song)
+				if ok then
+					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
+					return true
+				end
+			end
+		end
+
+		if currentState ~= nil then
+			local method = currentState and profile.RemoveFromFavorites or profile.AddToFavorites
+			if type(method) == "function" then
+				local ok = pcall(method, profile, song)
+				if ok then
+					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
+					return true
+				end
+			end
+		end
+	end
+
+	return false
+end
+
 -- Centralized Input Callback (Handles Click, Scroll, and both-EffectUp/Down reset)
 main_af[#main_af + 1] = Def.ActorFrame {
 	-- Handle rate changes via CodeMessageCommand (fired by metrics.ini CodeNames)
@@ -208,6 +304,8 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			else
 				adjustRate(-0.05)
 			end
+		elseif params.Name == "FavoriteToggle" then
+			toggleCurrentSongFavorite()
 		end
 	end,
 	BeginCommand = function(self)
@@ -363,13 +461,19 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						end
 
 						if target == "PROFILE" then target = "SOCIAL" end 
-						
-						-- Close if the SAME tab is clicked
+
+						local nextTab = ""
 						if HV.ActiveTab == tabName:upper() then
-							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
+							nextTab = ""
 						else
-							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = tabName:upper()})
+							nextTab = tabName:upper()
 						end
+
+						if nextTab ~= "" and footerOverlayTabs[nextTab] then
+							PlayWhooshOverlayOpen()
+						end
+
+						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = nextTab})
 						return true
 					end
 				end
@@ -648,21 +752,26 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
 				if ctrl then
 					if btn == "DeviceButton_1" then
+						if HV.ActiveTab ~= "PROFILE" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PROFILE"})
 						return true
 					elseif btn == "DeviceButton_2" then
+						if HV.ActiveTab ~= "SCORES" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SCORES"})
 						return true
 					elseif btn == "DeviceButton_3" then
+						if HV.ActiveTab ~= "PLAYLISTS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PLAYLISTS"})
 						return true
 					elseif btn == "DeviceButton_4" then
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SEARCH"})
 						return true
 					elseif btn == "DeviceButton_5" then
+						if HV.ActiveTab ~= "TAGS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "TAGS"})
 						return true
 					elseif btn == "DeviceButton_6" then
+						if HV.ActiveTab ~= "GOALS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "GOALS"})
 						return true
 					elseif btn == "DeviceButton_7" then

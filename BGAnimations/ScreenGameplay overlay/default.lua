@@ -6,6 +6,49 @@ local HV_PointsLost = 0
 local HV_MaxPoints = 1 -- Placeholder, will be set in BeginCommand
 local HV_PBThreshold = 0
 local HV_JudgeScale = 1.0
+local HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
+local failSfxPath = THEME:GetPathS("", "ScreenGameplay failed")
+local failSfxPlayed = false
+
+local function PlayFailSfxOnce()
+	if failSfxPlayed then return end
+	failSfxPlayed = true
+	if failSfxPath and failSfxPath ~= "" then
+		SOUND:PlayOnce(failSfxPath)
+	end
+end
+
+local function GetCurrentSongSecond()
+	local pos = GAMESTATE:GetSongPosition()
+	if pos and pos.GetMusicSeconds then
+		return pos:GetMusicSeconds() or 0
+	end
+	return 0
+end
+
+local function HardStopAutofail(top)
+	if not top then return end
+
+	local freezePos = math.max(0, GetCurrentSongSecond())
+
+	if top.SetSongPosition then
+		pcall(function() top:SetSongPosition(freezePos) end)
+	end
+
+	if top.GetPaused and top.TogglePause then
+		local ok, paused = pcall(function() return top:GetPaused() end)
+		if ok and not paused then
+			pcall(function() top:TogglePause() end)
+		end
+	end
+
+	if top.GetLifeMeter then
+		local lifeMeter = top:GetLifeMeter(pn)
+		if lifeMeter and lifeMeter.ChangeLife then
+			pcall(function() lifeMeter:ChangeLife(-10) end)
+		end
+	end
+end
 
 local function gameplayCoord(name)
 	return (MovableValues and MovableValues[name]) or getDefaultGameplayCoordinate(name) or 0
@@ -18,6 +61,8 @@ end
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
 	BeginCommand = function(self)
+		failSfxPlayed = false
+		HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
 		-- Re-check sync mode via SCREENMAN now that it's safer
 		local curScreen = SCREENMAN:GetTopScreen()
 		if curScreen and curScreen:GetName():find("Sync") then
@@ -168,6 +213,18 @@ local t = Def.ActorFrame {
 			-- A full miss loses 7.5 points relative to the 2.0 potential max per tap (2.0 - (-5.5) = 7.5)
 			HV_PointsLost = HV_PointsLost + 7.5
 		end
+
+		if s == "TapNoteScore_W2" then
+			HV_AutoFailJudgeCounts.W2 = HV_AutoFailJudgeCounts.W2 + 1
+		elseif s == "TapNoteScore_W3" then
+			HV_AutoFailJudgeCounts.W3 = HV_AutoFailJudgeCounts.W3 + 1
+		elseif s == "TapNoteScore_W4" then
+			HV_AutoFailJudgeCounts.W4 = HV_AutoFailJudgeCounts.W4 + 1
+		elseif s == "TapNoteScore_W5" then
+			HV_AutoFailJudgeCounts.W5 = HV_AutoFailJudgeCounts.W5 + 1
+		elseif s == "TapNoteScore_Miss" then
+			HV_AutoFailJudgeCounts.Miss = HV_AutoFailJudgeCounts.Miss + 1
+		end
 		
 		MESSAGEMAN:Broadcast("HV_PointsUpdate")
 	end,
@@ -188,6 +245,25 @@ local t = Def.ActorFrame {
 			MESSAGEMAN:Broadcast("HV_PointsUpdate")
 		end
 	end
+}
+
+t[#t + 1] = Def.Actor {
+	Name = "FailSoundController",
+	CurrentSongChangedMessageCommand = function(self)
+		failSfxPlayed = false
+		HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
+	end,
+	PlayingUpdateMessageCommand = function(self)
+		if failSfxPlayed then return end
+		local top = SCREENMAN:GetTopScreen()
+		if not top or not top.GetLifeMeter then return end
+		local lifeMeter = top:GetLifeMeter(pn)
+		if not lifeMeter or not lifeMeter.GetLife then return end
+		local life = lifeMeter:GetLife() or 0
+		if life <= 0 then
+			PlayFailSfxOnce()
+		end
+	end,
 }
 
 local accentColor = HVColor.Accent
@@ -2085,20 +2161,18 @@ t[#t + 1] = Def.Actor {
 		if actionMode == "Off" or not actionMode or self.hasTriggered then return end
 		
 		local condition = ThemePrefs.Get("HV_AutoFailCondition")
-		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-		if not pss then return end
 		
 		local triggered = false
 
 		if condition == "Wife Percent" then
 			local threshold = tonumber(ThemePrefs.Get("HV_AutoFailThreshold_Wife")) or 93.00
 			local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
-			if subtractiveWife < threshold then 
+			if subtractiveWife <= threshold then 
 				triggered = true 
 			end
 		elseif condition == "Personal Best" then
 			local subtractiveWife = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
-			if subtractiveWife < HV_PBThreshold then
+			if subtractiveWife <= HV_PBThreshold then
 				triggered = true
 			end
 		elseif condition == "Judgement Count" then
@@ -2111,7 +2185,7 @@ t[#t + 1] = Def.Actor {
 			end
 			local currentCount = 0
 			for i=idx, #order do
-				currentCount = currentCount + pss:GetTapNoteScores("TapNoteScore_" .. order[i])
+				currentCount = currentCount + (HV_AutoFailJudgeCounts[order[i]] or 0)
 			end
 			if currentCount > 0 and currentCount >= limit then 
 				triggered = true 
@@ -2132,12 +2206,20 @@ t[#t + 1] = Def.Actor {
 		local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 		
 		if top and pss then
+			PlayFailSfxOnce()
+
 			-- Explicitly mark the score as Failed for the engine's stats committer
 			if pss.FailPlayer then
 				pss:FailPlayer()
 			end
 			
 			if actionMode == "Fail" then
+				if top.GetLifeMeter then
+					local lifeMeter = top:GetLifeMeter(pn)
+					if lifeMeter and lifeMeter.ChangeLife then
+						lifeMeter:ChangeLife(-10)
+					end
+				end
 				top:PostScreenMessage("SM_BeginFailed", 0)
 			elseif actionMode == "Restart" then
 				SCREENMAN:SetNewScreen("ScreenGameplay")

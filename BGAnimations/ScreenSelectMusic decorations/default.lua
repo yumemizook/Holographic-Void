@@ -342,6 +342,10 @@ t[#t + 1] = Def.ActorFrame {
 				bnpath = SONGMAN:GetSongGroupBannerPath(group)
 			end
 
+			if not bnpath or bnpath == "" then
+				bnpath = THEME:GetPathG("Common", "fallback banner")
+			end
+
 			if bnpath and bnpath ~= "" then
 				if bnpath ~= self.lastPath then
 					self:Load(bnpath)
@@ -1655,6 +1659,8 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "SmallProfileFrame",
 	InitCommand = function(self)
 		self:xy(compactProfileX, compactProfileY)
+		self.hv_nameCycling = false
+		self.hv_showingLocalName = false
 		local profile = PROFILEMAN:GetProfile(PLAYER_1)
 		if profile then
 			HV.LastTotalXP = HV.GetXP(profile)
@@ -1707,14 +1713,66 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "ProfileName",
 		InitCommand = function(self)
 			self:halign(0):valign(0):x(56):y(-4):zoom(0.40):diffuse(mainText)
+			self.showOnline = true
+			self.transitionDuration = 0.25
+			self.displayDuration = 3
 		end,
 		SetCommand = function(self)
-			self:settext(HV.GetPlayerName())
+			self:stoptweening():diffusealpha(1)
+			local parent = self:GetParent()
+			local profile = PROFILEMAN:GetProfile(PLAYER_1)
+			self.onlineName = DLMAN:IsLoggedIn() and DLMAN:GetUsername() or nil
+			self.offlineName = profile and profile:GetDisplayName() or nil
+			if self.onlineName == "" then self.onlineName = nil end
+			if self.offlineName == "" then self.offlineName = nil end
+
+			if parent then
+				parent.hv_nameCycling = false
+				parent.hv_showingLocalName = false
+			end
+
+			if not self.onlineName then
+				self:settext(self.offlineName or "Player 1")
+			elseif not self.offlineName or self.onlineName == self.offlineName then
+				self:settext(self.onlineName)
+			else
+				self.showOnline = true
+				if parent then parent.hv_nameCycling = true end
+				self:playcommand("SwapName")
+				return
+			end
+
+			if parent then
+				local rank = parent:GetChild("Rank")
+				if rank then rank:playcommand("Set") end
+			end
+		end,
+		UpdateNameCommand = function(self)
+			local parent = self:GetParent()
+			if not parent or not parent.hv_nameCycling then return end
+			local rating = parent:GetChild("Rating")
+			if rating then rating:playcommand("FadeOut") end
+			self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(0):queuecommand("SwapName")
+		end,
+		SwapNameCommand = function(self)
+			local parent = self:GetParent()
+			local showingLocal = not self.showOnline
+			local nextName = self.showOnline and self.onlineName or self.offlineName
+			self:settext(nextName)
+			if parent then
+				parent.hv_showingLocalName = showingLocal
+				local rank = parent:GetChild("Rank")
+				if rank then rank:playcommand("Set") end
+				local rating = parent:GetChild("Rating")
+				if rating then rating:playcommand("FadeIn") end
+			end
+			self.showOnline = not self.showOnline
+			self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(1):sleep(self.displayDuration):queuecommand("UpdateName")
 		end,
 		LoginMessageCommand = function(self) self:playcommand("Set") end,
 		LogOutMessageCommand = function(self) self:playcommand("Set") end,
 		OnlineUpdateMessageCommand = function(self) self:playcommand("Set") end,
-		OnCommand = function(self) self:playcommand("Set") end
+		OnCommand = function(self) self:playcommand("Set"):diffusealpha(1) end
 	},
 
 	-- Level Badge
@@ -1823,6 +1881,12 @@ t[#t + 1] = Def.ActorFrame {
 				self:visible(false)
 				return
 			end
+
+			local parent = self:GetParent()
+			if parent and parent.hv_nameCycling and parent.hv_showingLocalName then
+				self:visible(false)
+				return
+			end
 			
 			if DLMAN:IsLoggedIn() then
 				local rank = DLMAN:GetSkillsetRank("Overall")
@@ -1852,6 +1916,21 @@ t[#t + 1] = Def.ActorFrame {
 		Name = "Rating",
 		InitCommand = function(self)
 			self:halign(0):valign(1):x(56):y(53):zoom(0.35)
+			self.transitionDuration = 0.25
+		end,
+		FadeOutCommand = function(self)
+			local parent = self:GetParent()
+			if not parent or not parent.hv_nameCycling then return end
+			self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(0)
+		end,
+		FadeInCommand = function(self)
+			local parent = self:GetParent()
+			if not parent or not parent.hv_nameCycling then
+				self:playcommand("Set")
+				return
+			end
+			self:playcommand("Set")
+			self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(1)
 		end,
 		SetCommand = function(self)
 			local showProfileStats = HV.ShowProfileStats()
@@ -1861,13 +1940,17 @@ t[#t + 1] = Def.ActorFrame {
 				return
 			end
 			
-			local rating = 0
-			if DLMAN:IsLoggedIn() then
-				rating = DLMAN:GetSkillsetRating("Overall")
-			else
-				local profile = PROFILEMAN:GetProfile(PLAYER_1)
-				if profile then rating = profile:GetPlayerRating() end
+			local parent = self:GetParent()
+			local profile = PROFILEMAN:GetProfile(PLAYER_1)
+			local onlineRating = DLMAN:IsLoggedIn() and DLMAN:GetSkillsetRating("Overall") or nil
+			local offlineRating = profile and profile:GetPlayerRating() or nil
+
+			local useLocal = parent and parent.hv_nameCycling and parent.hv_showingLocalName
+			local rating = useLocal and (offlineRating or 0) or (onlineRating or 0)
+			if rating <= 0 then
+				rating = useLocal and (onlineRating or 0) or (offlineRating or 0)
 			end
+
 			if rating > 0 then
 				self:settextf("%.2f", rating):diffuse(HVColor.GetMSDRatingColor(rating))
 			else

@@ -1084,7 +1084,7 @@ t[#t+1] = Def.Quad {
 
 -- Late ms text
 t[#t+1] = LoadFont("Common Normal")..{
-	InitCommand = function(self) self:zoom(0.35):halign(0):valign(1):diffuse(dimText) end,
+	InitCommand = function(self) self:zoom(0.42):halign(0):valign(1):diffuse(dimText) end,
 	UpdateCommand = function(self)
 		self:xy(5, -5):settextf("Late (+%d ms)", maxOffset)
 	end,
@@ -1093,7 +1093,7 @@ t[#t+1] = LoadFont("Common Normal")..{
 
 -- Early ms text
 t[#t+1] = LoadFont("Common Normal")..{
-	InitCommand = function(self) self:zoom(0.35):halign(0):valign(1):diffuse(dimText) end,
+	InitCommand = function(self) self:zoom(0.42):halign(0):valign(1):diffuse(dimText) end,
 	UpdateCommand = function(self, params)
 		params = checkParams(params)
 		self:xy(5, params.height - 5):settextf("Early (-%d ms)", maxOffset)

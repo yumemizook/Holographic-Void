@@ -648,13 +648,13 @@ local function scoreBoard(pn)
 
 			Def.Sprite {
 				Name = "Banner",
-				InitCommand = function(self) self:halign(0):valign(0):xy(pad + 30, 0):diffusealpha(0) end,
+				InitCommand = function(self) self:halign(0):valign(0):xy(pad -20, 0):diffusealpha(0) end,
 				OnCommand = function(self)
 					if song then
 						local bpath = song:GetBannerPath()
 						if not bpath then bpath = THEME:GetPathG("Common", "fallback banner") end
 						self:LoadBackground(bpath)
-						self:scaletofit(0, 0, (frameW - pad * 3) * 0.5, 60)
+						self:scaletoclipped((frameW - pad * 3) * 0.5, 60)
 					end
 					self:stoptweening():sleep(0.05):linear(0.25):diffusealpha(1)
 				end
@@ -685,6 +685,8 @@ local function scoreBoard(pn)
 					InitCommand = function(self)
 						self:xy(65, 8):zoom(0.45):halign(0):maxwidth(((frameW - pad * 3) * 0.5 - 65) / 0.45)
 						self.showOnline = true
+						self.transitionDuration = 0.25
+						self.displayDuration = 3
 						self.onlineName = DLMAN:IsLoggedIn() and DLMAN:GetUsername() or nil
 						self.offlineName = profile and profile:GetDisplayName() or nil
 						if self.offlineName == "" then self.offlineName = nil end
@@ -700,13 +702,13 @@ local function scoreBoard(pn)
 						self:playcommand("UpdateName")
 					end,
 					UpdateNameCommand = function(self)
-						self:stoptweening():linear(0.25):diffusealpha(0):queuecommand("SwapName")
+						self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(0):queuecommand("SwapName")
 					end,
 					SwapNameCommand = function(self)
 						local nextName = self.showOnline and self.onlineName or self.offlineName
 						self:settext(nextName)
 						self.showOnline = not self.showOnline
-						self:stoptweening():linear(0.25):diffusealpha(1):sleep(3):queuecommand("UpdateName")
+						self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(1):sleep(self.displayDuration):queuecommand("UpdateName")
 					end
 				},
 
@@ -851,6 +853,7 @@ local function scoreBoard(pn)
 					InitCommand = function(self)
 						self:xy(65, 53):zoom(0.45):halign(0)
 						self.showOnline = true
+						self.transitionDuration = 0.25
 						self.onlineRating = DLMAN:IsLoggedIn() and DLMAN:GetSkillsetRating("Overall") or nil
 						self.offlineRating = profile and profile:GetPlayerRating() or nil
 					end,
@@ -870,14 +873,14 @@ local function scoreBoard(pn)
 						self:playcommand("UpdateRating")
 					end,
 					UpdateRatingCommand = function(self)
-						self:stoptweening():linear(0.25):diffusealpha(0):queuecommand("SwapRating")
+						self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(0):queuecommand("SwapRating")
 					end,
 					SwapRatingCommand = function(self)
 						local val = self.showOnline and self.onlineRating or self.offlineRating
 						self:settextf("%.2f", val)
 						self:diffuse(HVColor.GetMSDRatingColor(val))
 						self.showOnline = not self.showOnline
-						self:stoptweening():linear(0.25):diffusealpha(1):sleep(3):queuecommand("UpdateRating")
+						self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(1):sleep(3):queuecommand("UpdateRating")
 					end
 				}
 			}

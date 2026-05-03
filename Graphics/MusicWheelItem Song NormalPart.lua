@@ -5,6 +5,23 @@
 
 local wheelItemW = 280
 
+local function isSongFavorited(song)
+	if not song then return false end
+
+	local getters = {"IsFavorited", "IsFavorite", "GetFavorited", "GetIsFavorited"}
+	for _, fn in ipairs(getters) do
+		local method = song[fn]
+		if type(method) == "function" then
+			local ok, result = pcall(method, song)
+			if ok then
+				return result and true or false
+			end
+		end
+	end
+
+	return false
+end
+
 local t = Def.ActorFrame {}
 
 -- Card background (OLED: true black unfocused, subtle lift on focus)
@@ -38,6 +55,27 @@ t[#t + 1] = Def.Quad {
 	end,
 	CurrentStepsChangedMessageCommand = function(self)
 		self:playcommand("Set")
+	end
+}
+
+-- Favorite indicator
+t[#t + 1] = Def.Sprite {
+	Name = "FavoriteStar",
+	Texture = THEME:GetPathG("", "round_star"),
+	InitCommand = function(self)
+		self:x(wheelItemW/2 - 35):y(7):zoomto(10, 10)
+			:diffuse(HVColor.Accent)
+			:visible(false)
+	end,
+	SetMessageCommand = function(self, params)
+		local song = (params and params.Song) or self.hv_lastSong
+		self.hv_lastSong = song
+		self:visible(isSongFavorited(song))
+	end,
+	FavoriteSongToggledMessageCommand = function(self, params)
+		if not params or not params.Song or params.Song == self.hv_lastSong then
+			self:playcommand("Set", {Song = self.hv_lastSong})
+		end
 	end
 }
 
