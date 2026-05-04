@@ -1782,8 +1782,11 @@ if not isSync then
 	t[#t + 1] = Def.ActorFrame {
 		Name = "AutofailDisplay",
 		InitCommand = function(self)
-			self:xy(10, SCREEN_CENTER_Y + 40)
+			self:xy(gameplayCoord("AutoFailDisplayX"), gameplayCoord("AutoFailDisplayY")):zoom(gameplaySize("AutoFailDisplayZoom"))
 			self:visible(false)
+		end,
+		OnCommand = function(self)
+			setMovableActor({"DeviceButton_g", "DeviceButton_h"}, self, self:GetChild("Border"))
 		end,
 		BeginCommand = function(self)
 			self:queuecommand("Refresh")
@@ -1886,7 +1889,8 @@ if not isSync then
 				self:halign(0):valign(0.5):xy(11, 20):zoom(0.55)
 				self:settext("")
 			end
-		}
+		},
+		MovableBorder(64, 64, 1, 32, 0)
 	}
 	t[#t + 1] = LoadActor("npscalc")
 	t[#t + 1] = LoadActor("multiplayer")

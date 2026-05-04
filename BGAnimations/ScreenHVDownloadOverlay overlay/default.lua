@@ -5,7 +5,8 @@
 
 local barH = 4
 local barY = SCREEN_BOTTOM - barH
-local textY = barY - 16
+local stripH = 22
+local textY = SCREEN_BOTTOM - (stripH / 2) +1
 local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
 local subText = color("0.65,0.65,0.65,1")
@@ -50,7 +51,7 @@ t[#t + 1] = Def.BitmapText {
 	Font = "Common Normal",
 	Name = "StatusText",
 	InitCommand = function(self)
-		self:xy(SCREEN_CENTER_X, textY)
+		self:valign(0.5):xy(SCREEN_CENTER_X, textY)
 			:zoom(0.35)
 			:diffuse(mainText)
 			:shadowlength(1)
@@ -63,7 +64,7 @@ t[#t + 1] = Def.BitmapText {
 	Font = "Common Normal",
 	Name = "PctText",
 	InitCommand = function(self)
-		self:halign(1)
+		self:halign(1):valign(0.5)
 			:xy(SCREEN_WIDTH - 6, textY)
 			:zoom(0.3)
 			:diffuse(accentColor)
@@ -159,6 +160,27 @@ t.OnCommand = function(self)
 	local panelBG = panel:GetChild("QueueBG")
 	local wasVisible = false
 	local isExpanded = false
+	local localLoadActive = false
+	local localLoadText = ""
+
+	self.DFRStartedMessageCommand = function(actor)
+		localLoadActive = true
+		localLoadText = THEME:GetString("DownloadOverlay", "LocalLoadingDefault")
+	end
+
+	self.DFRUpdateMessageCommand = function(actor, params)
+		localLoadActive = true
+		if params and params.txt and params.txt ~= "" then
+			localLoadText = params.txt
+		elseif localLoadText == "" then
+			localLoadText = THEME:GetString("DownloadOverlay", "LocalLoadingDefault")
+		end
+	end
+
+	self.DFRFinishedMessageCommand = function(actor)
+		localLoadActive = false
+		localLoadText = ""
+	end
 
 	self:SetUpdateFunction(function()
 		local screen = SCREENMAN:GetTopScreen()
@@ -169,7 +191,8 @@ t.OnCommand = function(self)
 		local queued = DLMAN:GetQueuedPacks()
 		local hasDL = dls and #dls > 0
 		local hasQueued = queued and #queued > 0
-		local shouldShow = (hasDL or hasQueued) and not isGameplay
+		local hasLocalLoad = localLoadActive and localLoadText ~= ""
+		local shouldShow = (hasDL or hasQueued or hasLocalLoad) and not isGameplay
 
 		-- Show/hide the compact bar
 		if shouldShow and not wasVisible then
@@ -219,11 +242,37 @@ t.OnCommand = function(self)
 			end
 
 			pct:settextf("%.0f%%", percent * 100)
+
+			local statusW = status:GetZoomedWidth()
+			local pctW = pct:GetZoomedWidth()
+			local pctGap = 8
+			local groupW = statusW + pctGap + pctW
+			local leftX = SCREEN_CENTER_X - (groupW / 2)
+			status:halign(0):x(leftX)
+			pct:halign(0):x(leftX + statusW + pctGap)
+
+			bar:diffuse(accentColor)
+			bar:diffusealpha(1)
 			bar:zoomto(SCREEN_WIDTH * percent, barH)
 		elseif hasQueued then
 			status:settextf(THEME:GetString("DownloadOverlay", "QueuedFormatted"), #queued)
 			pct:settext("")
+			status:halign(0):x(SCREEN_CENTER_X - (status:GetZoomedWidth() / 2))
+			pct:halign(0):x(SCREEN_CENTER_X + (status:GetZoomedWidth() / 2) + 8)
+			bar:diffuse(accentColor)
+			bar:diffusealpha(1)
 			bar:zoomto(0, barH)
+		elseif hasLocalLoad then
+			status:settextf(THEME:GetString("DownloadOverlay", "LocalLoadingFormatted"), localLoadText)
+			pct:settext("")
+			status:halign(0):x(SCREEN_CENTER_X - (status:GetZoomedWidth() / 2))
+			pct:halign(0):x(SCREEN_CENTER_X + (status:GetZoomedWidth() / 2) + 8)
+
+			local tNow = GetTimeSinceStart and GetTimeSinceStart() or 0
+			local pulse = 0.2 + (math.abs(math.sin(tNow * 3.0)) * 0.35)
+			bar:diffuse(accentColor)
+			bar:diffusealpha(pulse)
+			bar:zoomto(SCREEN_WIDTH, barH)
 		end
 
 		-- ====================================================
@@ -243,6 +292,7 @@ t.OnCommand = function(self)
 
 		local isHovering = my >= hoverTarget and my <= SCREEN_BOTTOM
 			and mx >= 0 and mx <= SCREEN_WIDTH
+		local forceCollapseAtTop = my <= 0
 
 		if isHovering and not isExpanded and (queueCount > 0 or hasDL) then
 			isExpanded = true
@@ -252,7 +302,7 @@ t.OnCommand = function(self)
 			panelH = 28 + displayCount * queueRowH + panelPadding
 			panelBG:stoptweening():linear(0.15):zoomto(SCREEN_WIDTH, panelH)
 
-		elseif not isHovering and isExpanded then
+		elseif (not isHovering or forceCollapseAtTop) and isExpanded then
 			isExpanded = false
 			panelBG:stoptweening():linear(0.1):zoomto(SCREEN_WIDTH, 0)
 			-- Hide after collapse animation

@@ -83,12 +83,22 @@ t[#t + 1] = Def.ActorFrame {
 		end
 
 		-- Life Difficulty
-		local lifeColor = color("#FFFFFF")
-		if tLife <= 2 then lifeColor = color("#A0CFAB")
-		elseif tLife <= 4 then lifeColor = color("#5ABAFF")
-		elseif tLife == 5 then lifeColor = color("#CFD198")
-		elseif tLife == 6 then lifeColor = color("#E0B080")
-		else lifeColor = color("#CF9898") end
+		local lifeKey = "L7"
+		if tLife <= 1 then
+			lifeKey = "L1"
+		elseif tLife == 2 then
+			lifeKey = "L2"
+		elseif tLife == 3 then
+			lifeKey = "L3"
+		elseif tLife == 4 then
+			lifeKey = "L4"
+		elseif tLife == 5 then
+			lifeKey = "L5"
+		elseif tLife == 6 then
+			lifeKey = "L6"
+		end
+		local lifeColor = (HVColor and HVColor.GetLifeBarColor and HVColor.GetLifeBarColor(lifeKey))
+			or color("#FFFFFF")
 		
 		local lifeActor = self:GetChild("Life")
 		lifeActor:settext(string.format("L%d", tLife))

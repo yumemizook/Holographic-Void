@@ -72,6 +72,9 @@ local function loadValuesTable()
 	MovableValues.DPDisplayX = coord("DPDisplayX")
 	MovableValues.DPDisplayY = coord("DPDisplayY")
 	MovableValues.DPDisplayZoom = size("DPDisplayZoom")
+	MovableValues.AutoFailDisplayX = coord("AutoFailDisplayX")
+	MovableValues.AutoFailDisplayY = coord("AutoFailDisplayY")
+	MovableValues.AutoFailDisplayZoom = size("AutoFailDisplayZoom")
 	MovableValues.NotefieldX = coord("NotefieldX")
 	MovableValues.NotefieldY = coord("NotefieldY")
 	MovableValues.NotefieldWidth = size("NotefieldWidth")
@@ -124,10 +127,21 @@ end
 local noteColumns = {}
 function spaceNotefieldCols(inc)
 	if inc == nil then inc = 0 end
+	for i = #noteColumns, 1, -1 do
+		local col = noteColumns[i]
+		local ok = col and col.addx and pcall(function()
+			return col:GetX()
+		end)
+		if not ok then
+			table.remove(noteColumns, i)
+		end
+	end
 	local hCols = math.floor(#noteColumns / 2)
 	for i, col in ipairs(noteColumns) do
 		if col and col.addx then
-			col:addx((i - hCols - 1) * inc)
+			pcall(function()
+				col:addx((i - hCols - 1) * inc)
+			end)
 		end
 	end
 end
@@ -648,6 +662,46 @@ Movable = {
 			inc = 3
 		}
 	},
+	DeviceButton_g = {
+		name = "AutoFailDisplay",
+		textHeader = "Auto-Fail Display Position:",
+		element = {},
+		properties = {"X", "Y"},
+		elementTree = "GameplayXYCoordinates",
+		condition = false,
+		DeviceButton_up = {
+			property = "AddY",
+			inc = -3
+		},
+		DeviceButton_down = {
+			property = "AddY",
+			inc = 3
+		},
+		DeviceButton_left = {
+			property = "AddX",
+			inc = -3
+		},
+		DeviceButton_right = {
+			property = "AddX",
+			inc = 3
+		}
+	},
+	DeviceButton_h = {
+		name = "AutoFailDisplay",
+		textHeader = "Auto-Fail Display Size:",
+		element = {},
+		properties = {"Zoom"},
+		elementTree = "GameplaySizes",
+		condition = false,
+		DeviceButton_up = {
+			property = "Zoom",
+			inc = 0.01
+		},
+		DeviceButton_down = {
+			property = "Zoom",
+			inc = -0.01
+		}
+	},
 	DeviceButton_z = {
 		name = "PracticeCDGraph",
 		textHeader = "Chord Density Graph Position:",
@@ -1133,6 +1187,7 @@ local function elementtobutton(name)
 		NPSGraph = "NPSGraph",
 		InGameLeaderboard = "Leaderboard",
 		ReplayControls = "ReplayButtons",
+		AutofailDisplay = "AutoFailDisplay",
 	}
 	name = aliases[name] or name
 	name = name == "Judgment" and "Judge" or name

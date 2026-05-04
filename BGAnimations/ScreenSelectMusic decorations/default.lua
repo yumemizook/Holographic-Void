@@ -1068,7 +1068,10 @@ for i = 1, maxVisibleCharts do
 					local curSteps = data.steps
 					if curSteps == entry.steps then
 						local dname = entry.difficulty
-						self:diffuse(HVColor.Difficulty[dname] or accentColor):diffusealpha(0.4)
+						local dcolor = (HVColor and HVColor.GetDifficultyColor and HVColor.GetDifficultyColor(dname))
+							or (HVColor and HVColor.Difficulty and HVColor.Difficulty[dname])
+							or accentColor
+						self:diffuse(dcolor):diffusealpha(0.4)
 					else
 						self:diffuse(color("0.08,0.08,0.08,1")):diffusealpha(1)
 					end

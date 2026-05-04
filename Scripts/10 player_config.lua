@@ -35,6 +35,8 @@ local defaultGameplayCoordinates = {
 	RecentJudgmentDisplayY = 50,
 	DPDisplayX = 60,
 	DPDisplayY = -12,
+	AutoFailDisplayX = 10,
+	AutoFailDisplayY = SCREEN_CENTER_Y + 40,
 	NotefieldX = 0,
 	NotefieldY = 0
 }
@@ -53,6 +55,7 @@ local defaultGameplaySizes = {
 	RecentJudgmentDisplayZoom = 1.0,
 	DPDisplayZoom = 1.0,
 	BPMTextZoom = 1.0,
+	AutoFailDisplayZoom = 1.0,
 	NotefieldWidth = 1.0,
 	NotefieldHeight = 1.0,
 	NotefieldSpacing = 0.0,

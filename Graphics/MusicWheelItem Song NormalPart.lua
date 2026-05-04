@@ -45,7 +45,8 @@ t[#t + 1] = Def.Quad {
 		local curSteps = GAMESTATE:GetCurrentSteps()
 		if curSteps then
 			local diff = ToEnumShortString(curSteps:GetDifficulty())
-			local dc = (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
+			local dc = (HVColor and HVColor.GetDifficultyColor and HVColor.GetDifficultyColor(diff))
+				or (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
 			if dc then
 				self:diffuse(dc):diffusealpha(0.6) -- Constant alpha for uniform look
 				return
