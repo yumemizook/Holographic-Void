@@ -18,6 +18,87 @@ local footerH = 40
 local profileOverlayActor = nil
 local IsMouseInSelectMusicInteractiveArea
 
+local function getPBJudgeRows(score, rst)
+	local ridic = nil
+	local w1 = 0
+	local w2 = 0
+	local w3 = 0
+	local w4 = 0
+	local w5 = 0
+	local miss = 0
+
+	if rst then
+		w1 = getRescoredJudge(rst.dvt, 4, 1)
+		w2 = getRescoredJudge(rst.dvt, 4, 2)
+		w3 = getRescoredJudge(rst.dvt, 4, 3)
+		w4 = getRescoredJudge(rst.dvt, 4, 4)
+		w5 = getRescoredJudge(rst.dvt, 4, 5)
+		miss = getRescoredJudge(rst.dvt, 4, 6)
+		ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt) or nil
+	elseif score then
+		w1 = score:GetTapNoteScore("TapNoteScore_W1")
+		w2 = score:GetTapNoteScore("TapNoteScore_W2")
+		w3 = score:GetTapNoteScore("TapNoteScore_W3")
+		w4 = score:GetTapNoteScore("TapNoteScore_W4")
+		w5 = score:GetTapNoteScore("TapNoteScore_W5")
+		miss = score:GetTapNoteScore("TapNoteScore_Miss")
+		ridic = HV.GetRidiculousCountFromScore(score)
+	end
+
+	if ridic then
+		return {
+			{name = "Ridiculous", label = "RID", val = ridic},
+			{name = "W1", label = "MARV", val = w1 - ridic},
+			{name = "W2", label = "PERF", val = w2},
+			{name = "W3", label = "GREAT", val = w3},
+			{name = "W4", label = "GOOD", val = w4},
+			{name = "W5", label = "BAD", val = w5},
+			{name = "Miss", label = "MISS", val = miss}
+		}
+	end
+
+	return {
+		{name = "W1", label = "MARV", val = w1},
+		{name = "W2", label = "PERF", val = w2},
+		{name = "W3", label = "GREAT", val = w3},
+		{name = "W4", label = "GOOD", val = w4},
+		{name = "W5", label = "BAD", val = w5},
+		{name = "Miss", label = "MISS", val = miss}
+	}
+end
+
+local function getPBRescoredClearType(rst)
+	local w1 = getRescoredJudge(rst.dvt, 4, 1)
+	local w2 = getRescoredJudge(rst.dvt, 4, 2)
+	local w3 = getRescoredJudge(rst.dvt, 4, 3)
+	local w4 = getRescoredJudge(rst.dvt, 4, 4)
+	local w5 = getRescoredJudge(rst.dvt, 4, 5)
+	local miss = getRescoredJudge(rst.dvt, 4, 6)
+	local pct = getRescoredWife3Judge(3, 4, rst) or 0
+	if pct <= 0 then return "Failed" end
+
+	local cb = miss + w5 + w4
+	if cb > 0 then
+		if cb == 1 then return "MF"
+		elseif cb < 10 then return "SDCB"
+		else return "Clear" end
+	elseif w3 > 0 then
+		if w3 == 1 then return "BF"
+		elseif w3 < 10 then return "SDG"
+		else return "FC" end
+	elseif w2 > 0 then
+		if w2 == 1 then return "WF"
+		elseif w2 < 10 then return "SDP"
+		else return "PFC" end
+	end
+
+	local ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt) or nil
+	if ridic and ridic == w1 then return "RFC"
+	elseif ridic and w1 - ridic == 1 then return "RF"
+	elseif ridic and w1 - ridic < 10 then return "SDM" end
+	return "MFC"
+end
+
 local root = Def.ActorFrame {
 	Name = "SelectMusicDecorations"
 }
@@ -1527,34 +1608,7 @@ t[#t + 1] = Def.ActorFrame {
 				if self:GetParent().isHovering then
 					local rst = getRescoreElementsFromScore(score)
 					if rst then
-						local w1 = getRescoredJudge(rst.dvt, 4, 1)
-						local w2 = getRescoredJudge(rst.dvt, 4, 2)
-						local w3 = getRescoredJudge(rst.dvt, 4, 3)
-						local w4 = getRescoredJudge(rst.dvt, 4, 4)
-						local w5 = getRescoredJudge(rst.dvt, 4, 5)
-						local miss = getRescoredJudge(rst.dvt, 4, 6)
-						
-						local pct = getRescoredWife3Judge(3, 4, rst) or 0
-						if pct <= 0 then
-							ct = "Failed"
-						else
-							local cb = miss + w5 + w4
-							if cb > 0 then
-								if cb == 1 then ct = "MF"
-								elseif cb < 10 then ct = "SDCB"
-								else ct = "Clear" end
-							elseif w3 > 0 then
-								if w3 == 1 then ct = "BF"
-								elseif w3 < 10 then ct = "SDG"
-								else ct = "FC" end
-							elseif w2 > 0 then
-								if w2 == 1 then ct = "WF"
-								elseif w2 < 10 then ct = "SDP"
-								else ct = "PFC" end
-							else
-								ct = "MFC"
-							end
-						end
+						ct = getPBRescoredClearType(rst)
 					end
 				end
 				
@@ -1617,31 +1671,12 @@ t[#t + 1] = Def.ActorFrame {
 				return
 			end
 			self:visible(true)
-			local ridic = HV.GetRidiculousCountFromScore(score)
-			local w1 = score:GetTapNoteScore("TapNoteScore_W1")
-			local judges = ridic and {
-				{name = "Ridiculous", label = "RID", val = ridic},
-				{name = "W1", label = "MARV", val = w1 - ridic},
-				{name = "W2", label = "PERF", val = score:GetTapNoteScore("TapNoteScore_W2")},
-				{name = "W3", label = "GREAT", val = score:GetTapNoteScore("TapNoteScore_W3")},
-				{name = "W4", label = "GOOD", val = score:GetTapNoteScore("TapNoteScore_W4")},
-				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
-				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
-			} or {
-				{name = "W1", label = "MARV", val = w1},
-				{name = "W2", label = "PERF", val = score:GetTapNoteScore("TapNoteScore_W2")},
-				{name = "W3", label = "GREAT", val = score:GetTapNoteScore("TapNoteScore_W3")},
-				{name = "W4", label = "GOOD", val = score:GetTapNoteScore("TapNoteScore_W4")},
-				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
-				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
-			}
+			local judges = getPBJudgeRows(score)
 			
 			if self:GetParent().isHovering then
 				local rst = getRescoreElementsFromScore(score)
 				if rst then
-					for i=1, math.min(6, #judges) do
-						judges[i].val = getRescoredJudge(rst.dvt, 4, i)
-					end
+					judges = getPBJudgeRows(score, rst)
 				end
 			end
 			

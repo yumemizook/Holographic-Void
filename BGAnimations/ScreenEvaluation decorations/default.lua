@@ -13,7 +13,7 @@ local profile = PROFILEMAN:GetProfile(pn)
 -- State variables (declared early for function visibility)
 local curScore = pss:GetHighScore()
 local judge = 4
-local judges = {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"}
+local judges = HV.EmulateRidiculousEnabled() and {"Ridiculous","TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"} or {"TapNoteScore_W1","TapNoteScore_W2","TapNoteScore_W3","TapNoteScore_W4","TapNoteScore_W5","TapNoteScore_Miss"}
 
 -- Rescoring/offset plot state
 local nrv, dvt, ctt, ntt, totalTaps
@@ -381,14 +381,26 @@ local function getEvaluationRescoredJudgeCount(offsetVector, judgeScale, judgeNa
 	return count
 end
 
+local function getRATallyCount(rowIndex)
+	local ra, la, ridic, marvRA, ludic, ridicLA = getRatios()
+	if rowIndex == 1 then return ludic
+	elseif rowIndex == 2 then return ridicLA
+	elseif rowIndex == 3 then return marvRA
+	elseif rowIndex == 4 then return pss:GetTapNoteScores("TapNoteScore_W2")
+	elseif rowIndex == 5 then return pss:GetTapNoteScores("TapNoteScore_W3")
+	elseif rowIndex == 6 then return pss:GetTapNoteScores("TapNoteScore_Miss")
+	end
+	return 0
+end
+
 -- Combo Graph Configuration
 local comboConfig = {
  	{ name = "8ms FA+",  window = 8.0,  judgment = 4, color = color("#c3f1ff") },
  	{ name = "10ms FA+", window = 10.0,  judgment = 4, color = color("#86e3ff") },
  	{ name = "15ms FA+", window = 15.0,  judgment = 4, color = color("#39d1ff") },
- 	{ name = "Marvelous", window = 22.5,  judgment = 4, color = judgmentColors[1] },
+	{ name = "Marvelous", window = 22.5,  judgment = 4, color = HVColor.GetJudgmentColor("W1") },
  	{ name = "J6 Perfect", window = 45.0,  judgment = 6, color = color("#feffafff") },
- 	{ name = "Perfect", window = 45.0, judgment = 4, color = judgmentColors[2] },
+	{ name = "Perfect", window = 45.0, judgment = 4, color = HVColor.GetJudgmentColor("W2") },
  }
 
 -- Life Difficulty Color Helper (1-7 scale)
@@ -1410,7 +1422,7 @@ local function scoreBoard(pn)
 			
 			-- Handle hover logic via direct update function to avoid command overhead
 			self:SetUpdateFunction(function(self)
-				if usingCustomWindows or HV.EmulateRidiculousEnabled() then
+				if usingCustomWindows then
 					if showRATally then 
 						showRATally = false 
 						self:playcommand("RATallyChanged") 
@@ -1428,7 +1440,7 @@ local function scoreBoard(pn)
 		Def.Quad {
 			Name = "HoverArea",
 			InitCommand = function(self)
-				self:halign(0):valign(0):xy(col1X, statsStartY + 20):zoomto(col2X - pad - 5, rowH * 6 + 4):diffusealpha(0)
+				self:halign(0):valign(0):xy(col1X, statsStartY + 20):zoomto(col2X - pad - 5, rowH * #judges + 4):diffusealpha(0)
 			end
 		},
 
@@ -1467,15 +1479,8 @@ local function scoreBoard(pn)
 			RATallyChangedCommand = function(self)
 				local count = 0
 				if showRATally then
-					local ra, la, ridic, marvRA, ludic, ridicLA = getRatios()
-					if k == 1 then count = ludic
-					elseif k == 2 then count = ridicLA
-					elseif k == 3 then count = marvRA
-					elseif k == 4 then count = pss:GetTapNoteScores("TapNoteScore_W2")
-					elseif k == 5 then count = pss:GetTapNoteScores("TapNoteScore_W3")
-					elseif k == 6 then count = pss:GetTapNoteScores("TapNoteScore_Miss")
-					end
-					self:diffuse(raColors[k]):diffusealpha(0.2)
+					count = getRATallyCount(k)
+					self:diffuse(raColors[k] or judgmentColors[k]):diffusealpha(k <= #raLabels and 0.2 or 0)
 				else
 					count = getEvaluationRescoredJudgeCount(dvt, judge, v, k)
 					self:diffuse(judgmentColors[k]):diffusealpha(0.2)
@@ -1493,7 +1498,7 @@ local function scoreBoard(pn)
 			end,
 			RATallyChangedCommand = function(self)
 				if showRATally then
-					self:settext(raLabels[k]):diffuse(raColors[k])
+					self:settext(raLabels[k] or ""):diffuse(raColors[k] or judgmentColors[k])
 				elseif usingCustomWindows then
 					if getCustomWindowConfigJudgmentName then self:settext(getCustomWindowConfigJudgmentName(v)) end
 					self:diffuse(judgmentColors[k])
@@ -1516,14 +1521,7 @@ local function scoreBoard(pn)
 			end,
 			RATallyChangedCommand = function(self)
 				if showRATally then
-					local ra, la, ridic, marvRA, ludic, ridicLA = getRatios()
-					if k == 1 then self:settext(ludic)
-					elseif k == 2 then self:settext(ridicLA)
-					elseif k == 3 then self:settext(marvRA)
-					elseif k == 4 then self:settext(pss:GetTapNoteScores("TapNoteScore_W2"))
-					elseif k == 5 then self:settext(pss:GetTapNoteScores("TapNoteScore_W3"))
-					elseif k == 6 then self:settext(pss:GetTapNoteScores("TapNoteScore_Miss"))
-					end
+					self:settext(k <= #raLabels and getRATallyCount(k) or "")
 				else
 					self:playcommand("SetJudge")
 				end
@@ -1551,16 +1549,9 @@ local function scoreBoard(pn)
 			end,
 			RATallyChangedCommand = function(self)
 				if showRATally then
-					local ra, la, ridic, marvRA, ludic, ridicLA = getRatios()
-					local count = 0
-					if k == 1 then count = ludic
-					elseif k == 2 then count = ridicLA
-					elseif k == 3 then count = marvRA
-					elseif k == 4 then count = pss:GetTapNoteScores("TapNoteScore_W2")
-					elseif k == 5 then count = pss:GetTapNoteScores("TapNoteScore_W3")
-					elseif k == 6 then count = pss:GetTapNoteScores("TapNoteScore_Miss")
-					end
-					if totalTaps > 0 then self:settextf("%.1f%%", count / totalTaps * 100) end
+					local count = getRATallyCount(k)
+					if k <= #raLabels and totalTaps > 0 then self:settextf("%.1f%%", count / totalTaps * 100)
+					else self:settext("") end
 				else
 					self:playcommand("SetJudge")
 				end
@@ -1570,7 +1561,7 @@ local function scoreBoard(pn)
 	end
 
 	-- Ratios (Bottom Column 1 - 2x2 Grid)
-	local ratioStartY = statsStartY + 28 + (6 * rowH) + 12
+	local ratioStartY = statsStartY + 28 + (#judges * rowH) + 12
 	local ratioLabels = {"LA", "RA", "MA", "PA"}
 	local ratioColors = {color("#FF69B4"), color("#FFD700"), color("#FFFFFF"), color("#E0E0A0")}
 	for ri, rlabel in ipairs(ratioLabels) do
