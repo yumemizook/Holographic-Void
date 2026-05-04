@@ -353,9 +353,33 @@ local bgCard = color("0.06,0.06,0.06,0.7")
 local dividerColor = color("0.2,0.2,0.2,1")
 
 local judgmentColors = {
+	HV.EmulateRidiculousEnabled() and HVColor.GetJudgmentColor("Ridiculous") or nil,
 	HVColor.GetJudgmentColor("W1"), HVColor.GetJudgmentColor("W2"), HVColor.GetJudgmentColor("W3"),
 	HVColor.GetJudgmentColor("W4"), HVColor.GetJudgmentColor("W5"), HVColor.GetJudgmentColor("Miss")
 }
+if not HV.EmulateRidiculousEnabled() then table.remove(judgmentColors, 1) end
+
+local ridiculousCount = nil
+if HV.EmulateRidiculousEnabled() then
+	local ok, offsets = pcall(function() return pss:GetOffsetVector() end)
+	ridiculousCount = ok and HV.GetRidiculousCountFromOffsets(offsets) or nil
+end
+
+local function getEvaluationJudgeCount(judgeName, judgeIndex)
+	if judgeName == "Ridiculous" then return ridiculousCount or 0 end
+	if judgeName == "TapNoteScore_W1" and ridiculousCount then return pss:GetTapNoteScores(judgeName) - ridiculousCount end
+	return pss:GetTapNoteScores(judgeName)
+end
+
+local function getEvaluationRescoredJudgeCount(offsetVector, judgeScale, judgeName, judgeIndex)
+	if judgeName == "Ridiculous" then return HV.GetRidiculousCountFromOffsets(offsetVector) end
+	local index = HV.EmulateRidiculousEnabled() and judgeIndex - 1 or judgeIndex
+	local count = getRescoredJudge(offsetVector, judgeScale, index)
+	if judgeName == "TapNoteScore_W1" and HV.EmulateRidiculousEnabled() then
+		count = count - HV.GetRidiculousCountFromOffsets(offsetVector)
+	end
+	return count
+end
 
 -- Combo Graph Configuration
 local comboConfig = {
@@ -1386,7 +1410,7 @@ local function scoreBoard(pn)
 			
 			-- Handle hover logic via direct update function to avoid command overhead
 			self:SetUpdateFunction(function(self)
-				if usingCustomWindows then
+				if usingCustomWindows or HV.EmulateRidiculousEnabled() then
 					if showRATally then 
 						showRATally = false 
 						self:playcommand("RATallyChanged") 
@@ -1431,12 +1455,12 @@ local function scoreBoard(pn)
 				self:halign(0):xy(col1X - 2, jy):zoomto(0, rowH - 2):diffuse(judgmentColors[k]):diffusealpha(0.2)
 			end,
 			OnCommand = function(self)
-				local count = pss:GetTapNoteScores(v)
+				local count = getEvaluationJudgeCount(v, k)
 				local pct = count / songTotalNotes
 				self:zoomto((col2X - pad - col1X) * pct, rowH - 2)
 			end,
 			SetJudgeCommand = function(self)
-				local count = getRescoredJudge(dvt, judge, k)
+				local count = getEvaluationRescoredJudgeCount(dvt, judge, v, k)
 				local pct = count / songTotalNotes
 				self:finishtweening():linear(0.2):zoomto((col2X - pad - col1X) * pct, rowH - 2)
 			end,
@@ -1453,7 +1477,7 @@ local function scoreBoard(pn)
 					end
 					self:diffuse(raColors[k]):diffusealpha(0.2)
 				else
-					count = getRescoredJudge(dvt, judge, k)
+					count = getEvaluationRescoredJudgeCount(dvt, judge, v, k)
 					self:diffuse(judgmentColors[k]):diffusealpha(0.2)
 				end
 				local pct = count / songTotalNotes
@@ -1465,7 +1489,7 @@ local function scoreBoard(pn)
 		tallyFrame[#tallyFrame + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self)
 				self:halign(0):xy(col1X, jy):zoom(0.45):diffuse(judgmentColors[k])
-				self:settext(getJudgeStrings(v))
+					self:settext(v == "Ridiculous" and THEME:GetString("TapNoteScore", "Ridiculous") or getJudgeStrings(v))
 			end,
 			RATallyChangedCommand = function(self)
 				if showRATally then
@@ -1474,7 +1498,7 @@ local function scoreBoard(pn)
 					if getCustomWindowConfigJudgmentName then self:settext(getCustomWindowConfigJudgmentName(v)) end
 					self:diffuse(judgmentColors[k])
 				else
-					self:settext(getJudgeStrings(v)):diffuse(judgmentColors[k])
+					self:settext(v == "Ridiculous" and THEME:GetString("TapNoteScore", "Ridiculous") or getJudgeStrings(v)):diffuse(judgmentColors[k])
 				end
 			end,
 			LoadedCustomWindowMessageCommand = function(self)
@@ -1485,9 +1509,9 @@ local function scoreBoard(pn)
 		-- Count
 		tallyFrame[#tallyFrame + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(1):xy(col2X - pad - 40, jy):zoom(0.55):diffuse(brightText) end,
-			OnCommand = function(self) self:settext(pss:GetTapNoteScores(v)) end,
+			OnCommand = function(self) self:settext(getEvaluationJudgeCount(v, k)) end,
 			SetJudgeCommand = function(self) 
-				local count = getRescoredJudge(dvt, judge, k)
+				local count = getEvaluationRescoredJudgeCount(dvt, judge, v, k)
 				self:settext(count)
 			end,
 			RATallyChangedCommand = function(self)
@@ -1516,13 +1540,12 @@ local function scoreBoard(pn)
 		tallyFrame[#tallyFrame + 1] = LoadFont("Common Normal") .. {
 			InitCommand = function(self) self:halign(1):xy(col2X - pad - 5, jy):zoom(0.35):diffuse(dimText) end,
 			OnCommand = function(self)
-				local pct = pss:GetPercentageOfTaps(v)
-				if tostring(pct) == tostring(0/0) then pct = 0 end
+				local pct = songTotalNotes > 0 and getEvaluationJudgeCount(v, k) / songTotalNotes or 0
 				self:settextf("%.1f%%", pct * 100)
 			end,
 			SetJudgeCommand = function(self)
 				if totalTaps > 0 then
-					local count = getRescoredJudge(dvt, judge, k)
+					local count = getEvaluationRescoredJudgeCount(dvt, judge, v, k)
 					self:settextf("%.1f%%", count / totalTaps * 100)
 				end
 			end,

@@ -39,6 +39,14 @@ local function formatRateValue(rate)
 	return r
 end
 
+local function hasAssistEnabled(po, modStr)
+	if po then
+		if po.AssistClap and po:AssistClap() then return true end
+		if po.AssistTick and po:AssistTick() then return true end
+	end
+	return string.find(modStr, "AssistClap") or string.find(modStr, "AssistTick") or string.find(modStr, "AutoPlay")
+end
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ModIcons",
 	InitCommand = function(self)
@@ -70,7 +78,7 @@ t[#t + 1] = Def.ActorFrame {
 		local tLife = GetLifeDifficulty()
 		local tJudge = GetTimingDifficulty()
 		local tFail = po:FailSetting()
-		local tAssist = (string.find(modStr, "AssistClap") or string.find(modStr, "AssistTick") or string.find(modStr, "AutoPlay"))
+		local tAssist = hasAssistEnabled(po, modStr)
 		local tTurn = nil -- For Mirror/etc
 		local tSpeedMode = self._speedMode
 		local tSpeed = self._speed
@@ -99,7 +107,7 @@ t[#t + 1] = Def.ActorFrame {
 							elseif choice == 1 then tFail = "FailType_EndOfSong"
 							elseif choice == 2 then tFail = "FailType_Off" end
 						elseif rName == "assist" then
-							tAssist = (choice > 0)
+							tAssist = (choice ~= nil)
 						elseif rName == "mirror" or rName == "turn" then
 							if choice > 0 then tTurn = "MIR" end -- Simplify for icon
 						end

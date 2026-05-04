@@ -243,17 +243,55 @@ end
 -- CLEAR TYPE SYSTEM (IIDX-style)
 ------------------------------------------------------------
 local clearTypeNames = {
-	[1]="ClearType_MFC", [2]="ClearType_WF", [3]="ClearType_SDP",
-	[4]="ClearType_PFC", [5]="ClearType_BF", [6]="ClearType_SDG",
-	[7]="ClearType_FC",  [8]="ClearType_MF", [9]="ClearType_SDCB",
-	[10]="ClearType_EXHC", [11]="ClearType_HClear", [12]="ClearType_Clear",
-	[13]="ClearType_EClear", [14]="ClearType_AClear", [15]="ClearType_Failed",
-	[16]="ClearType_Invalid", [17]="ClearType_Noplay", [18]="ClearType_None",
-	[19]="ClearType_SoftInvalid",
+	[1]="ClearType_RFC", [2]="ClearType_RF", [3]="ClearType_SDM",
+	[4]="ClearType_MFC", [5]="ClearType_WF", [6]="ClearType_SDP",
+	[7]="ClearType_PFC", [8]="ClearType_BF", [9]="ClearType_SDG",
+	[10]="ClearType_FC",  [11]="ClearType_MF", [12]="ClearType_SDCB",
+	[13]="ClearType_EXHC", [14]="ClearType_HClear", [15]="ClearType_Clear",
+	[16]="ClearType_EClear", [17]="ClearType_AClear", [18]="ClearType_Failed",
+	[19]="ClearType_Invalid", [20]="ClearType_Noplay", [21]="ClearType_None",
+	[22]="ClearType_SoftInvalid",
 }
 
 local clearTypeReverse = {}
 for k, v in pairs(clearTypeNames) do clearTypeReverse[v] = k end
+
+function HV.EmulateRidiculousEnabled()
+	return ThemePrefs and ThemePrefs.Get and (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true")
+end
+
+function HV.GetRidiculousCountFromOffsets(offsetVector)
+	local count = 0
+	if type(offsetVector) ~= "table" then return count end
+	for i = 1, #offsetVector do
+		local offset = tonumber(offsetVector[i])
+		if offset and math.abs(offset) <= 11.25 then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+function HV.GetRidiculousCountFromScore(score)
+	if not HV.EmulateRidiculousEnabled() then return nil end
+	local rst = getRescoreElementsFromScore(score)
+	if not rst or type(rst.dvt) ~= "table" or #rst.dvt == 0 then return nil end
+	return HV.GetRidiculousCountFromOffsets(rst.dvt)
+end
+
+function HV.GetRidiculousTallyString(score)
+	local w1 = score:GetTapNoteScore("TapNoteScore_W1") or 0
+	local w2 = score:GetTapNoteScore("TapNoteScore_W2") or 0
+	local w3 = score:GetTapNoteScore("TapNoteScore_W3") or 0
+	local w4 = score:GetTapNoteScore("TapNoteScore_W4") or 0
+	local w5 = score:GetTapNoteScore("TapNoteScore_W5") or 0
+	local miss = score:GetTapNoteScore("TapNoteScore_Miss") or 0
+	local ridic = HV.GetRidiculousCountFromScore(score)
+	if ridic then
+		return string.format("%d | %d | %d | %d | %d | %d | %d", ridic, w1 - ridic, w2, w3, w4, w5, miss)
+	end
+	return string.format("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
+end
 
 ------------------------------------------------------------
 -- INVALIDATING MODIFIERS DETECTION
@@ -373,16 +411,16 @@ function getClearTypeShortText(ct)
 end
 
 function getClearLevel(pn, steps, score)
-	if score == nil or steps == nil then return 17 end
+	if score == nil or steps == nil then return 20 end
 	
 	local grade
 	if score.GetWifeGrade then grade = score:GetWifeGrade()
 	else grade = score:GetGrade() end
 
-	if grade == nil then return 17 end
+	if grade == nil then return 20 end
 	-- Check invalid mods FIRST: a failed invalid score should still be Invalid
-	if IsScoreInvalid(score) then return 16 end
-	if grade == "Grade_Failed" then return 15 end
+	if IsScoreInvalid(score) then return 19 end
+	if grade == "Grade_Failed" then return 18 end
 
 	local tns = {}
 	if score.GetTapNoteScore then
@@ -418,29 +456,37 @@ function getClearLevel(pn, steps, score)
 		+ (steps:GetRadarValues(pn):GetValue("RadarCategory_Rolls") or 0)
 
 	local totalTaps = tns.W1 + tns.W2 + tns.W3 + tns.W4 + tns.W5 + tns.Miss
-	if totalTaps ~= maxNotes then return 16 end -- note count mismatch
+	if totalTaps ~= maxNotes then return 19 end -- note count mismatch
+
+	local ridiculous = HV.GetRidiculousCountFromScore(score)
+	if ridiculous and tns.W1 == maxNotes and hns.Held == maxHolds then
+		local marvelous = maxNotes - ridiculous
+		if ridiculous == maxNotes then return 1
+		elseif marvelous == 1 then return 2
+		elseif marvelous < 10 then return 3 end
+	end
 
 	-- MFC
-	if tns.W1 == maxNotes and hns.Held == maxHolds then return 1 end
+	if tns.W1 == maxNotes and hns.Held == maxHolds then return 4 end
 
 	-- PFC variants
 	if tns.W1 + tns.W2 == maxNotes and hns.Held == maxHolds then
-		if tns.W2 == 1 then return 2      -- WF
-		elseif tns.W2 < 10 then return 3  -- SDP
-		else return 4 end                 -- PFC
+		if tns.W2 == 1 then return 5      -- WF
+		elseif tns.W2 < 10 then return 6  -- SDP
+		else return 7 end                 -- PFC
 	end
 
 	-- FC variants
 	local missCount = tns.W4 + tns.W5 + tns.Miss
 	if missCount == 0 then
-		if tns.W3 == 1 then return 5      -- BF
-		elseif tns.W3 < 10 then return 6  -- SDG
-		else return 7 end                 -- FC
-	elseif missCount == 1 then return 8   -- MF
-	elseif missCount < 10 then return 9   -- SDCB
+		if tns.W3 == 1 then return 8      -- BF
+		elseif tns.W3 < 10 then return 9  -- SDG
+		else return 10 end                -- FC
+	elseif missCount == 1 then return 11  -- MF
+	elseif missCount < 10 then return 12  -- SDCB
 	end
 
-	return 12 -- Clear
+	return 15 -- Clear
 end
 
 function getClearType(pn, steps, score)
@@ -448,7 +494,7 @@ function getClearType(pn, steps, score)
 end
 
 function getClearTypeLevel(ct)
-	return clearTypeReverse[ct] or 18
+	return clearTypeReverse[ct] or 21
 end
 
 
@@ -457,15 +503,15 @@ function getClearTypeColor(ct)
 end
 
 function getHighestClearType(pn, steps, scoreList, ignore)
-	if steps == nil then return clearTypeNames[18] end
-	local highest = 17
+	if steps == nil then return clearTypeNames[21] end
+	local highest = 20
 	if scoreList ~= nil then
 		for i = 1, #scoreList do
 			if i ~= ignore then
 				local hScore = scoreList[i]
 				if hScore ~= nil then
 					local cl = getClearLevel(pn, steps, hScore)
-					if cl ~= 16 then
+					if cl ~= 19 then
 						highest = math.min(highest, cl)
 					end
 				end
@@ -480,7 +526,7 @@ end
 ------------------------------------------------------------
 function getDetailedClearType(obj)
 	if not obj then return "Failed" end
-	local miss, w5, w4, w3, w2 = 0, 0, 0, 0, 0
+	local miss, w5, w4, w3, w2, w1 = 0, 0, 0, 0, 0, 0
 	local missedHolds = 0
 	local grade = "Grade_None"
 	local wifeScore = 0
@@ -491,6 +537,7 @@ function getDetailedClearType(obj)
 		w4 = obj:GetTapNoteScores("TapNoteScore_W4")
 		w3 = obj:GetTapNoteScores("TapNoteScore_W3")
 		w2 = obj:GetTapNoteScores("TapNoteScore_W2")
+		w1 = obj:GetTapNoteScores("TapNoteScore_W1")
 		missedHolds = obj:GetHoldNoteScores("HoldNoteScore_LetGo") + obj:GetHoldNoteScores("HoldNoteScore_MissedHold")
 		grade = obj:GetGrade()
 		wifeScore = obj:GetWifeScore()
@@ -500,6 +547,7 @@ function getDetailedClearType(obj)
 		w4 = obj:GetTapNoteScore("TapNoteScore_W4")
 		w3 = obj:GetTapNoteScore("TapNoteScore_W3")
 		w2 = obj:GetTapNoteScore("TapNoteScore_W2")
+		w1 = obj:GetTapNoteScore("TapNoteScore_W1")
 		missedHolds = obj:GetHoldNoteScore("HoldNoteScore_LetGo") + obj:GetHoldNoteScore("HoldNoteScore_MissedHold")
 		grade = obj:GetGrade()
 		wifeScore = obj:GetWifeScore()
@@ -527,6 +575,16 @@ function getDetailedClearType(obj)
 			elseif w2 < 10 then return "SDP"
 			else return "PFC" end
 		end
+		local ridiculous
+		if obj.GetTapNoteScores then
+			local ok, offsets = pcall(function() return obj:GetOffsetVector() end)
+			ridiculous = ok and HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(offsets) or nil
+		else
+			ridiculous = HV.GetRidiculousCountFromScore(obj)
+		end
+		if ridiculous and ridiculous == w1 then return "RFC"
+		elseif ridiculous and w1 - ridiculous == 1 then return "RF"
+		elseif ridiculous and w1 - ridiculous < 10 then return "SDM" end
 		return "MFC"
 	end
 

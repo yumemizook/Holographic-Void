@@ -304,13 +304,7 @@ local function scoreItem(i)
 			InitCommand = function(self) self:xy(SCREEN_CENTER_X - 50, 26):zoom(0.35):halign(1):diffuse(subText) end,
 			SetScoreCommand = function(self, params)
 				local s = scoreList[params.index]
-				self:settextf("%d / %d / %d / %d / %d / %d",
-					s:GetTapNoteScore("TapNoteScore_W1"),
-					s:GetTapNoteScore("TapNoteScore_W2"),
-					s:GetTapNoteScore("TapNoteScore_W3"),
-					s:GetTapNoteScore("TapNoteScore_W4"),
-					s:GetTapNoteScore("TapNoteScore_W5"),
-					s:GetTapNoteScore("TapNoteScore_Miss"))
+				self:settext(HV.GetRidiculousTallyString(s))
 			end
 		},
 

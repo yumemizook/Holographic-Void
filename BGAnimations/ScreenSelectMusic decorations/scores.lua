@@ -456,13 +456,7 @@ for i = 1, pageSize do
 					self:GetChild("Player"):settext(THEME:GetString("Common", "You"))
 					
 					-- Judgments
-					local w1 = s:GetTapNoteScore("TapNoteScore_W1")
-					local w2 = s:GetTapNoteScore("TapNoteScore_W2")
-					local w3 = s:GetTapNoteScore("TapNoteScore_W3")
-					local w4 = s:GetTapNoteScore("TapNoteScore_W4")
-					local w5 = s:GetTapNoteScore("TapNoteScore_W5")
-					local miss = s:GetTapNoteScore("TapNoteScore_Miss")
-					self:GetChild("Judgments"):settextf("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
+					self:GetChild("Judgments"):settext(HV.GetRidiculousTallyString(s))
 
 					-- Wife% display
 					local wife = s:GetWifeScore() * 100
@@ -530,13 +524,7 @@ for i = 1, pageSize do
 						self:GetChild("Player"):settext(username)
 
 						-- Online judgments if available
-						local w1 = s:GetTapNoteScore("TapNoteScore_W1") or 0
-						local w2 = s:GetTapNoteScore("TapNoteScore_W2") or 0
-						local w3 = s:GetTapNoteScore("TapNoteScore_W3") or 0
-						local w4 = s:GetTapNoteScore("TapNoteScore_W4") or 0
-						local w5 = s:GetTapNoteScore("TapNoteScore_W5") or 0
-						local miss = s:GetTapNoteScore("TapNoteScore_Miss") or 0
-						self:GetChild("Judgments"):settextf("%d | %d | %d | %d | %d | %d", w1, w2, w3, w4, w5, miss)
+						self:GetChild("Judgments"):settext(HV.GetRidiculousTallyString(s))
 
 						local wife = s:GetWifeScore() * 100
 						if wife >= 99.7 then

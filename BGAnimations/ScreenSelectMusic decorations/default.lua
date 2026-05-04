@@ -1617,8 +1617,18 @@ t[#t + 1] = Def.ActorFrame {
 				return
 			end
 			self:visible(true)
-			local judges = {
-				{name = "W1", label = "MARV", val = score:GetTapNoteScore("TapNoteScore_W1")},
+			local ridic = HV.GetRidiculousCountFromScore(score)
+			local w1 = score:GetTapNoteScore("TapNoteScore_W1")
+			local judges = ridic and {
+				{name = "Ridiculous", label = "RID", val = ridic},
+				{name = "W1", label = "MARV", val = w1 - ridic},
+				{name = "W2", label = "PERF", val = score:GetTapNoteScore("TapNoteScore_W2")},
+				{name = "W3", label = "GREAT", val = score:GetTapNoteScore("TapNoteScore_W3")},
+				{name = "W4", label = "GOOD", val = score:GetTapNoteScore("TapNoteScore_W4")},
+				{name = "W5", label = "BAD", val = score:GetTapNoteScore("TapNoteScore_W5")},
+				{name = "Miss", label = "MISS", val = score:GetTapNoteScore("TapNoteScore_Miss")}
+			} or {
+				{name = "W1", label = "MARV", val = w1},
 				{name = "W2", label = "PERF", val = score:GetTapNoteScore("TapNoteScore_W2")},
 				{name = "W3", label = "GREAT", val = score:GetTapNoteScore("TapNoteScore_W3")},
 				{name = "W4", label = "GOOD", val = score:GetTapNoteScore("TapNoteScore_W4")},
@@ -1629,14 +1639,17 @@ t[#t + 1] = Def.ActorFrame {
 			if self:GetParent().isHovering then
 				local rst = getRescoreElementsFromScore(score)
 				if rst then
-					for i=1, 6 do
+					for i=1, math.min(6, #judges) do
 						judges[i].val = getRescoredJudge(rst.dvt, 4, i)
 					end
 				end
 			end
 			
-			for i, j in ipairs(judges) do
+			for i = 1, 7 do
 				local block = self:GetChild("Blocks"):GetChild("Block_" .. i)
+				local j = judges[i]
+				block:visible(j ~= nil)
+				if not j then break end
 				local bg = block:GetChild("Bg")
 				local lbl = block:GetChild("Lbl")
 				local valTxt = block:GetChild("Val")
@@ -1664,7 +1677,7 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 		(function()
 			local blocks = Def.ActorFrame{ Name = "Blocks" }
-			local numBlocks = 6
+			local numBlocks = 7
 			local panelWConst = SCREEN_WIDTH * 0.36
 			local gap = 2
 			local blockW = (panelWConst - 32 - (gap * (numBlocks - 1))) / numBlocks
