@@ -25,12 +25,30 @@ local modShorthands = {
 	["Reverse"] = "REV", ["Mines"] = "MNS",
 }
 
+local function formatSpeedMode(mode, speed)
+	if mode == "x" then
+		return string.format("%.2fx", speed / 100)
+	end
+	return mode .. tostring(speed)
+end
+
+local function formatRateValue(rate)
+	local r = string.format("%.2f", rate):gsub("%.?0+$", "") .. "x"
+	if r == "1x" then r = "1.0x" end
+	if r == "2x" then r = "2.0x" end
+	return r
+end
+
 t[#t + 1] = Def.ActorFrame {
 	Name = "ModIcons",
 	InitCommand = function(self)
 		self:xy(SCREEN_LEFT + 18, 18)
 		self._lastModStr = ""
 		self._lastExtra = ""
+		local speed, mode = GetSpeedModeAndValueFromPoptions(PLAYER_1)
+		self._speed = speed
+		self._speedMode = mode
+		self._rate = getCurRateValue()
 	end,
 	OnCommand = function(self)
 		self:SetUpdateFunction(function(self)
@@ -41,8 +59,8 @@ t[#t + 1] = Def.ActorFrame {
 	UpdateCommand = function(self)
 		local screen = SCREENMAN:GetTopScreen()
 		local ps = GAMESTATE:GetPlayerState(PLAYER_1)
-		local po = ps:GetPlayerOptions("ModsLevel_Current")
-		local modStr = ps:GetPlayerOptionsString("ModsLevel_Current")
+		local po = ps:GetPlayerOptions("ModsLevel_Preferred")
+		local modStr = ps:GetPlayerOptionsString("ModsLevel_Preferred")
 
 		local accent = (HVColor and HVColor.Accent or color("#5ABAFF"))
 		local dim = color("0.4,0.4,0.4,1")
@@ -54,6 +72,9 @@ t[#t + 1] = Def.ActorFrame {
 		local tFail = po:FailSetting()
 		local tAssist = (string.find(modStr, "AssistClap") or string.find(modStr, "AssistTick") or string.find(modStr, "AutoPlay"))
 		local tTurn = nil -- For Mirror/etc
+		local tSpeedMode = self._speedMode
+		local tSpeed = self._speed
+		local tRate = self._rate
 
 		if screen and screen.GetNumRows then
 			for i = 0, screen:GetNumRows() - 1 do
@@ -68,19 +89,32 @@ t[#t + 1] = Def.ActorFrame {
 							tLife = choice + 1
 						elseif rName == "judge" then
 							tJudge = choice + 4
+						elseif rName == "speed" and row.CurValues and row.CurValues[PLAYER_1] then
+							tSpeedMode = row.CurValues[PLAYER_1].mode
+							tSpeed = row.CurValues[PLAYER_1].speed
+						elseif rName == "ratelist" then
+							tRate = notShit.round(0.05 + choice * 0.05, 2)
 						elseif rName == "fail" then
 							if choice == 0 then tFail = "FailType_Immediate"
 							elseif choice == 1 then tFail = "FailType_EndOfSong"
 							elseif choice == 2 then tFail = "FailType_Off" end
 						elseif rName == "assist" then
 							tAssist = (choice > 0)
-						elseif rName == "mirror" or rName == rName:match("turn") then
+						elseif rName == "mirror" or rName == "turn" then
 							if choice > 0 then tTurn = "MIR" end -- Simplify for icon
 						end
 					end
 				end
 			end
 		end
+
+		local speedActor = self:GetChild("Speed")
+		speedActor:settext(formatSpeedMode(tSpeedMode, tSpeed))
+		speedActor:diffuse(accent)
+
+		local rateActor = self:GetChild("Rate")
+		rateActor:settext(formatRateValue(tRate))
+		rateActor:diffuse(accent)
 
 		-- Life Difficulty
 		local lifeKey = "L7"
@@ -148,23 +182,43 @@ t[#t + 1] = Def.ActorFrame {
 	MenuUpMessageCommand = function(self) self:playcommand("Update") end,
 	MenuDownMessageCommand = function(self) self:playcommand("Update") end,
 	ChoiceChangedMessageCommand = function(self) self:playcommand("Update") end,
+	SpeedChoiceChangedMessageCommand = function(self, param)
+		if param.pn == PLAYER_1 then
+			self._speed = param.speed
+			self._speedMode = param.mode
+			self:playcommand("Update")
+		end
+	end,
+	RateListOptionChangedMessageCommand = function(self)
+		self:finishtweening():sleep(0.01):queuecommand("Update")
+	end,
+	RateListOptionSavedMessageCommand = function(self, param)
+		self._rate = param and param.rate or getCurRateValue()
+		self:playcommand("Update")
+	end,
+	CurrentRateChangedMessageCommand = function(self)
+		self._rate = getCurRateValue()
+		self:playcommand("Update")
+	end,
 
 	-- Prefix Icons (L, J, F, AST)
-	LoadFont("Common Normal") .. { Name = "Life", InitCommand = function(self) self:zoom(0.4):halign(0) end },
-	LoadFont("Common Normal") .. { Name = "Judge", InitCommand = function(self) self:x(28):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
-	LoadFont("Common Normal") .. { Name = "Fail", InitCommand = function(self) self:x(56):zoom(0.4):halign(0):diffuse(color("#CF9898")) end },
-	LoadFont("Common Normal") .. { Name = "Assist", InitCommand = function(self) self:x(100):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
+	LoadFont("Common Normal") .. { Name = "Speed", InitCommand = function(self) self:zoom(0.4):halign(0) end },
+	LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:x(42):zoom(0.4):halign(0) end },
+	LoadFont("Common Normal") .. { Name = "Life", InitCommand = function(self) self:x(82):zoom(0.4):halign(0) end },
+	LoadFont("Common Normal") .. { Name = "Judge", InitCommand = function(self) self:x(110):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
+	LoadFont("Common Normal") .. { Name = "Fail", InitCommand = function(self) self:x(138):zoom(0.4):halign(0):diffuse(color("#CF9898")) end },
+	LoadFont("Common Normal") .. { Name = "Assist", InitCommand = function(self) self:x(182):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end },
 	
 	-- Separator
 	LoadFont("Common Normal") .. { 
 		Name = "Separator", 
-		InitCommand = function(self) self:x(135):zoom(0.4):halign(0):settext("|"):diffuse(color("0.4,0.4,0.4,1")) end 
+		InitCommand = function(self) self:x(217):zoom(0.4):halign(0):settext("|"):diffuse(color("0.4,0.4,0.4,1")) end 
 	},
 
 	-- Main Mods
 	LoadFont("Common Normal") .. { 
 		Name = "Mods", 
-		InitCommand = function(self) self:x(150):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end 
+		InitCommand = function(self) self:x(232):zoom(0.4):halign(0):diffuse(HVColor and HVColor.Accent or color("#5ABAFF")) end 
 	}
 }
 
