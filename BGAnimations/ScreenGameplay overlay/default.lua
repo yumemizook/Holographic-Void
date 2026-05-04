@@ -7,6 +7,7 @@ local HV_MaxPoints = 1 -- Placeholder, will be set in BeginCommand
 local HV_PBThreshold = 0
 local HV_JudgeScale = 1.0
 local HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
+local HV_RidiculousCount = 0
 local failSfxPath = THEME:GetPathS("", "ScreenGameplay failed")
 local failSfxPlayed = false
 
@@ -58,6 +59,10 @@ local function gameplaySize(name)
 	return (MovableValues and MovableValues[name]) or getDefaultGameplaySize(name) or 1
 end
 
+local function isRidiculousJudgment(params)
+	return HV.EmulateRidiculousEnabled() and params and params.TapNoteScore == "TapNoteScore_W1" and params.TapNoteOffset and math.abs(params.TapNoteOffset) <= 0.01125
+end
+
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
 	BeginCommand = function(self)
@@ -100,6 +105,7 @@ local t = Def.ActorFrame {
 		-- Properly initialize total chart points once song/steps are loaded
 		HV_MaxPoints = (getMaxNotes(PLAYER_1) or 1) * 2
 		HV_PointsLost = 0
+		HV_RidiculousCount = 0
 		HV_JudgeScale = PREFSMAN:GetPreference("TimingWindowScale") or 1.0
 
 		-- Initialize Auto-Fail Personal Best threshold if needed
@@ -176,6 +182,7 @@ local t = Def.ActorFrame {
 
 	
 	CurrentSongChangedMessageCommand = function(self)
+		HV_RidiculousCount = 0
 		-- Re-apply sync mods on every loop start to prevent engine resets
 		if isSync then
 			for _, pn_loop in ipairs(GAMESTATE:GetEnabledPlayers()) do
@@ -212,6 +219,10 @@ local t = Def.ActorFrame {
 		elseif s == "TapNoteScore_Miss" then
 			-- A full miss loses 7.5 points relative to the 2.0 potential max per tap (2.0 - (-5.5) = 7.5)
 			HV_PointsLost = HV_PointsLost + 7.5
+		end
+
+		if isRidiculousJudgment(params) then
+			HV_RidiculousCount = HV_RidiculousCount + 1
 		end
 
 		if s == "TapNoteScore_W2" then
@@ -252,6 +263,7 @@ t[#t + 1] = Def.Actor {
 	CurrentSongChangedMessageCommand = function(self)
 		failSfxPlayed = false
 		HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
+		HV_RidiculousCount = 0
 	end,
 	PlayingUpdateMessageCommand = function(self)
 		if failSfxPlayed then return end
@@ -293,6 +305,21 @@ local judgmentTNS = {
 	"TapNoteScore_W1", "TapNoteScore_W2", "TapNoteScore_W3",
 	"TapNoteScore_W4", "TapNoteScore_W5", "TapNoteScore_Miss"
 }
+
+if HV.EmulateRidiculousEnabled() then
+	table.insert(judgmentColors, 1, HVColor.GetJudgmentColor("Ridiculous"))
+	table.insert(judgmentLabels, 1, THEME:GetString("TapNoteScore", "Ridiculous"))
+	table.insert(judgmentTNS, 1, "Ridiculous")
+end
+
+local function getGameplayJudgmentCount(pss, judgeName)
+	if judgeName == "Ridiculous" then return HV_RidiculousCount end
+	local count = pss:GetTapNoteScores(judgeName)
+	if judgeName == "TapNoteScore_W1" and HV.EmulateRidiculousEnabled() then
+		count = count - HV_RidiculousCount
+	end
+	return count
+end
 
 -- ============================================================
 -- FRAME UPDATER (for time-based elements: life bar, progress bar)
@@ -1034,9 +1061,9 @@ t[#t + 1] = Def.ActorFrame {
 
 		if isComboBreak and params.Notes then
 			local jColor = color("#FF5050")
-			if params.TapNoteScore == "TapNoteScore_W4" then jColor = judgmentColors[4]
-			elseif params.TapNoteScore == "TapNoteScore_W5" then jColor = judgmentColors[5]
-			elseif params.TapNoteScore == "TapNoteScore_Miss" then jColor = judgmentColors[6] end
+			if params.TapNoteScore == "TapNoteScore_W4" then jColor = HVColor.GetJudgmentColor("W4")
+			elseif params.TapNoteScore == "TapNoteScore_W5" then jColor = HVColor.GetJudgmentColor("W5")
+			elseif params.TapNoteScore == "TapNoteScore_Miss" then jColor = HVColor.GetJudgmentColor("Miss") end
 
 			-- Flash lanes that had notes in this judgment
 			for i = 1, 4 do
@@ -1130,8 +1157,18 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 		(function()
 			local g = Def.ActorFrame{}
 			local windows = {180, 135, 90, 45, 22.5}
-			local colors = {judgmentColors[5], judgmentColors[4], judgmentColors[3], judgmentColors[2], judgmentColors[1]}
-			for i=1, 5 do
+			local colors = {
+				HVColor.GetJudgmentColor("W5"),
+				HVColor.GetJudgmentColor("W4"),
+				HVColor.GetJudgmentColor("W3"),
+				HVColor.GetJudgmentColor("W2"),
+				HVColor.GetJudgmentColor("W1")
+			}
+			if HV.EmulateRidiculousEnabled() then
+				table.insert(windows, 11.25)
+				table.insert(colors, HVColor.GetJudgmentColor("Ridiculous"))
+			end
+			for i=1, #windows do
 				g[#g+1] = Def.Quad {
 					InitCommand = function(self)
 						local w = (windows[i] / maxOffset) * ebW
@@ -1298,11 +1335,17 @@ t[#t + 1] = Def.ActorFrame {
 						UpdateCommand = function(self)
 							local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
 							if pss then
-								self:settext(pss:GetTapNoteScores(judgmentTNS[i]))
+								self:settext(getGameplayJudgmentCount(pss, judgmentTNS[i]))
 							end
 						end,
-						PracticeModeResetMessageCommand = function(self) self:settext("0") end,
-						PracticeModeReloadMessageCommand = function(self) self:settext("0") end
+						PracticeModeResetMessageCommand = function(self)
+							if judgmentTNS[i] == "Ridiculous" then HV_RidiculousCount = 0 end
+							self:settext("0")
+						end,
+						PracticeModeReloadMessageCommand = function(self)
+							if judgmentTNS[i] == "Ridiculous" then HV_RidiculousCount = 0 end
+							self:settext("0")
+						end
 					}
 				}
 			end

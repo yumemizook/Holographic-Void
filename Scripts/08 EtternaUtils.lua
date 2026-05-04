@@ -1186,7 +1186,9 @@ function offsetToJudgeColor(offset, scale)
 	if not offset then return HVColor.GetJudgmentColor("Miss") end
 	scale = scale or 1
 	local absOff = math.abs(offset)
-	if absOff <= 22.5 * scale then
+	if HV.EmulateRidiculousEnabled() and absOff <= 11.25 * scale then
+		return HVColor.GetJudgmentColor("Ridiculous")
+	elseif absOff <= 22.5 * scale then
 		return HVColor.GetJudgmentColor("W1")
 	elseif absOff <= 45 * scale then
 		return HVColor.GetJudgmentColor("W2")

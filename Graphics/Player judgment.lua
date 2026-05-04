@@ -56,6 +56,13 @@ local t = Def.ActorFrame {
 		local jdgIdx = judgments[tns]
 		if not jdgIdx then return end
 		
+		local isRidiculous = false
+		if HV.EmulateRidiculousEnabled() and tns == "W1" and params.TapNoteOffset then
+			if math.abs(params.TapNoteOffset) <= 0.01125 then
+				isRidiculous = true
+			end
+		end
+
 		-- Recent Judgment Display Logic
 		if HV.RecentJudgmentDisplay and HV.RecentJudgmentDisplay() and not HV.MinimalisticMode() then
 			local dotFrame = self:GetChild("RecentJudgmentDisplay")
@@ -64,7 +71,7 @@ local t = Def.ActorFrame {
 				for i = DOT_COUNT, 2, -1 do
 					dotHistory[i] = dotHistory[i-1]
 				end
-				dotHistory[1] = HVColor.GetJudgmentColor(tns)
+				dotHistory[1] = HVColor.GetJudgmentColor(isRidiculous and "Ridiculous" or tns)
 				
 				-- Update dots
 				for i = 1, DOT_COUNT do
@@ -84,16 +91,7 @@ local t = Def.ActorFrame {
 			end
 		end
 
-		-- Ridiculous Emulation Logic
-		local isRidiculous = false
-		if (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true") and tns == "W1" and params.TapNoteOffset then
-			-- Ridiculous window = 22.5 / 2 = 11.25ms (0.01125s)
-			if math.abs(params.TapNoteOffset) <= 0.01125 then
-				isRidiculous = true
-			end
-		end
-
-		local emulateRidiculous = (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true")
+		local emulateRidiculous = HV.EmulateRidiculousEnabled()
 		local numStates = sprite:GetNumStates()
 		local state
 		local offset = params.TapNoteOffset
@@ -180,7 +178,7 @@ local t = Def.ActorFrame {
 		if offsetText then
 			if shouldShowLowerJudgementOffset(tns) and params.TapNoteOffset ~= nil then
 				offsetText:settext(string.format("%+.2fms", params.TapNoteOffset * 1000))
-				offsetText:diffuse(HVColor.GetJudgmentColor(tns))
+				offsetText:diffuse(HVColor.GetJudgmentColor(isRidiculous and "Ridiculous" or tns))
 				offsetText:visible(true):diffusealpha(1)
 			else
 				offsetText:visible(false)
