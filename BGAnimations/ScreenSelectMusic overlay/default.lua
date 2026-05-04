@@ -63,6 +63,23 @@ local function PlayWhooshOverlayOpen()
 	SOUND:PlayOnce(THEME:GetPathS("", "whoosh"))
 end
 
+local function IsSelectMusicBackgroundClickArea()
+	local mx = INPUTFILTER:GetMouseX() or SCREEN_CENTER_X
+	local my = INPUTFILTER:GetMouseY() or SCREEN_CENTER_Y
+	if HV.ActiveTab and HV.ActiveTab ~= "" then return false end
+	if my <= 40 or my >= SCREEN_HEIGHT - 40 then return false end
+	if mx <= panelX + panelW + 110 then return false end
+	return true
+end
+
+local function ApplyNativeMusicWheelHoldTransform(p)
+	local screen = SCREENMAN:GetTopScreen()
+	local wheel = screen and screen.GetMusicWheel and screen:GetMusicWheel()
+	if wheel then
+		wheel:x((SCREEN_WIDTH - 180) + (SCREEN_WIDTH * 0.32) * p)
+	end
+end
+
 local main_af = Def.ActorFrame {
 	InitCommand = function(self)
 		self:SetUpdateFunction(function(af)
@@ -84,6 +101,12 @@ local main_af = Def.ActorFrame {
 		HV.SuppressSearchCloseEnter = false
 		HV.GameplaySessionValid = false
 		HV.ChartPreviewActive = false
+		HV.LeftMousePeekHold = false
+		HV.LeftMousePeekHoldAllowed = false
+		ApplyNativeMusicWheelHoldTransform(0)
+		if INPUTFILTER and INPUTFILTER.SetMouseVisible then
+			INPUTFILTER:SetMouseVisible(true)
+		end
 		
 		-- If returning from a gameplay session, reset the preview position to 0
 		-- to avoid trying to "resume" from the end of the song.
@@ -114,6 +137,12 @@ local main_af = Def.ActorFrame {
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		SCREENMAN:set_input_redirected(PLAYER_2, false)
+		if HV.LeftMousePeekHold then
+			HV.LeftMousePeekHold = false
+			HV.LeftMousePeekHoldAllowed = false
+			MESSAGEMAN:Broadcast("HVLeftMousePeekHoldChanged", {Held = false, Allowed = false})
+		end
+		ApplyNativeMusicWheelHoldTransform(0)
 	end,
 	LoginMessageCommand = function(self)
 		local user = DLMAN:GetUsername()
@@ -332,6 +361,21 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
 			local evType = event.type or ""
+			if btn == "DeviceButton_left mouse button" then
+				local nextHeld = nil
+				local allowed = false
+				if evType == "InputEventType_FirstPress" then
+					allowed = IsSelectMusicBackgroundClickArea()
+					nextHeld = allowed
+				elseif evType == "InputEventType_Release" then
+					nextHeld = false
+				end
+				if nextHeld ~= nil and HV.LeftMousePeekHold ~= nextHeld then
+					HV.LeftMousePeekHold = nextHeld
+					HV.LeftMousePeekHoldAllowed = allowed
+					MESSAGEMAN:Broadcast("HVLeftMousePeekHoldChanged", {Held = nextHeld, Allowed = allowed})
+				end
+			end
 			local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
 			
 			-- After search confirm closes the tab, keep swallowing only the triggering Enter/Start
@@ -831,6 +875,18 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "MusicWheelHighlight",
 	InitCommand = function(self)
 		self:xy(SCREEN_WIDTH - 180, SCREEN_CENTER_Y)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			actor:x(SCREEN_WIDTH - 180 + SCREEN_WIDTH * 0.32 * actor.hv_holdLerp)
+		end)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+		local held = params and params.Held and params.Allowed
+		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	-- The main highlight box - fixed in center
@@ -851,6 +907,28 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	},
 	
 
+}
+
+
+-- ============================================================
+-- MUSIC WHEEL HOLD TRANSFORM
+-- ============================================================
+main_af[#main_af + 1] = Def.ActorFrame {
+	Name = "MusicWheelHoldTransformDriver",
+	InitCommand = function(self)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			ApplyNativeMusicWheelHoldTransform(actor.hv_holdLerp)
+		end)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+		local held = params and params.Held and params.Allowed
+		self.hv_holdTarget = held and 1 or 0
+	end
 }
 
 
@@ -1613,6 +1691,18 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "HeaderBar",
 	InitCommand = function(self)
 		self:xy(0, 0)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			actor:y(-(headerH + 16) * actor.hv_holdLerp)
+		end)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+		local held = params and params.Held and params.Allowed
+		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	Def.Quad {
@@ -1828,6 +1918,18 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "FooterBar",
 	InitCommand = function(self)
 		self:xy(0, SCREEN_HEIGHT - footerH)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			actor:y(SCREEN_HEIGHT - footerH + (footerH + 16) * actor.hv_holdLerp)
+		end)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+		local held = params and params.Held and params.Allowed
+		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	Def.Quad {
@@ -1888,6 +1990,18 @@ for i, tabName in ipairs(tabs) do
 		Name = "FooterTab_" .. tabName,
 		InitCommand = function(self)
 			self:xy(10 + (i - 1) * tabW, SCREEN_HEIGHT - footerH)
+			self.hv_holdLerp = 0
+			self.hv_holdTarget = 0
+		end,
+		OnCommand = function(self)
+			self:SetUpdateFunction(function(actor)
+				actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+				actor:y(SCREEN_HEIGHT - footerH + (footerH + 16) * actor.hv_holdLerp)
+			end)
+		end,
+		HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+			local held = params and params.Held and params.Allowed
+			self.hv_holdTarget = held and 1 or 0
 		end,
 		
 		Def.Quad {

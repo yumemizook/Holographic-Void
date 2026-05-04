@@ -34,6 +34,13 @@ local HVPrefRows = {
 		Values = {0, 1, 2},
 	},
 
+	-- Mouse Parallax
+	HV_Parallax = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true},
+	},
+
 	-- Song Preview Mode
 	HV_SongPreview = {
 		Default = 1,
@@ -479,7 +486,7 @@ function HVThemeOptionsLines()
 	-- Logical grouping of theme options
 	local l = table.concat({
 		-- General / Visual
-		"HV_BGAnimIntensity", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
+		"HV_BGAnimIntensity", "HV_Parallax", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
 		"HV_SongBackgroundBrightness",
 		
 		-- Music Select

@@ -450,7 +450,9 @@ local t = Def.ActorFrame {
 	OnCommand = function(self)
 		SCREENMAN:GetTopScreen():AddInputCallback(scroller)
 		SCREENMAN:SetSystemCursorVisible(true)
-		INPUTFILTER:SetMouseVisible(true)
+		if INPUTFILTER and INPUTFILTER.SetMouseVisible then
+			INPUTFILTER:SetMouseVisible(true)
+		end
 		self:sleep(0):queuecommand("RefreshJudgeDisplay")
 	end,
 

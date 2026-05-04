@@ -253,6 +253,13 @@ local HVPrefs = {
 		Values = {0, 1, 2}
 	},
 
+	-- Visual: Enable mouse parallax effects
+	HV_Parallax = {
+		Default = true,
+		Choices = {"Off", "On"},
+		Values = {false, true}
+	},
+
 	-- Gameplay: Show MSD ratings on music wheel
 	HV_ShowMSD = {
 		Default = true,
@@ -926,6 +933,11 @@ end
 --- Get song background brightness (0.0-1.0).
 function HV.GetSongBackgroundBrightness()
 	return tonumber(ThemePrefs.Get("HV_SongBackgroundBrightness")) or 0.5
+end
+
+--- Check if mouse parallax effects are enabled.
+function HV.ParallaxEnabled()
+	return isTrue(ThemePrefs.Get("HV_Parallax"))
 end
 
 --- Get screen filter / lane cover opacity (0.0-1.0).

@@ -16,10 +16,33 @@ local headerH = 40
 local footerH = 40
 
 local profileOverlayActor = nil
+local IsMouseInSelectMusicInteractiveArea
 
-local t = Def.ActorFrame {
+local root = Def.ActorFrame {
 	Name = "SelectMusicDecorations"
 }
+
+local t = Def.ActorFrame {
+	Name = "SelectMusicContent",
+	InitCommand = function(self)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			local p = actor.hv_holdLerp
+			actor:x(-SCREEN_WIDTH * 0.28 * p)
+			actor:zoom(1 + 0.18 * p)
+			actor:diffusealpha(1 - p)
+		end)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
+		local held = params and params.Held and params.Allowed
+		self.hv_holdTarget = held and 1 or 0
+	end
+}
+root[#root + 1] = t
 
 
 HV.LoginState = HV.LoginState or {
@@ -57,6 +80,16 @@ local loginBtnW = 180
 local loginBtnH = 28
 local loginBtnCX = panelX + panelW / 2
 local loginBtnCY = SCREEN_BOTTOM - 24
+
+function IsMouseInSelectMusicInteractiveArea()
+	local mx = INPUTFILTER:GetMouseX() or SCREEN_CENTER_X
+	local my = INPUTFILTER:GetMouseY() or SCREEN_CENTER_Y
+	if HV.ActiveTab and HV.ActiveTab ~= "" then return true end
+	if mx <= panelX + panelW + 95 then return true end
+	if my >= SCREEN_HEIGHT - footerH then return true end
+	if my <= headerH then return true end
+	return false
+end
 
 local function GetOnlineStatus()
 	local connected = DLMAN:IsLoggedIn()
@@ -308,6 +341,34 @@ t[#t + 1] = Def.Actor {
 	DelayedChartUpdateMessageCommand = function(self) self:playcommand("SyncPermamirror") end
 }
 
+local function GetCurrentBannerPath()
+	local song = HV.CurrentSongData.song
+	local group = HV.CurrentSongData.group
+	local bnpath = ""
+	if song then
+		bnpath = song:GetBannerPath()
+	elseif group then
+		bnpath = SONGMAN:GetSongGroupBannerPath(group)
+	end
+
+	if not bnpath or bnpath == "" then
+		bnpath = THEME:GetPathG("Common", "fallback banner")
+	end
+
+	return bnpath
+end
+
+local function GetCurrentSongBackgroundPath()
+	local song = HV.CurrentSongData.song
+	if song and song.GetBackgroundPath then
+		local bgPath = song:GetBackgroundPath()
+		if bgPath and bgPath ~= "" then
+			return bgPath
+		end
+	end
+	return nil
+end
+
 -- ============================================================
 -- BANNER AREA
 -- ============================================================
@@ -333,18 +394,7 @@ t[#t + 1] = Def.ActorFrame {
 			self.lastPath = ""
 		end,
 		SetCommand = function(self)
-			local song = HV.CurrentSongData.song
-			local group = HV.CurrentSongData.group
-			local bnpath = ""
-			if song then
-				bnpath = song:GetBannerPath()
-			elseif group then
-				bnpath = SONGMAN:GetSongGroupBannerPath(group)
-			end
-
-			if not bnpath or bnpath == "" then
-				bnpath = THEME:GetPathG("Common", "fallback banner")
-			end
+			local bnpath = GetCurrentBannerPath()
 
 			if bnpath and bnpath ~= "" then
 				if bnpath ~= self.lastPath then
@@ -2158,6 +2208,92 @@ t[#t + 1] = Def.ActorFrame {
 	end
 }
 
+root[#root + 1] = Def.ActorFrame {
+	Name = "MouseHoldPeekOverlay",
+	InitCommand = function(self)
+		self:draworder(12000):visible(false)
+		self.hv_holdLerp = 0
+		self.hv_holdTarget = 0
+	end,
+	OnCommand = function(self)
+		self:playcommand("Set")
+		self:SetUpdateFunction(function(actor)
+			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
+			local active = actor.hv_holdLerp > 0.01
+			actor:visible(active)
+
+			local cover = actor:GetChild("Cover")
+			if cover then
+				cover:diffusealpha(actor.hv_holdLerp)
+			end
+
+			local bg = actor:GetChild("PeekSongBackground")
+			if bg and bg:GetVisible() then
+				local mx = INPUTFILTER:GetMouseX() or SCREEN_CENTER_X
+				local my = INPUTFILTER:GetMouseY() or SCREEN_CENTER_Y
+				local nx = (mx / SCREEN_WIDTH) - 0.5
+				local ny = (my / SCREEN_HEIGHT) - 0.5
+				local moveScale = 1 - actor.hv_holdLerp
+				local zoom = 1.10 + (0.12 * actor.hv_holdLerp)
+				bg:xy(
+					SCREEN_CENTER_X + (nx * 2 * 40 * moveScale),
+					SCREEN_CENTER_Y + (ny * 2 * 24 * moveScale)
+				)
+				bg:zoomto(SCREEN_WIDTH * zoom, SCREEN_HEIGHT * zoom)
+				bg:diffusealpha(actor.hv_holdLerp)
+			end
+		end)
+	end,
+	SetCommand = function(self)
+		local held = HV.LeftMousePeekHold == true
+		local allowed = held and HV.LeftMousePeekHoldAllowed == true
+		self.hv_holdTarget = allowed and 1 or 0
+		if allowed then
+			self:playcommand("UpdateBanner")
+		end
+	end,
+	UpdateBannerCommand = function(self)
+		local bg = self:GetChild("PeekSongBackground")
+		if not bg then return end
+		local bgPath = GetCurrentSongBackgroundPath()
+		if not bgPath then
+			bg:visible(false)
+			return
+		end
+		if bg.lastPath ~= bgPath then
+			bg:LoadBackground(bgPath)
+			bg.lastPath = bgPath
+		end
+		bg:visible(true):diffuse(color("1,1,1,1")):diffusealpha(self.hv_holdLerp)
+	end,
+	HVLeftMousePeekHoldChangedMessageCommand = function(self)
+		self:playcommand("Set")
+	end,
+	CurrentSongChangedMessageCommand = function(self)
+		if self:GetVisible() then
+			self:playcommand("UpdateBanner")
+		end
+	end,
+	DelayedChartUpdateMessageCommand = function(self)
+		if self:GetVisible() then
+			self:playcommand("UpdateBanner")
+		end
+	end,
+	Def.Quad {
+		Name = "Cover",
+		InitCommand = function(self)
+			self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):zoomto(SCREEN_WIDTH, SCREEN_HEIGHT):diffuse(color("0,0,0,1")):diffusealpha(0)
+		end
+	},
+	Def.Sprite {
+		Name = "PeekSongBackground",
+		InitCommand = function(self)
+			self.lastPath = ""
+			self:diffusealpha(0)
+		end
+	}
+}
+
 t[#t + 1] = LoadActor("netplay.lua")
 
-return t
+return root
