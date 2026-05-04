@@ -594,9 +594,20 @@ t[#t + 1] = Def.ActorFrame {
 			local wifePct
 			local scoreMode = ThemePrefs.Get("HV_ScoreDisplayMode") or "Normal"
 			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-			local ps = GAMESTATE:GetPlayerState(pn)
+			local isAutoplay = getAutoplay and getAutoplay() ~= 0
 			
-			if scoreMode == "Subtractive" then
+			if isAutoplay and pss then
+				if type(pss.GetWifePoints) == "function" then
+					local ok, value = pcall(pss.GetWifePoints, pss)
+					value = ok and tonumber(value) or nil
+					if value then wifePct = (value / HV_MaxPoints) * 100 end
+				end
+				if not wifePct and type(pss.GetWifeScore) == "function" then
+					local ok, value = pcall(pss.GetWifeScore, pss)
+					value = ok and tonumber(value) or nil
+					if value then wifePct = value * 100 end
+				end
+			elseif scoreMode == "Subtractive" then
 				wifePct = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
 			else
 				if pss then
