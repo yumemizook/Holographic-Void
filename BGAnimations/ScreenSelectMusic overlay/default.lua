@@ -69,6 +69,7 @@ local function IsSelectMusicBackgroundClickArea()
 	if HV.ActiveTab and HV.ActiveTab ~= "" then return false end
 	if my <= 40 or my >= SCREEN_HEIGHT - 40 then return false end
 	if mx <= panelX + panelW + 110 then return false end
+	if mx >= SCREEN_WIDTH - 390 and mx <= SCREEN_WIDTH - 10 and my >= 84 and my <= SCREEN_HEIGHT - 64 then return false end
 	return true
 end
 
