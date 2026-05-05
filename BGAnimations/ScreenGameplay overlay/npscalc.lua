@@ -1,4 +1,4 @@
--- Holographic Void: NPS Calculator
+-- Etternity: NPS Calculator
 -- Ported from spawncamping-wallhack
 -- Time-based moving average with ActorMultiVertex graph display
 
@@ -24,7 +24,6 @@ local graphX = 10
 local graphY = SCREEN_CENTER_Y + 100
 local fontZoom = 0.65
 local accentColor = HVColor.Accent or color("#00CFFF")
-local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
 -- Graph settings
 local initialPeak = 1 -- Set lower so easy songs don't look broken
@@ -85,8 +84,6 @@ end
 local t = Def.ActorFrame {
 	Name = "NPSCalcContainer",
 	OnCommand = function(self)
-		setMovableActor({"DeviceButton_y", "DeviceButton_u"}, self:GetChild("NPSTextContainer"), self:GetChild("NPSTextContainer"):GetChild("Border"))
-		setMovableActor({"DeviceButton_i", "DeviceButton_o"}, self:GetChild("NPSGraph"), self:GetChild("NPSGraph"):GetChild("Border"))
 		self:SetUpdateFunction(Update)
 	end,
 	
@@ -115,14 +112,14 @@ local t = Def.ActorFrame {
 				npsWindow = getWindowSize()
 			end
 		end
-	},
+	}
 }
 
 -- Text Container
 t[#t + 1] = Def.ActorFrame {
 	Name = "NPSTextContainer",
 	InitCommand = function(self)
-		self:xy((MovableValues and MovableValues.NPSDisplayX) or getDefaultGameplayCoordinate("NPSDisplayX") or graphX, (MovableValues and MovableValues.NPSDisplayY) or getDefaultGameplayCoordinate("NPSDisplayY") or (graphY - 5)):zoom((MovableValues and MovableValues.NPSDisplayZoom) or getDefaultGameplaySize("NPSDisplayZoom") or fontZoom)
+		self:xy(graphX, graphY - 5):zoom(fontZoom)
 	end,
 	LoadFont("Common Normal") .. {
 		Name = "Text",
@@ -131,8 +128,7 @@ t[#t + 1] = Def.ActorFrame {
 			self:settext("NPS: 0  Peak: 0")
 			npsTextActor = self
 		end
-	},
-	MovableBorder(110, 18, 1, 55, -9)
+	}
 }
 
 -- Graph Container
@@ -143,7 +139,7 @@ local graphPeakNPS = initialPeak
 local graphVerts = Def.ActorFrame {
 	Name = "NPSGraph",
 	InitCommand = function(self)
-		self:xy((MovableValues and MovableValues.NPSGraphX) or getDefaultGameplayCoordinate("NPSGraphX") or graphX, (MovableValues and MovableValues.NPSGraphY) or getDefaultGameplayCoordinate("NPSGraphY") or graphY):zoomtowidth((MovableValues and MovableValues.NPSGraphWidth) or getDefaultGameplaySize("NPSGraphWidth") or 1):zoomtoheight((MovableValues and MovableValues.NPSGraphHeight) or getDefaultGameplaySize("NPSGraphHeight") or 1)
+		self:xy(graphX, graphY)
 	end,
 	
 	-- Background Quad
@@ -213,8 +209,7 @@ local graphVerts = Def.ActorFrame {
 			self:sleep(graphFreq)
 			self:queuecommand("GraphUpdate")
 		end
-	},
-	MovableBorder(graphWidth, graphHeight, 1, graphWidth / 2, graphHeight / 2)
+	}
 }
 
 t[#t + 1] = graphVerts

@@ -1,12 +1,10 @@
--- Holographic Void: In-Game Leaderboard (Single Player)
--- Shows local or online high scores for the current song during gameplay
+-- Etternity: In-Game Leaderboard (Single Player)
+-- Shows local high scores for the current song during gameplay
 -- Top-left corner, individual score cards + live current score
--- THe judgement display is not shown here.
+-- The judgement display is not shown here.
 
 local leaderboardMode = HV.ShowInGameLeaderboard() or "Off"
-local topScreen = SCREENMAN:GetTopScreen()
-local isNetMultiplayer = NSMAN and NSMAN.IsETTP and NSMAN:IsETTP() and topScreen and topScreen:GetName() and topScreen:GetName():find("Net") ~= nil or false
-if (leaderboardMode == "Off" and not isNetMultiplayer) or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
+if leaderboardMode == "Off" or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
 	return Def.ActorFrame {}
 end
 
@@ -31,10 +29,14 @@ local cardGap = 3
 local startX = 10
 local startY = 40
 local maxEntries = 5
-local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
--- Get player name (prefer online)
-local profileName = HV.GetPlayerName()
+-- Get player profile name
+local profileName = "Player"
+local profile = PROFILEMAN:GetProfile(PLAYER_1)
+if profile then
+	local name = profile:GetDisplayName()
+	if name and name ~= "" then profileName = name end
+end
 
 -- Grade helper
 local function GetGradeStr(wife)
@@ -62,80 +64,22 @@ local function UpdateScores()
 	if not ck then return end
 
 	-- Get current rate for filtering
-	local curRate = getCurRateValue()
 	local curRateStr = getCurRateString()
+	
+	-- Initialize filtered table to avoid 'nil' sort error
+	local filtered = {} 
 
-	if isNetMultiplayer then
-		local lb = NSMAN:GetMPLeaderboard() or {}
-		table.sort(lb, function(a, b)
-			return (a.wife or -1) > (b.wife or -1)
+	-- [Optional: Add Online/Global filtering logic here if needed]
+	-- For now, we ensure table.sort doesn't crash if 'filtered' is empty
+	if #filtered > 0 then
+		-- Sort by wife% descending
+		table.sort(filtered, function(a, b)
+			return a:GetWifeScore() > b:GetWifeScore()
 		end)
-		for i = 1, math.min(maxEntries, #lb) do
-			local s = lb[i]
-			local wife = (s.wife or 0) * 100
-			highScores[#highScores + 1] = {
-				rank = i,
-				wife = wife,
-				combo = 0,
-				gradeStr = GetGradeStr(wife),
-				name = s.user or "???",
-				rate = curRate,
-				ssr = -1,
-			}
-		end
-	elseif leaderboardMode == "Online" then
-		-- Fetch from DLMAN
-		local lb = DLMAN:GetChartLeaderBoard(ck)
-		if lb then
-			local filtered = {}
-			for i = 1, #lb do
-				local s = lb[i]
-				-- Filter by current rate (within epsilon)
-				if math.abs(s:GetMusicRate() - curRate) < 0.001 then
-					filtered[#filtered + 1] = s
-				end
-			end
 
-			-- Sort by wife% descending
-			table.sort(filtered, function(a, b)
-				return a:GetWifeScore() > b:GetWifeScore()
-			end)
-
-			for i = 1, math.min(maxEntries, #filtered) do
-				local s = filtered[i]
-				pcall(function()
-					local wife = s:GetWifeScore() * 100
-					local ssr = s:GetSkillsetSSR("Overall") or 0
-					highScores[#highScores + 1] = {
-						rank = i,
-						wife = wife,
-						combo = s:GetMaxCombo(),
-						gradeStr = GetGradeStr(wife),
-						name = s:GetDisplayName() or s:GetName() or "???",
-						rate = s:GetMusicRate(),
-						ssr = ssr,
-					}
-				end)
-			end
-		end
-
-		-- If none found, request them
-		if #highScores == 0 and DLMAN:IsLoggedIn() then
-			DLMAN:RequestChartLeaderBoardFromOnline(ck, function(lbData)
-				if lbData and #lbData > 0 then
-					MESSAGEMAN:Broadcast("RefreshLeaderboard")
-				end
-			end)
-		end
-	else
-		-- Local Scores: Only for current rate
-		local sl = getScoreTable(PLAYER_1, curRateStr)
-		if sl then
-			-- Already sorted by score usually, but let's be sure it's wife%
-			table.sort(sl, function(a, b) return a:GetWifeScore() > b:GetWifeScore() end)
-			
-			for i = 1, math.min(maxEntries, #sl) do
-				local s = sl[i]
+		for i = 1, math.min(maxEntries, #filtered) do
+			local s = filtered[i]
+			pcall(function()
 				local wife = s:GetWifeScore() * 100
 				local ssr = s:GetSkillsetSSR("Overall") or 0
 				highScores[#highScores + 1] = {
@@ -143,11 +87,33 @@ local function UpdateScores()
 					wife = wife,
 					combo = s:GetMaxCombo(),
 					gradeStr = GetGradeStr(wife),
-					name = HV.GetPlayerName(),
+					name = s:GetDisplayName() or s:GetName() or "???",
 					rate = s:GetMusicRate(),
 					ssr = ssr,
 				}
-			end
+			end)
+		end
+	end
+
+	-- Local Scores: Only for current rate
+	local sl = getScoreTable(PLAYER_1, curRateStr)
+	if sl and #sl > 0 then
+		-- Already sorted by score usually, but let's be sure it's wife%
+		table.sort(sl, function(a, b) return a:GetWifeScore() > b:GetWifeScore() end)
+		
+		for i = 1, math.min(maxEntries, #sl) do
+			local s = sl[i]
+			local wife = s:GetWifeScore() * 100
+			local ssr = s:GetSkillsetSSR("Overall") or 0
+			highScores[#highScores + 1] = {
+				rank = i,
+				wife = wife,
+				combo = s:GetMaxCombo(),
+				gradeStr = GetGradeStr(wife),
+				name = profileName,
+				rate = s:GetMusicRate(),
+				ssr = ssr,
+			}
 		end
 	end
 end
@@ -160,21 +126,10 @@ UpdateScores()
 -- ============================================================
 local t = Def.ActorFrame {
 	Name = "InGameLeaderboard",
-	InitCommand = function(self)
-		self:xy((MovableValues and MovableValues.LeaderboardX) or getDefaultGameplayCoordinate("LeaderboardX") or startX, (MovableValues and MovableValues.LeaderboardY) or getDefaultGameplayCoordinate("LeaderboardY") or startY):zoomtowidth((MovableValues and MovableValues.LeaderboardWidth) or getDefaultGameplaySize("LeaderboardWidth") or 1):zoomtoheight((MovableValues and MovableValues.LeaderboardHeight) or getDefaultGameplaySize("LeaderboardHeight") or 1)
-	end,
-	OnCommand = function(self)
-		setMovableActor({"DeviceButton_a", "DeviceButton_s"}, self, self:GetChild("Border"))
-	end,
+	InitCommand = function(self) self:xy(startX, startY) end,
 	RefreshLeaderboardMessageCommand = function(self)
 		UpdateScores()
 		self:playcommand("RefreshScores")
-	end,
-	JudgmentMessageCommand = function(self)
-		if isNetMultiplayer then
-			UpdateScores()
-			self:playcommand("RefreshScores")
-		end
 	end,
 
 	-- Mode Tag
@@ -182,7 +137,7 @@ local t = Def.ActorFrame {
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(4, -12):zoom(0.24)
 				:diffuse(accentColor):diffusealpha(0.6)
-				:settext((isNetMultiplayer and "MULTI") or leaderboardMode:upper())
+				:settext(leaderboardMode:upper())
 		end
 	}
 }
@@ -321,17 +276,6 @@ t[#t + 1] = Def.ActorFrame {
 			local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats(PLAYER_1)
 			if not pss then return end
 			local wife = pss:GetWifeScore() * 100
-			
-			local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
-							   pss:GetTapNoteScores("TapNoteScore_W2") +
-							   pss:GetTapNoteScores("TapNoteScore_W3") +
-							   pss:GetTapNoteScores("TapNoteScore_W4") +
-							   pss:GetTapNoteScores("TapNoteScore_W5") +
-							   pss:GetTapNoteScores("TapNoteScore_Miss")
-			if notesPassed == 0 then
-				wife = 100.0000
-			end
-			
 			if wife >= 99.7 then self:settextf("%.4f%%", wife)
 			else self:settextf("%.2f%%", wife) end
 			local g = GetGradeStr(wife)
@@ -356,7 +300,5 @@ t[#t + 1] = Def.ActorFrame {
 
 -- Trigger first refresh
 t.BeginCommand = function(self) self:playcommand("RefreshScores") end
-
-t[#t + 1] = MovableBorder(cardW, ((cardH + cardGap) * (maxEntries + 1)), 1, cardW / 2, ((cardH + cardGap) * (maxEntries + 1)) / 2)
 
 return t

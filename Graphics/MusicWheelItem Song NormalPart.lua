@@ -1,26 +1,9 @@
---- Holographic Void: MusicWheelItem Song NormalPart
+--- Etternity: MusicWheelItem Song NormalPart
 -- Enhanced song row: MSD for selected difficulty type, local best grade,
 -- artist + subtitle display.
 -- Uses SetMessageCommand with params.Song for reliable song data access.
 
 local wheelItemW = 280
-
-local function isSongFavorited(song)
-	if not song then return false end
-
-	local getters = {"IsFavorited", "IsFavorite", "GetFavorited", "GetIsFavorited"}
-	for _, fn in ipairs(getters) do
-		local method = song[fn]
-		if type(method) == "function" then
-			local ok, result = pcall(method, song)
-			if ok then
-				return result and true or false
-			end
-		end
-	end
-
-	return false
-end
 
 local t = Def.ActorFrame {}
 
@@ -45,8 +28,7 @@ t[#t + 1] = Def.Quad {
 		local curSteps = GAMESTATE:GetCurrentSteps()
 		if curSteps then
 			local diff = ToEnumShortString(curSteps:GetDifficulty())
-			local dc = (HVColor and HVColor.GetDifficultyColor and HVColor.GetDifficultyColor(diff))
-				or (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
+			local dc = (HVColor and HVColor.Difficulty and HVColor.Difficulty[diff])
 			if dc then
 				self:diffuse(dc):diffusealpha(0.6) -- Constant alpha for uniform look
 				return
@@ -59,33 +41,12 @@ t[#t + 1] = Def.Quad {
 	end
 }
 
--- Favorite indicator
-t[#t + 1] = Def.Sprite {
-	Name = "FavoriteStar",
-	Texture = THEME:GetPathG("", "round_star"),
-	InitCommand = function(self)
-		self:x(wheelItemW/2 - 35):y(7):zoomto(10, 10)
-			:diffuse(HVColor.Accent)
-			:visible(false)
-	end,
-	SetMessageCommand = function(self, params)
-		local song = (params and params.Song) or self.hv_lastSong
-		self.hv_lastSong = song
-		self:visible(isSongFavorited(song))
-	end,
-	FavoriteSongToggledMessageCommand = function(self, params)
-		if not params or not params.Song or params.Song == self.hv_lastSong then
-			self:playcommand("Set", {Song = self.hv_lastSong})
-		end
-	end
-}
-
--- MSD rating text (right side) - shows MSD for the SAME difficulty as selected
+-- MSD rating text (left side) - shows MSD for closest available difficulty
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "MSDDisplay",
 	InitCommand = function(self)
-		self:halign(1):x(wheelItemW/2 - 6):y(-6)
-			:zoom(0.40):diffuse(color("0.65,0.65,0.65,1")) -- Increased from 0.32
+		self:halign(0):x(-wheelItemW/2 + 8):y(0)
+			:zoom(0.52):diffuse(color("0.65,0.65,0.65,1"))
 	end,
 	SetMessageCommand = function(self, params)
 		local song = (params and params.Song) or self.hv_lastSong
@@ -97,31 +58,43 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 			return 
 		end
 
-		local targetDiffOption = curSteps:GetDifficulty()
-		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-		
+		local diffOrder = {Beginner=1, Easy=2, Medium=3, Hard=4, Challenge=5, Edit=6}
+		local targetDiff = ToEnumShortString(curSteps:GetDifficulty())
+		local targetIdx = diffOrder[targetDiff] or 4
+		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType())
+			or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+
 		local showMSD = HV.ShowMSD()
-		
+
 		if allSteps then
+			-- Find best matching chart: exact first, then closest by difficulty index
+			local bestSt = nil
+			local bestDist = math.huge
 			for _, st in ipairs(allSteps) do
-				if st:GetDifficulty() == targetDiffOption then
-					if showMSD then
-						local msd = st:GetMSD(getCurRateValue(), 1)
-						if msd and msd > 0 then
-							self:settext(string.format("%.2f", msd)) -- Standardized to 2 decimal points
-							self:diffuse(HVColor.GetMSDRatingColor(msd))
-						else
-							self:settext("-")
-							self:diffuse(color("0.45,0.45,0.45,1"))
-						end
-					else
-						-- Show chart meter if MSD is disabled
-						local meter = st:GetMeter()
-						self:settext(tostring(meter))
-						self:diffuse(color("0.65,0.65,0.65,1")) -- Neutral text color
-					end
-					return
+				local d = ToEnumShortString(st:GetDifficulty())
+				local idx = diffOrder[d] or 99
+				local dist = math.abs(idx - targetIdx)
+				if dist < bestDist then
+					bestDist = dist
+					bestSt = st
 				end
+			end
+
+			if bestSt then
+				if showMSD then
+					local msd = bestSt:GetMSD(getCurRateValue(), 1)
+					if msd and msd > 0 then
+						self:settext(string.format("%.2f", msd))
+						self:diffuse(HVColor.GetMSDRatingColor(msd))
+					else
+						self:settext("-")
+						self:diffuse(color("0.45,0.45,0.45,1"))
+					end
+				else
+					self:settext(tostring(bestSt:GetMeter()))
+					self:diffuse(color("0.65,0.65,0.65,1"))
+				end
+				return
 			end
 		end
 		self:settext("")
@@ -134,12 +107,12 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 	end
 }
 
--- Grade badge (right side, below MSD) - shows grade for matching difficulty
+-- Grade badge (left side, below MSD) - shows grade for closest available difficulty
 t[#t + 1] = LoadFont("Common Normal") .. {
 	Name = "GradeDisplay",
 	InitCommand = function(self)
-		self:halign(1):x(wheelItemW/2 - 6):y(7)
-			:zoom(0.30):diffuse(color("0.45,0.45,0.45,1")) -- Increased from 0.22
+		self:halign(0):x(-wheelItemW/2 + 8):y(11)
+			:zoom(0.50):diffuse(color("0.45,0.45,0.45,1"))
 	end,
 	SetMessageCommand = function(self, params)
 		local song = (params and params.Song) or self.hv_lastSong
@@ -151,41 +124,49 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 			return 
 		end
 
-		local targetDiffOption = curSteps:GetDifficulty()
-		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+		local diffOrder = {Beginner=1, Easy=2, Medium=3, Hard=4, Challenge=5, Edit=6}
+		local targetDiff = ToEnumShortString(curSteps:GetDifficulty())
+		local targetIdx = diffOrder[targetDiff] or 4
+		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType())
+			or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
+
 		if allSteps then
+			local bestSt = nil
+			local bestDist = math.huge
 			for _, st in ipairs(allSteps) do
-				if st:GetDifficulty() == targetDiffOption then
-					local profile = PROFILEMAN:GetProfile(PLAYER_1)
-					if profile then
-						local chartKey = st:GetChartKey()
-						if chartKey then
-							local scoresByRate = SCOREMAN:GetScoresByKey(chartKey)
-							if scoresByRate then
-								local bestWife = -1
-								local bestGrade = nil
-								for _, scoresAtRate in pairs(scoresByRate) do
-									local scoreList = scoresAtRate:GetScores()
-									if scoreList then
-										for _, s in ipairs(scoreList) do
-											if not IsScoreInvalid(s) then
-												local w = s:GetWifeScore()
-												if w > bestWife then
-													bestWife = w
-													bestGrade = s:GetWifeGrade()
-												end
-											end
-										end
+				local d = ToEnumShortString(st:GetDifficulty())
+				local idx = diffOrder[d] or 99
+				local dist = math.abs(idx - targetIdx)
+				if dist < bestDist then
+					bestDist = dist
+					bestSt = st
+				end
+			end
+
+			if bestSt then
+				local chartKey = bestSt:GetChartKey()
+				if chartKey then
+					local scoresByRate = SCOREMAN:GetScoresByKey(chartKey)
+					if scoresByRate then
+						local bestWife = -1
+						local bestGrade = nil
+						for _, scoresAtRate in pairs(scoresByRate) do
+							local scoreList = scoresAtRate:GetScores()
+							if scoreList then
+								for _, s in ipairs(scoreList) do
+									local w = s:GetWifeScore()
+									if w > bestWife then
+										bestWife = w
+										bestGrade = s:GetWifeGrade()
 									end
 								end
-								if bestGrade and bestGrade ~= "Grade_Failed" then
-									local gs = ToEnumShortString(bestGrade)
-									local displayGrade = HV.GetGradeName(bestGrade)
-									self:settext(displayGrade)
-									self:diffuse(HVColor.GetGradeColor(gs))
-									return
-								end
 							end
+						end
+						if bestGrade and bestGrade ~= "Grade_Failed" then
+							local gs = ToEnumShortString(bestGrade)
+							self:settext(HV.GetGradeName(bestGrade))
+							self:diffuse(HVColor.GetGradeColor(gs))
+							return
 						end
 					end
 				end
@@ -215,52 +196,6 @@ t[#t + 1] = LoadFont("Common Normal") .. {
 		else
 			self:settext("")
 		end
-	end
-}
-
--- Permamirror Indicator
-t[#t + 1] = LoadFont("Common Normal") .. {
-	Name = "PermamirrorIndicator",
-	InitCommand = function(self)
-		-- Position left of the MSD value 
-		self:halign(1):x(wheelItemW/2 - 35):y(-6)
-			:zoom(0.35):diffuse(color("#FF6666")):settext("(MR)")
-	end,
-	SetMessageCommand = function(self, params)
-		local song = (params and params.Song) or self.hv_lastSong
-		self.hv_lastSong = song
-		local curSteps = GAMESTATE:GetCurrentSteps()
-		
-		if not song or not curSteps then 
-			self:visible(false)
-			return 
-		end
-
-		local targetDiffOption = curSteps:GetDifficulty()
-		local allSteps = (song.GetChartsOfCurrentGameType and song:GetChartsOfCurrentGameType()) or (song.GetStepsByStepsType and song:GetStepsByStepsType(GAMESTATE:GetCurrentStyle():GetStepsType()))
-		
-		local isPM = false
-		if allSteps then
-			for _, st in ipairs(allSteps) do
-				if st:GetDifficulty() == targetDiffOption then
-					if st.IsPermaMirror and st:IsPermaMirror() then
-						isPM = true
-					end
-					break
-				end
-			end
-		end
-
-		self:visible(isPM)
-	end,
-	CurrentStepsChangedMessageCommand = function(self)
-		self:playcommand("Set", {Song = self.hv_lastSong})
-	end,
-	PermamirrorUpdatedMessageCommand = function(self)
-		self:stoptweening():sleep(0.05):queuecommand("Set", {Song = self.hv_lastSong})
-	end,
-	PermamirrorChangedMessageCommand = function(self)
-		self:stoptweening():sleep(0.05):queuecommand("Set", {Song = self.hv_lastSong})
 	end
 }
 

@@ -1,6 +1,5 @@
 local settext = BitmapText.settext
 local isPractice = GAMESTATE:IsPracticeMode()
-local allowedCustomization = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
 local function highlight(self)
 	self:queuecommand("Highlight")
@@ -20,23 +19,15 @@ end
 
 return Def.ActorFrame {
 	OnCommand = function(self)
-		if not allowedCustomization then
-			self:visible(false)
-			return
-		end
 		if SCREENMAN:GetTopScreen():GetName() == "ScreenGameplaySyncMachine" then 
 			self:visible(false)
 		end
-		GAMESTATE:SetAutoplay(true)
 		SCREENMAN:GetTopScreen():AddInputCallback(MovableInput)
 		self:SetUpdateFunction(highlight)
 	end,
 	OffCommand = function(self)
-		if allowedCustomization then
-			-- save CustomizeGameplay changes when leaving the screen
-			playerConfig:save(pn_to_profile_slot(PLAYER_1))
-			GAMESTATE:SetAutoplay(false)
-		end
+		-- save CustomizeGameplay changes when leaving the screen
+		playerConfig:save(pn_to_profile_slot(PLAYER_1))
 	end,
 	Def.BitmapText {
 		Name = "message",
@@ -50,7 +41,7 @@ return Def.ActorFrame {
 		Name = "Instructions",
 		Font = "Common Normal",
 		InitCommand = function(self)
-			self:horizalign(left):vertalign(top):xy(SCREEN_WIDTH - 240, 20):zoom(.375):visible(allowedCustomization)
+			self:horizalign(left):vertalign(top):xy(SCREEN_WIDTH - 240, 20):zoom(.375):visible(true)
 		end,
 		HighlightCommand = function(self)
 			highlightIfOver(self)
@@ -69,6 +60,8 @@ return Def.ActorFrame {
 				"7: "..transStr("TargetTrackerPosition"),
 				"8: "..transStr("TargetTrackerSize"),
 				"9: "..transStr("FullProgressBarPosition"),
+				"0: "..transStr("FullProgressBarSize"),
+				"q: "..transStr("MiniProgressBarPosition"),
 				"w: "..transStr("DisplayPercentPosition"),
 				"e: "..transStr("DisplayPercentSize"),
 				"r: "..transStr("NotefieldPosition"),
@@ -80,18 +73,20 @@ return Def.ActorFrame {
 				"p: "..transStr("JudgeCounterPosition"),
 				"a: "..transStr("LeaderboardPosition"),
 				"s: "..transStr("LeaderboardSize"),
+				"d: "..transStr("LeaderboardSpacing"),
 				"f: "..transStr("ReplayButtonPosition"),
-				"g: "..transStr("AutoFailPosition"),
-				"h: "..transStr("AutoFailSize"),
+				--"g: Replay Buttons Size",
+				"h: "..transStr("ReplayButtonSpacing"),
+				"j: "..transStr("LifebarPosition"),
+				"k: "..transStr("LifebarSize"),
+				"l: "..transStr("LifebarRotation"),
 				"x: "..transStr("BPMPosition"),
 				"c: "..transStr("BPMSize"),
 				"v: "..transStr("RatePosition"),
 				"b: "..transStr("RateSize"),
-				"m: "..transStr("MeanPosition"),
 				"n: "..transStr("NotefieldSpacing"),
+				"m: "..transStr("MeanPosition"),
 				",: "..transStr("MeanSize"),
-				".: "..transStr("DPDisplayPosition"),
-				"/: "..transStr("DPDisplaySize"),
 			}
 			if playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).LaneCover ~= 0 then
 				local selectStr = THEME:GetString("GameButton", "Select")

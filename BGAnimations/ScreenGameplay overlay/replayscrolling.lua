@@ -1,4 +1,4 @@
--- Holographic Void: Replay Control Overlay
+-- Etternity: Replay Control Overlay
 -- Ported from 'Til Death with HV-style visuals and simplified logic
 -- Supports mouse interaction and keyboard shortcuts
 
@@ -90,16 +90,14 @@ end
 
 local inputAdded = false
 local playerName = "Replay"
-local isCustomizeGameplay = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
 
 local t = Def.ActorFrame {
 	Name = "ReplayControls",
 	InitCommand = function(self)
-		self:xy((MovableValues and MovableValues.ReplayButtonsX) or getDefaultGameplayCoordinate("ReplayButtonsX") or (SCREEN_RIGHT - 40), (MovableValues and MovableValues.ReplayButtonsY) or getDefaultGameplayCoordinate("ReplayButtonsY") or (SCREEN_CENTER_Y + 50))
+		self:xy(SCREEN_RIGHT - 40, SCREEN_CENTER_Y + 50)
 		self:diffusealpha(0)
 	end,
 	OnCommand = function(self)
-		setMovableActor({"DeviceButton_f"}, self, self:GetChild("Border"))
 		-- Fetch name once
 		local screen = SCREENMAN:GetTopScreen()
 		if screen and screen.GetReplayScore then
@@ -205,8 +203,7 @@ local t = Def.ActorFrame {
 			local top = SCREENMAN:GetTopScreen()
 			if top then top:Cancel() end
 		end),
-	},
-	MovableBorder(btnW + 10, (spacing * 5) + 60, 1, 0, 0)
+	}
 }
 
 return t

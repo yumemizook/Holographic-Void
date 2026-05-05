@@ -1,4 +1,4 @@
---- Holographic Void: ScreenSelectMusic Overlay
+--- Etternity: ScreenSelectMusic Overlay
 -- Restore sequential Til Death-style login flow.
 
 local accentColor = HVColor.Accent
@@ -44,42 +44,12 @@ local searchString = ""
 
 -- Mouse wheel locking to prevent double-moves
 local lastWheelMove = 0
-local wheelLockTime = 0.05
+local wheelLockTime = 0.02
 
 -- Bottom Footer Config (Top-level for scope)
 local tabs = {"PROFILE", "SCORES", "PLAYLISTS", "FILTERS", "TAGS", "GOALS", "RANDOM"}
 local tabW = 80
 local footerH = 40
-local footerOverlayTabs = {
-	PROFILE = true,
-	SCORES = true,
-	PLAYLISTS = true,
-	FILTERS = true,
-	TAGS = true,
-	GOALS = true,
-}
-
-local function PlayWhooshOverlayOpen()
-	SOUND:PlayOnce(THEME:GetPathS("", "whoosh"))
-end
-
-local function IsSelectMusicBackgroundClickArea()
-	local mx = INPUTFILTER:GetMouseX() or SCREEN_CENTER_X
-	local my = INPUTFILTER:GetMouseY() or SCREEN_CENTER_Y
-	if HV.ActiveTab and HV.ActiveTab ~= "" then return false end
-	if my <= 40 or my >= SCREEN_HEIGHT - 40 then return false end
-	if mx <= panelX + panelW + 110 then return false end
-	if mx >= SCREEN_WIDTH - 390 and mx <= SCREEN_WIDTH - 10 and my >= 84 and my <= SCREEN_HEIGHT - 64 then return false end
-	return true
-end
-
-local function ApplyNativeMusicWheelHoldTransform(p)
-	local screen = SCREENMAN:GetTopScreen()
-	local wheel = screen and screen.GetMusicWheel and screen:GetMusicWheel()
-	if wheel then
-		wheel:x((SCREEN_WIDTH - 180) + (SCREEN_WIDTH * 0.32) * p)
-	end
-end
 
 local main_af = Def.ActorFrame {
 	InitCommand = function(self)
@@ -99,15 +69,8 @@ local main_af = Def.ActorFrame {
 		HV = HV or {}
 		HV.SSM = SCREENMAN:GetTopScreen()
 		HV.ActiveTab = ""
-		HV.SuppressSearchCloseEnter = false
 		HV.GameplaySessionValid = false
 		HV.ChartPreviewActive = false
-		HV.LeftMousePeekHold = false
-		HV.LeftMousePeekHoldAllowed = false
-		ApplyNativeMusicWheelHoldTransform(0)
-		if INPUTFILTER and INPUTFILTER.SetMouseVisible then
-			INPUTFILTER:SetMouseVisible(true)
-		end
 		
 		-- If returning from a gameplay session, reset the preview position to 0
 		-- to avoid trying to "resume" from the end of the song.
@@ -115,91 +78,13 @@ local main_af = Def.ActorFrame {
 		
 		-- Always default Practice Mode to Off when entering song select
 		GAMESTATE:SetPracticeMode(false)
-		
-		-- Refresh EtternaOnline user data upon entering Select Music (e.g. after finishing a song)
-		if DLMAN:IsLoggedIn() and DLMAN.RefreshUserData then
-			DLMAN:RefreshUserData()
-		end
-
-		self:sleep(0.01):queuecommand("OpenPendingStatsScore")
-	end,
-	OpenPendingStatsScoreCommand = function(self)
-		local pending = getenv("HVPendingScoreFromStats")
-		if not pending then return end
-		setenv("HVPendingScoreFromStats", nil)
-		local screen = SCREENMAN:GetTopScreen()
-		if screen and screen.ShowEvalScreenForScore then
-			screen:ShowEvalScreenForScore(pending)
-		elseif STATSMAN:GetCurStageStats() then
-			STATSMAN:GetCurStageStats():GetPlayerStageStats():SetHighScore(pending)
-			SCREENMAN:SetNewScreen("ScreenEvaluation")
-		end
 	end,
 	EndCommand = function(self)
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		SCREENMAN:set_input_redirected(PLAYER_2, false)
-		if HV.LeftMousePeekHold then
-			HV.LeftMousePeekHold = false
-			HV.LeftMousePeekHoldAllowed = false
-			MESSAGEMAN:Broadcast("HVLeftMousePeekHoldChanged", {Held = false, Allowed = false})
-		end
-		ApplyNativeMusicWheelHoldTransform(0)
-	end,
-	LoginMessageCommand = function(self)
-		local user = DLMAN:GetUsername()
-		local token = DLMAN:GetToken()
-		if user and token and user ~= "" and token ~= "" then
-			ThemePrefs.Set("HV_Username", user)
-			ThemePrefs.Set("HV_PasswordToken", token)
-			ThemePrefs.Save()
-		end
-	end,
-	LoginFailedMessageCommand = function(self)
-		ms.ok("Login Failed. Please check your credentials.")
-	end,
-	LogOutMessageCommand = function(self)
-		-- Only clear username on manual logout to preserve auto-login token
-	end,
-	TriggerLoginFlowMessageCommand = function(self)
-		-- Sequential Til Death flow with frame delay to avoid overlaps
-		local tempEmail = ""
-		easyInputStringOKCancel(
-			"Email:", 255, true,
-			function(email)
-				if email ~= "" then
-					self.tempEmail = email
-					self:sleep(0.02):queuecommand("LoginStep2")
-				else
-					ms.ok("Login Canceled")
-				end
-			end,
-			function() ms.ok("Login Canceled") end
-		)
-	end,
-	
-	LoginStep2Command = function(self)
-		easyInputStringOKCancel(
-			"Password:", 255, true,
-			function(password)
-				if password ~= "" then
-					Trace("[HV] Attempting DLMAN:Login for " .. tostring(self.tempEmail))
-					DLMAN:Login(self.tempEmail, password)
-				else
-					ms.ok("Login Canceled")
-				end
-			end,
-			function() ms.ok("Login Canceled") end
-		)
-	end,
-	
-	CodeMessageCommand = function(self, params)
-		if params.Name == "Permamirror" then
-			-- The engine has already toggled the flag because the code was matched.
-			-- We just need to trigger the UI update.
-			MESSAGEMAN:Broadcast("PermamirrorChanged")
-		end
 	end
 }
+
 
 
 -- LoginButtonUI was moved to decorations/default.lua to nest visually within the profile card.
@@ -230,90 +115,6 @@ local function resetRate()
 	end
 end
 
-local function getSongFavoriteState(song)
-	if not song then return nil end
-
-	local getters = {"IsFavorited", "IsFavorite", "GetFavorited", "GetIsFavorited"}
-	for _, fn in ipairs(getters) do
-		local method = song[fn]
-		if type(method) == "function" then
-			local ok, result = pcall(method, song)
-			if ok then
-				return result and true or false
-			end
-		end
-	end
-
-	return nil
-end
-
-local function toggleCurrentSongFavorite()
-	local song = GAMESTATE:GetCurrentSong()
-	if not song then return false end
-
-	local profile = PROFILEMAN and PROFILEMAN:GetProfile(PLAYER_1)
-	local currentState = getSongFavoriteState(song)
-
-	local songToggles = {
-		"ToggleFavorited",
-		"ToggleFavorite",
-	}
-	for _, fn in ipairs(songToggles) do
-		local method = song[fn]
-		if type(method) == "function" then
-			local ok = pcall(method, song)
-			if ok then
-				MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
-				return true
-			end
-		end
-	end
-
-	local songSetters = {"SetFavorited", "SetFavorite"}
-	if currentState ~= nil then
-		for _, fn in ipairs(songSetters) do
-			local method = song[fn]
-			if type(method) == "function" then
-				local ok = pcall(method, song, not currentState)
-				if ok then
-					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
-					return true
-				end
-			end
-		end
-	end
-
-	if profile then
-		local profileToggles = {
-			"ToggleSongFavorite",
-			"ToggleFavorite",
-		}
-		for _, fn in ipairs(profileToggles) do
-			local method = profile[fn]
-			if type(method) == "function" then
-				local ok = pcall(method, profile, song)
-				if ok then
-					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
-					return true
-				end
-			end
-		end
-
-		if currentState ~= nil then
-			local method = currentState and profile.RemoveFromFavorites or profile.AddToFavorites
-			if type(method) == "function" then
-				local ok = pcall(method, profile, song)
-				if ok then
-					MESSAGEMAN:Broadcast("FavoriteSongToggled", {Song = song})
-					return true
-				end
-			end
-		end
-	end
-
-	return false
-end
-
 -- Centralized Input Callback (Handles Click, Scroll, and both-EffectUp/Down reset)
 main_af[#main_af + 1] = Def.ActorFrame {
 	-- Handle rate changes via CodeMessageCommand (fired by metrics.ini CodeNames)
@@ -334,8 +135,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			else
 				adjustRate(-0.05)
 			end
-		elseif params.Name == "FavoriteToggle" then
-			toggleCurrentSongFavorite()
 		end
 	end,
 	BeginCommand = function(self)
@@ -362,32 +161,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 			local deviceInput = event.DeviceInput
 			local btn = deviceInput.button or ""
 			local evType = event.type or ""
-			if btn == "DeviceButton_left mouse button" then
-				local nextHeld = nil
-				local allowed = false
-				if evType == "InputEventType_FirstPress" then
-					allowed = IsSelectMusicBackgroundClickArea()
-					nextHeld = allowed
-				elseif evType == "InputEventType_Release" then
-					nextHeld = false
-				end
-				if nextHeld ~= nil and HV.LeftMousePeekHold ~= nextHeld then
-					HV.LeftMousePeekHold = nextHeld
-					HV.LeftMousePeekHoldAllowed = allowed
-					MESSAGEMAN:Broadcast("HVLeftMousePeekHoldChanged", {Held = nextHeld, Allowed = allowed})
-				end
-			end
-			local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
-			
-			-- After search confirm closes the tab, keep swallowing only the triggering Enter/Start
-			-- until its release event arrives. This avoids leaking the confirm input into the
-			-- native music wheel without trapping unrelated keyboard input.
-			if HV.SuppressSearchCloseEnter and isEnter then
-				if evType == "InputEventType_Release" then
-					HV.SuppressSearchCloseEnter = false
-				end
-				return true
-			end
 			
 			-- Log to the isolated debugger if it's loaded
 			if HV_DEBUG_LOG then
@@ -440,21 +213,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				local virtualX = INPUTFILTER:GetMouseX()
 				local virtualY = INPUTFILTER:GetMouseY()
 				
-				-- Check Login Button logic (btnCX/btnCY defined above)
-				local loginOver = virtualX >= btnCX - btnW/2 and virtualX <= btnCX + btnW/2
-						 and virtualY >= btnCY - btnH/2 and virtualY <= btnCY + btnH/2
-				if loginOver then
-					if DLMAN:IsLoggedIn() then
-						ThemePrefs.Set("HV_Username", "")
-						ThemePrefs.Set("HV_PasswordToken", "")
-						ThemePrefs.Save()
-						DLMAN:Logout()
-						ms.ok("Logged Out")
-					else
-						MESSAGEMAN:Broadcast("TriggerLoginFlow")
-					end
-					return true
-				end
 
 				-- Check Avatar Button
 				if virtualX >= compactProfileX - 8 and virtualX <= compactProfileX + 50
@@ -506,19 +264,13 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						end
 
 						if target == "PROFILE" then target = "SOCIAL" end 
-
-						local nextTab = ""
+						
+						-- Close if the SAME tab is clicked
 						if HV.ActiveTab == tabName:upper() then
-							nextTab = ""
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						else
-							nextTab = tabName:upper()
+							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = tabName:upper()})
 						end
-
-						if nextTab ~= "" and footerOverlayTabs[nextTab] then
-							PlayWhooshOverlayOpen()
-						end
-
-						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = nextTab})
 						return true
 					end
 				end
@@ -527,25 +279,17 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 				-- --- PROFILE TAB SPECIFIC CLICKS ---
 				if HV.ActiveTab == "PROFILE" then
-					local gradeSidebarCX = SCREEN_CENTER_X - overlayW/2 + gradeSidebarW/2
-					local gradeSidebarTop = SCREEN_CENTER_Y - overlayH/2
 					local profileSidebarX = (SCREEN_CENTER_X - overlayW/2) + gradeSidebarW
 					local scoreAreaX = profileSidebarX + profileSidebarW
 					local headerY = SCREEN_CENTER_Y - overlayH/2 + 35
 
-					-- 1. Dedicated profile stats screen
-					if IsMouseOverCentered(gradeSidebarCX, gradeSidebarTop + 25, gradeSidebarW - 12, 22) then
-						SCREENMAN:SetNewScreen("ScreenHVStats")
-						return true
-					end
-
-					-- 2. Mode Toggle (TOP / RECENT)
+					-- 1. Mode Toggle (TOP / RECENT)
 					if IsMouseOverCentered(scoreAreaX + mainPartW - 250, headerY, 100, 24) then
 						profileOverlayActor.isRecentMode = not profileOverlayActor.isRecentMode
 						profileOverlayActor.topPage = 1; profileOverlayActor.recentPage = 1
 						MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
 					end
-					-- 3. Source Toggle (ONLINE / LOCAL)
+					-- 2. Source Toggle (ONLINE / LOCAL)
 					if IsMouseOverCentered(scoreAreaX + mainPartW - 140, headerY, 100, 24) then
 						if not profileOverlayActor.isRecentMode then
 							profileOverlayActor.isOnlineMode = not profileOverlayActor.isOnlineMode
@@ -554,16 +298,11 @@ main_af[#main_af + 1] = Def.ActorFrame {
 						end
 						return true
 					end
-					-- 4. Upload Button
-					if IsMouseOverCentered(scoreAreaX + mainPartW - 40, headerY, 80, 24) then
-						if DLMAN:IsLoggedIn() then DLMAN:UploadAllScores() else ms.ok("Log in to upload scores.") end
-						return true
-					end
-					-- 5. Avatar
+					-- 4. Avatar
 					if IsMouseOverCentered(profileSidebarX + profileSidebarW/2, SCREEN_CENTER_Y - overlayH/2 + 50, 60, 60) then
 						SCREENMAN:SetNewScreen("ScreenAssetSettings"); return true
 					end
-					-- 6. Skillset Tabs
+					-- 5. Skillset Tabs
 					local tabsYStart = SCREEN_CENTER_Y - overlayH/2 + 140
 					for i, ss in ipairs(skillsets) do
 						if IsMouseOver(profileSidebarX + 10, tabsYStart + (i-1)*skillsetTabH - skillsetTabH/2, profileSidebarW - 20, skillsetTabH) then
@@ -573,7 +312,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							MESSAGEMAN:Broadcast("UpdateOverlayUI"); return true
 						end
 					end
-					-- 7. Score Rows
+					-- 6. Score Rows
 					local absRowsYStart = SCREEN_CENTER_Y - overlayH/2 + rowsYStart
 					for i = 1, scorePageSize do
 						if IsMouseOver(scoreAreaX + 10, absRowsYStart + (i-1)*rowH - rowH/2, mainPartW - 20, rowH) then
@@ -691,18 +430,20 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 			-- --- SEARCH INPUT HANDLING ---
 			if HV.ActiveTab == "SEARCH" then
-				local whee = top.GetMusicWheel and top:GetMusicWheel() or (HV.SSM and HV.SSM.GetMusicWheel and HV.SSM:GetMusicWheel())
-				local instant = HV.InstantSearch()
+				local whee = nil
+				local s = SCREENMAN:GetTopScreen()
+				if s then
+					if s.GetMusicWheel then whee = s:GetMusicWheel() end
+				end
 
 				-- Handle Backspace
 				if btn:lower() == "devicebutton_backspace" then
 					if evType ~= "InputEventType_Release" then
 						if #searchString > 0 then
 							searchString = searchString:sub(1, -2)
-							if instant and whee then whee:SongSearch(searchString) end
+							if whee then whee:SongSearch(searchString) end
 							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 						else
-							-- Backspace on empty search closes (sc-wh behavior)
 							MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						end
 					end
@@ -713,25 +454,23 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				if btn:lower() == "devicebutton_delete" then
 					if evType ~= "InputEventType_Release" then
 						searchString = ""
-						if instant and whee then whee:SongSearch("") end
+						if whee then whee:SongSearch("") end
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 					end
 					return true
 				end
 
 				-- Handle Enter / Escape (Deactivate)
+				local isEnter = (event.button == "Start" or btn:lower() == "devicebutton_enter" or btn:lower() == "devicebutton_kp enter")
 				local isEscape = (event.button == "Back" or btn:lower() == "devicebutton_escape")
 				
 				if isEnter then
 					if evType == "InputEventType_FirstPress" then
-						-- Filter now if not instant
-						if not instant and whee then whee:SongSearch(searchString) end
-						-- CLOSE SEARCH but keep filter.
-						HV.SuppressSearchCloseEnter = true
+						if whee then whee:SongSearch(searchString) end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = ""})
 						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString, applied = true})
 					end
-					return true -- STRICT CAPTURE
+					return true
 				end
 				if isEscape then
 					if evType == "InputEventType_FirstPress" then
@@ -751,7 +490,7 @@ main_af[#main_af + 1] = Def.ActorFrame {
 							local clip = Arch.getClipboard()
 							if clip then
 								searchString = searchString .. clip
-								if instant and whee then whee:SongSearch(searchString) end
+								if whee then whee:SongSearch(searchString) end
 								MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 							end
 						end
@@ -759,27 +498,46 @@ main_af[#main_af + 1] = Def.ActorFrame {
 					return true
 				end
 
-				-- Handle Typing (Robust character detection)
+				-- Handle Typing
 				local shifted = INPUTFILTER:IsBeingPressed("left shift") or INPUTFILTER:IsBeingPressed("right shift")
-				local c = (event.char and event.char ~= "") and event.char or DeviceBtnToChar(btn, shifted)
-				
-				-- Use a whitelist for characters to ensure stability (adapted from spawncamping-wallhack)
-				-- This regex covers letters, numbers, and a wide range of symbols.
-				local whitelist = '[%%%+%-%!%@%#%$%^%&%*%(%)%=%_%.%,%:%;%\'%"%>%<%?%/%~%|%w%[%]%{%}%`%\\]'
-				
-				if c and c ~= "" then
-					if c:match(whitelist) or c == " " then
-						if evType ~= "InputEventType_Release" then
-							searchString = searchString .. c
-							if instant and whee then whee:SongSearch(searchString) end
-							MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
+
+				-- Resolve character: prefer event.char, then parse DeviceButton name directly
+				local c = nil
+				if event.char and event.char ~= "" then
+					c = event.char
+				else
+					local raw = btn:match("DeviceButton_(.+)$")
+					if raw then
+						if #raw == 1 and raw:match("%a") then
+							c = shifted and raw:upper() or raw:lower()
+						elseif #raw == 1 and raw:match("%d") then
+							local sd = {["1"]="!",["2"]="@",["3"]="#",["4"]="$",["5"]="%",["6"]="^",["7"]="&",["8"]="*",["9"]="(",["0"]=")"}
+							c = shifted and sd[raw] or raw
+						else
+							local rmap = {
+								space=" ", period=shifted and ">" or ".", comma=shifted and "<" or ",",
+								slash=shifted and "?" or "/", backslash=shifted and "|" or "\\",
+								semicolon=shifted and ":" or ";", apostrophe=shifted and '"' or "'",
+								minus=shifted and "_" or "-", equals=shifted and "+" or "=",
+								["open bracket"]=shifted and "{" or "[",
+								["close bracket"]=shifted and "}" or "]",
+								grave=shifted and "~" or "`",
+							}
+							c = rmap[raw:lower()]
 						end
+					end
+				end
+
+				-- Only accept printable ASCII (codes 32-126)
+				if c and c ~= "" and string.byte(c) >= 32 and string.byte(c) <= 126 then
+					if evType ~= "InputEventType_Release" then
+						searchString = searchString .. c
+						if whee then whee:SongSearch(searchString) end
+						MESSAGEMAN:Broadcast("SearchQueryUpdated", {query = searchString})
 					end
 					return true
 				end
 
-				-- Fallback: Sink most input to prevent music wheel movement while typing
-				-- but allow mouse movement and clicks to close the search
 				if btn:match("mouse") then return false end
 				return true
 			end
@@ -797,26 +555,21 @@ main_af[#main_af + 1] = Def.ActorFrame {
 				local ctrl = INPUTFILTER:IsBeingPressed("left ctrl") or INPUTFILTER:IsBeingPressed("right ctrl")
 				if ctrl then
 					if btn == "DeviceButton_1" then
-						if HV.ActiveTab ~= "PROFILE" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PROFILE"})
 						return true
 					elseif btn == "DeviceButton_2" then
-						if HV.ActiveTab ~= "SCORES" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SCORES"})
 						return true
 					elseif btn == "DeviceButton_3" then
-						if HV.ActiveTab ~= "PLAYLISTS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "PLAYLISTS"})
 						return true
 					elseif btn == "DeviceButton_4" then
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "SEARCH"})
 						return true
 					elseif btn == "DeviceButton_5" then
-						if HV.ActiveTab ~= "TAGS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "TAGS"})
 						return true
 					elseif btn == "DeviceButton_6" then
-						if HV.ActiveTab ~= "GOALS" then PlayWhooshOverlayOpen() end
 						MESSAGEMAN:Broadcast("SelectMusicTabChanged", {Tab = "GOALS"})
 						return true
 					elseif btn == "DeviceButton_7" then
@@ -876,18 +629,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "MusicWheelHighlight",
 	InitCommand = function(self)
 		self:xy(SCREEN_WIDTH - 180, SCREEN_CENTER_Y)
-		self.hv_holdLerp = 0
-		self.hv_holdTarget = 0
-	end,
-	OnCommand = function(self)
-		self:SetUpdateFunction(function(actor)
-			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
-			actor:x(SCREEN_WIDTH - 180 + SCREEN_WIDTH * 0.32 * actor.hv_holdLerp)
-		end)
-	end,
-	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
-		local held = params and params.Held and params.Allowed
-		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	-- The main highlight box - fixed in center
@@ -912,28 +653,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 
 
 -- ============================================================
--- MUSIC WHEEL HOLD TRANSFORM
--- ============================================================
-main_af[#main_af + 1] = Def.ActorFrame {
-	Name = "MusicWheelHoldTransformDriver",
-	InitCommand = function(self)
-		self.hv_holdLerp = 0
-		self.hv_holdTarget = 0
-	end,
-	OnCommand = function(self)
-		self:SetUpdateFunction(function(actor)
-			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
-			ApplyNativeMusicWheelHoldTransform(actor.hv_holdLerp)
-		end)
-	end,
-	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
-		local held = params and params.Held and params.Allowed
-		self.hv_holdTarget = held and 1 or 0
-	end
-}
-
-
--- ============================================================
 -- PROFILE OVERLAY
 -- ============================================================
 
@@ -953,7 +672,7 @@ local profileOverlay = Def.ActorFrame {
 		self.recentPage = 1
 		self.currentSkillset = "Overall"
 		self.isRecentMode = false
-		self.isOnlineMode = true
+		self.isOnlineMode = false
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y):visible(false)
 	end,
 	
@@ -982,21 +701,6 @@ local profileOverlay = Def.ActorFrame {
 			local g = Def.ActorFrame { InitCommand = function(self) self:y(-overlayH/2 + 60) end }
 			local grades = {"AAAAA", "AAAA", "AAA", "AA", "A"}
 			local tiers = {"Grade_Tier01", "Grade_Tier04", "Grade_Tier07", "Grade_Tier10", "Grade_Tier13"}
-
-			g[#g+1] = Def.ActorFrame {
-				InitCommand = function(self) self:y(-35) end,
-				Def.Quad {
-					InitCommand = function(self)
-						self:zoomto(gradeSidebarW - 12, 20):diffuse(accentColor):diffusealpha(0.22)
-					end
-				},
-				LoadFont("Common Normal") .. {
-					Text = "STATS",
-					InitCommand = function(self)
-						self:zoom(0.28):diffuse(brightText)
-					end
-				}
-			}
 			
 			for i, grade in ipairs(grades) do
 				local gy = (i-1) * 32
@@ -1074,15 +778,8 @@ local profileOverlay = Def.ActorFrame {
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self) self:y(40):zoom(0.4):diffuse(brightText) end,
 				UpdateOverlaySkillsetsMessageCommand = function(self)
-					local p = profileOverlayActor
-					if p and not p.isOnlineMode then
-						local prof = PROFILEMAN:GetProfile(PLAYER_1)
-						if prof then
-							self:settext(prof:GetDisplayName())
-							return
-						end
-					end
-					self:settext(HV.GetPlayerName())
+					local name = DLMAN:GetUsername() ~= "" and DLMAN:GetUsername() or (PROFILEMAN:GetProfile(PLAYER_1) and PROFILEMAN:GetProfile(PLAYER_1):GetDisplayName() or "LOCAL PLAYER")
+					self:settext(name)
 				end
 			},
 			Def.ActorFrame {
@@ -1159,9 +856,7 @@ local profileOverlay = Def.ActorFrame {
 					if not HV.ShowMSD() then self:visible(false); return end
 					local val = 0
 					local prof = PROFILEMAN:GetProfile(PLAYER_1)
-					if DLMAN:IsLoggedIn() and profileOverlayActor.isOnlineMode then 
-						val = DLMAN:GetSkillsetRating("Overall")
-					elseif prof then
+					if prof then
 						val = prof:GetPlayerRating()
 					end
 					self:visible(true):settext(string.format("%.2f", val)):diffuse(HVColor.GetMSDRatingColor(val))
@@ -1205,9 +900,7 @@ local profileOverlay = Def.ActorFrame {
 							if not HV.ShowMSD() then self:visible(false); return end
 							local val = 0
 							local prof = PROFILEMAN:GetProfile(PLAYER_1)
-							if DLMAN:IsLoggedIn() and profileOverlayActor.isOnlineMode then 
-								val = DLMAN:GetSkillsetRating(ss)
-							elseif prof then
+							if prof then
 								if ss == "Overall" then val = prof:GetPlayerRating()
 								else val = prof:GetPlayerSkillsetRating(i-2) or 0 end
 							end
@@ -1262,7 +955,7 @@ local profileOverlay = Def.ActorFrame {
 					if p.isRecentMode then
 						modeText = "RECENT SCORES (LOCAL)"
 					else
-						local src = (p.isOnlineMode and DLMAN:IsLoggedIn()) and "ONLINE" or "LOCAL"
+						local src = (p.isOnlineMode and DLMAN:IsLoggedIn()) and "LOCAL"
 						modeText = "TOP SCORES (" .. p.currentSkillset:upper() .. " · " .. src .. ")"
 					end
 					self:settext(modeText)
@@ -1302,25 +995,16 @@ local profileOverlay = Def.ActorFrame {
 				end
 			},
 			-- Toggle Online/Local Button
-			Def.ActorFrame {
-				Name = "SourceToggle",
-				InitCommand = function(self) self:x(mainPartW/2 - 140) end,
-				Def.Quad {
-					Name = "Bg",
-					InitCommand = function(self) 
-						self:zoomto(100, 24):diffuse(accentColor):diffusealpha(0.15)
-					end
-				},
 				LoadFont("Common Normal") .. {
 					Name = "Txt",
 					InitCommand = function(self) self:zoom(0.32) end,
 					UpdateOverlayUIMessageCommand = function(self)
 						local p = profileOverlayActor
 						if p.isRecentMode then
-							self:settext("ONLINE/LOCAL"):diffuse(dimText)
+							self:settext("LOCAL"):diffuse(dimText)
 						else
 							local active = p.isOnlineMode and DLMAN:IsLoggedIn()
-							self:settext(active and "ONLINE" or "LOCAL"):diffuse(brightText)
+							self:settext(active "LOCAL"):diffuse(brightText)
 						end
 					end
 				},
@@ -1336,21 +1020,13 @@ local profileOverlay = Def.ActorFrame {
 					local bg = af:GetChild("Bg")
 					if parent.isRecentMode then
 						bg:diffuse(dimText):diffusealpha(0.1)
-					elseif (parent.isOnlineMode and DLMAN:IsLoggedIn()) or over then
-						bg:diffuse(accentColor):diffusealpha(0.4)
-					else
+					elseif over then -- Removed the DLMAN (online) check
 						bg:diffuse(accentColor):diffusealpha(0.15)
 					end
 				end
 			},
 			-- Upload All Button
 			Def.ActorFrame {
-				Name = "UploadBtn",
-				InitCommand = function(self) self:x(mainPartW/2 - 40) end,
-				Def.Quad {
-					Name = "Bg",
-					InitCommand = function(self) self:zoomto(80, 24):diffuse(color("0.1,0.4,0.1,0.5")) end
-				},
 				LoadFont("Common Normal") .. {
 					InitCommand = function(self) self:zoom(0.32):diffuse(brightText):settext("UPLOAD ALL") end
 				},
@@ -1402,7 +1078,7 @@ local profileOverlay = Def.ActorFrame {
 						Name = "SSR",
 						InitCommand = function(self) self:halign(0):x(-mainPartW/2 + 30):zoom(0.4) end
 					},
-					LoadFont("Zpix normal") .. {
+					LoadFont("_open sans 48px") .. {
 						Name = "Title",
 						InitCommand = function(self) self:halign(0):x(-mainPartW/2 + 90):y(-5):zoom(0.35):diffuse(brightText):maxwidth(400 * 1.5) end
 					},
@@ -1437,7 +1113,7 @@ local profileOverlay = Def.ActorFrame {
 						local bg = af:GetChild("Bg")
 						local score = af.currentScore
 						
-						if score and type(score) ~= "table" and not score:GetEtternaValid() then
+						if score and type(score) ~= "table" and not score:GetEtternityValid() then
 							bg:diffuse(color("0.5,0.2,0.2,0.3"))
 						else
 							bg:diffuse(color("0,0,0,0.3"))
@@ -1466,8 +1142,8 @@ local profileOverlay = Def.ActorFrame {
 						if params.index ~= i then return end
 						local score = self.currentScore
 						if not score or type(score) == "table" then return end
-						score:ToggleEtternaValidation()
-						if score:GetEtternaValid() then
+						score:ToggleEtternityValidation()
+						if score:GetEtternityValid() then
 							ms.ok("Score validated")
 						else
 							ms.ok("Score invalidated")
@@ -1488,8 +1164,7 @@ local profileOverlay = Def.ActorFrame {
 				self:settext("PAGE " .. cur .. " · CLICK TO FIND SONG · RIGHT-CLICK TO VALIDATE (LOCAL)")
 			end
 		}
-	},
-
+	}
 	UpdateAllScoresCommand = function(self)
 		local rows = self:GetChild("MainArea"):GetChild("ScoreListRows")
 		local start = ((self.isRecentMode and self.recentPage or self.topPage) - 1) * scorePageSize
@@ -1509,23 +1184,18 @@ local profileOverlay = Def.ActorFrame {
 		local foundAnyOnPage = false
 		for i = 1, scorePageSize do
 			local row = rows:GetChild("Row_" .. i)
-			local pageIndex = start + i
+			local idx = start + i - 1 -- Adjust to 0-based for internal APIs
 			local score = nil
 			
 			if self.isRecentMode then
-				-- Local score APIs are 1-indexed; using pageIndex keeps row 1 aligned to slot 1.
-				local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(pageIndex) end)
-				score = (ok and res ~= nil) and res or nil
-			else
-				if self.isOnlineMode and DLMAN:IsLoggedIn() then
-					-- Online scores are 1-indexed
-					local ok, res = pcall(function() return DLMAN:GetTopSkillsetScore(pageIndex, self.currentSkillset) end)
-					score = (ok and res ~= nil) and res or nil
-				else
-					local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(pageIndex, self.currentSkillset) end)
-					score = (ok and res ~= nil) and res or nil
-				end
-			end
+                -- Recent scores are 0-indexed
+                local ok, res = pcall(function() return SCOREMAN:GetRecentScoreForGame(idx) end)
+                score = (ok and res ~= nil) and res or nil
+            else
+                -- Removed Online check: directly fetch local Top SSR scores
+                local ok, res = pcall(function() return SCOREMAN:GetTopSSRHighScoreForGame(idx, self.currentSkillset) end)
+                score = (ok and res ~= nil) and res or nil
+            end
 			
 			row.currentScore = score
 			if score then
@@ -1539,15 +1209,7 @@ local profileOverlay = Def.ActorFrame {
 					date = score.date or "N/A"
 					wife = score.wife or 0
 					ssr = score.ssr or 0
-					
-					local ct = "Clear"
-					
-					-- If judgments are available in the table, show them
-					if score.w1 then
-						metadata = string.format("%s  |  %d/%d/%d/%d/%d/%d", THEME:GetString("ClearTypes", ct), score.w1, score.w2, score.w3, score.w4, score.w5, score.miss or 0)
-					else
-						metadata = string.format("%s  |  ONLINE", THEME:GetString("ClearTypes", ct))
-					end
+					metadata = "ONLINE"
 				else
 					local ck = score:GetChartKey()
 					local thssong = SONGMAN:GetSongByChartKey(ck)
@@ -1603,7 +1265,7 @@ local profileOverlay = Def.ActorFrame {
 				
 				row:GetChild("Validation"):settext(metadata)
 				
-				local isInvalid = type(score) ~= "table" and not score:GetEtternaValid()
+				local isInvalid = type(score) ~= "table" and not score:GetEtternityValid()
 				row:GetChild("InvalidIndicator"):visible(isInvalid)
 				if isInvalid then
 					row:GetChild("Bg"):diffuse(color("0.5,0.05,0.05,0.4"))
@@ -1630,10 +1292,10 @@ local profileOverlay = Def.ActorFrame {
 		self:playcommand("UpdateOverlaySkillsets")
 		self:GetChild("MainArea"):playcommand("UpdateOverlayUI")
 		self:GetChild("Sidebar"):playcommand("UpdateOverlayUI")
-	end,
+	end
 
 	-- Core Logic Signals
-	UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateAllScores") end,
+	UpdateOverlayUIMessageCommand = function(self) self:playcommand("UpdateAllScores") end
 	SelectMusicTabChangedMessageCommand = function(self, params)
 		HV.ActiveTab = params and params.Tab or ""
 		local targetTab = params and params.Tab or ""
@@ -1648,8 +1310,9 @@ local profileOverlay = Def.ActorFrame {
 			SCREENMAN:set_input_redirected(PLAYER_1, true)
 			SCREENMAN:set_input_redirected(PLAYER_2, true)
 		else
-			-- Unlock is driven by the hide tween path below. Do not queue it here,
-			-- because the subsequent stoptweening() for the fade-out would cancel it.
+			-- Delay unlocking redirection by 1 tick (0.01s) to ensure the Enter/Start event 
+			-- that triggered this close is fully swallowed by the input callback.
+			self:stoptweening():sleep(0.01):queuecommand("UnlockInput")
 		end
 
 		if targetTab == "PROFILE" then
@@ -1657,10 +1320,10 @@ local profileOverlay = Def.ActorFrame {
 				:diffusealpha(0):linear(0.15):diffusealpha(1)
 			self:playcommand("UpdateAllScores")
 		else
-			self:stoptweening():linear(0.1):diffusealpha(0):queuecommand("UnlockInput"):queuecommand("Hide")
+			self:stoptweening():linear(0.1):diffusealpha(0):queuecommand("Hide")
 		end
-	end,
-	HideCommand = function(self) self:visible(false) end,
+	end
+	HideCommand = function(self) self:visible(false) end
 
 	UnlockInputCommand = function(self)
 		-- Only unlock if we are still not in an active tab (safety check)
@@ -1668,19 +1331,19 @@ local profileOverlay = Def.ActorFrame {
 			SCREENMAN:set_input_redirected(PLAYER_1, false)
 			SCREENMAN:set_input_redirected(PLAYER_2, false)
 		end
-	end,
+	end
 
 	NextScorePageMessageCommand = function(self)
 		if self.isRecentMode then self.recentPage = self.recentPage + 1
 		else self.topPage = self.topPage + 1 end
 		self:playcommand("UpdateAllScores")
-	end,
+	end
 	PrevScorePageMessageCommand = function(self)
 		if self.isRecentMode then self.recentPage = math.max(1, self.recentPage - 1)
 		else self.topPage = math.max(1, self.topPage - 1) end
 		self:playcommand("UpdateAllScores")
 	end
-}
+
 
 main_af[#main_af + 1] = profileOverlay
 
@@ -1692,18 +1355,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "HeaderBar",
 	InitCommand = function(self)
 		self:xy(0, 0)
-		self.hv_holdLerp = 0
-		self.hv_holdTarget = 0
-	end,
-	OnCommand = function(self)
-		self:SetUpdateFunction(function(actor)
-			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
-			actor:y(-(headerH + 16) * actor.hv_holdLerp)
-		end)
-	end,
-	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
-		local held = params and params.Held and params.Allowed
-		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	Def.Quad {
@@ -1743,6 +1394,16 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Def.ActorFrame {
 		Name = "SearchBar",
 		InitCommand = function(self) self:xy(SCREEN_WIDTH / 2 - 150, 6) end,
+		-- Re-assert HV.ActiveTab = "SEARCH" after all other handlers run,
+		-- because decoration overlays may reset it in their else-branches.
+		SelectMusicTabChangedMessageCommand = function(self, params)
+			if params.Tab == "SEARCH" then
+				self:queuecommand("AssertSearchActive")
+			end
+		end,
+		AssertSearchActiveCommand = function(self)
+			HV.ActiveTab = "SEARCH"
+		end,
 		Def.Quad {
 			Name = "Bg",
 			InitCommand = function(self)
@@ -1919,18 +1580,6 @@ main_af[#main_af + 1] = Def.ActorFrame {
 	Name = "FooterBar",
 	InitCommand = function(self)
 		self:xy(0, SCREEN_HEIGHT - footerH)
-		self.hv_holdLerp = 0
-		self.hv_holdTarget = 0
-	end,
-	OnCommand = function(self)
-		self:SetUpdateFunction(function(actor)
-			actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
-			actor:y(SCREEN_HEIGHT - footerH + (footerH + 16) * actor.hv_holdLerp)
-		end)
-	end,
-	HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
-		local held = params and params.Held and params.Allowed
-		self.hv_holdTarget = held and 1 or 0
 	end,
 	
 	Def.Quad {
@@ -1991,18 +1640,6 @@ for i, tabName in ipairs(tabs) do
 		Name = "FooterTab_" .. tabName,
 		InitCommand = function(self)
 			self:xy(10 + (i - 1) * tabW, SCREEN_HEIGHT - footerH)
-			self.hv_holdLerp = 0
-			self.hv_holdTarget = 0
-		end,
-		OnCommand = function(self)
-			self:SetUpdateFunction(function(actor)
-				actor.hv_holdLerp = actor.hv_holdLerp + (actor.hv_holdTarget - actor.hv_holdLerp) * 0.16
-				actor:y(SCREEN_HEIGHT - footerH + (footerH + 16) * actor.hv_holdLerp)
-			end)
-		end,
-		HVLeftMousePeekHoldChangedMessageCommand = function(self, params)
-			local held = params and params.Held and params.Allowed
-			self.hv_holdTarget = held and 1 or 0
 		end,
 		
 		Def.Quad {

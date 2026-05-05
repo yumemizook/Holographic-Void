@@ -1,4 +1,4 @@
---- Holographic Void: ScreenSelectMusic Out Transition
+--- Etternity: ScreenSelectMusic Out Transition
 -- Shows "Press Start again for Options" prompt when a song is selected,
 -- and "Entering Options..." when Start is pressed a second time.
 -- Engine broadcasts: ShowPressStartForOptionsCommand, ShowEnteringOptionsCommand,
@@ -11,14 +11,13 @@ local translated_info = {
 
 local t = Def.ActorFrame {}
 
--- Circular expanding transition
-t[#t + 1] = Def.Sprite {
-	Texture = THEME:GetPathG("", "_thick circle"),
+-- Black fade overlay
+t[#t + 1] = Def.Quad {
 	InitCommand = function(self)
-		self:Center():diffuse(color("0,0,0,1")):zoom(0)
+		self:Center():zoomto(SCREEN_WIDTH, SCREEN_HEIGHT)
 	end,
 	OnCommand = function(self)
-		self:sleep(0.1):accelerate(0.25):zoom(24)
+		self:diffuse(color("0,0,0,0")):sleep(0.1):linear(0.15):diffusealpha(1)
 	end
 }
 

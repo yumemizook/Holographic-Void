@@ -1,4 +1,4 @@
--- Holographic Void: Avatar / Profile Display (adapted from Fatigue)
+-- Etternity: Avatar / Profile Display (adapted from Fatigue)
 -- Shows player avatar, name, MSD, difficulty, mods, judge/scoring info,
 -- life bar, and real-time DP / Wife% during gameplay.
 
@@ -35,28 +35,6 @@ end
 -- DP tracking
 local actual_dp = 0
 local total_max = 0
-
-local function updateDPFromJudgment(msg)
-	if msg.HoldNoteScore or msg.RollNoteScore then
-		if msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
-			actual_dp = actual_dp - 4.5
-		end
-		return
-	end
-
-	if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
-		if msg.TapNoteOffset then
-			local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
-			actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
-		elseif msg.TapNoteScore == "TapNoteScore_Miss" then
-			actual_dp = actual_dp - 5.5
-		elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
-			actual_dp = actual_dp - 7.0
-		elseif msg.TapNoteScore ~= "TapNoteScore_None" then
-			actual_dp = actual_dp + 2.0
-		end
-	end
-end
 
 local t = Def.ActorFrame {
 	Name = "AvatarDisplay",
@@ -108,35 +86,10 @@ local t = Def.ActorFrame {
 	-- Profile name
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
+			local name = profile:GetDisplayName()
 			self:xy(avatarSize + 6, 5):zoom(fontZoom):halign(0):maxwidth(130 / fontZoom)
+			self:settext(name)
 			self:diffuse(color("1,1,1,1"))
-			self.cycleState = 0
-			self:playcommand("CycleName")
-		end,
-		CycleNameCommand = function(self)
-			self:stoptweening()
-			local pn = PLAYER_1
-			local onlineName = (DLMAN:IsLoggedIn()) and DLMAN:GetUsername() or ""
-			local localName = ""
-			local profile = PROFILEMAN:GetProfile(pn)
-			if profile then localName = profile:GetDisplayName() end
-			if localName == "" then localName = "Player 1" end
-			
-			if onlineName ~= "" and onlineName ~= localName then
-				if self.cycleState == 0 then
-					self:settext(onlineName)
-				else
-					self:settext(localName)
-				end
-				self.cycleState = 1 - self.cycleState
-				
-				self:diffusealpha(0):linear(0.25):diffusealpha(1)
-				self:sleep(2.5):linear(0.25):diffusealpha(0):queuecommand("CycleName")
-			else
-				self:diffusealpha(1)
-				self:settext(onlineName ~= "" and onlineName or localName)
-				self:sleep(3):queuecommand("CycleName")
-			end
 		end
 	},
 	
@@ -229,23 +182,20 @@ local t = Def.ActorFrame {
 		UpdateLifeCommand = function(self)
 			local life = PLife()
 			self:settextf("%.1f%%", life * 100)
-
+			
+			-- Coloring based on Life Difficulty (Range 1-7)
 			local diff = GetLifeDifficulty()
-			local lifeKey = "L7"
-			if diff <= 1 then
-				lifeKey = "L1"
-			elseif diff == 2 then
-				lifeKey = "L2"
-			elseif diff == 3 then
-				lifeKey = "L3"
-			elseif diff == 4 then
-				lifeKey = "L4"
+			if diff <= 2 then
+				self:diffuse(color("#A0CFAB")) -- Green
+			elseif diff <= 4 then
+				self:diffuse(color("#5ABAFF")) -- Cyan/Blue
 			elseif diff == 5 then
-				lifeKey = "L5"
+				self:diffuse(color("#CFD198")) -- Yellow
 			elseif diff == 6 then
-				lifeKey = "L6"
+				self:diffuse(color("#E0B080")) -- Orange
+			else
+				self:diffuse(color("#CF9898")) -- Red
 			end
-			self:diffuse(HVColor.GetLifeBarColor(lifeKey))
 		end
 	},
 
@@ -285,98 +235,57 @@ local t = Def.ActorFrame {
 			-- Color shift based on Life Difficulty and low life
 			local life = PLife()
 			if life < 0.3 and life > 0 then
-				self:diffuse(HVColor.GetLifeBarColor("Danger"))
+				self:diffuse(color("#FF4444"))
 			elseif life <= 0 then
-				self:diffuse(HVColor.GetLifeBarColor("Danger"))
+				self:diffuse(color("#440000"))
 			else
+				-- Unified Difficulty-based tinting
 				local diff = GetLifeDifficulty()
-				local lifeKey = "L7"
-				if diff <= 1 then
-					lifeKey = "L1"
-				elseif diff == 2 then
-					lifeKey = "L2"
-				elseif diff == 3 then
-					lifeKey = "L3"
-				elseif diff == 4 then
-					lifeKey = "L4"
+				if diff <= 2 then
+					self:diffuse(color("#A0CFAB")) -- Green
+				elseif diff <= 4 then
+					self:diffuse(color("#5ABAFF")) -- Cyan/Blue
 				elseif diff == 5 then
-					lifeKey = "L5"
+					self:diffuse(color("#CFD198")) -- Yellow
 				elseif diff == 6 then
-					lifeKey = "L6"
+					self:diffuse(color("#E0B080")) -- Orange
+				else
+					self:diffuse(color("#CF9898")) -- Red
 				end
-				self:diffuse(HVColor.GetLifeBarColor(lifeKey))
 			end
 		end
 	},
 
-	-- DP Display Frame
-	Def.ActorFrame {
-		Name = "DPDisplay",
+	-- Fatigue DP & Incremental Wife% Tracker
+	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:xy(-panelX, -12):halign(0)
-			self:xy((MovableValues and MovableValues.DPDisplayX) or getDefaultGameplayCoordinate("DPDisplayX") or (-panelX), (MovableValues and MovableValues.DPDisplayY) or getDefaultGameplayCoordinate("DPDisplayY") or -12):zoom((MovableValues and MovableValues.DPDisplayZoom) or getDefaultGameplaySize("DPDisplayZoom") or 1)
+			self:xy(avatarSize + 4, -12):halign(0):zoom(0.45)
+			self:settext("0.00 DP (0.00%)")
+			self:diffuse(color("#b3b3b3"))
 		end,
 		JudgmentMessageCommand = function(self, msg)
-			updateDPFromJudgment(msg)
-		end,
-		OnCommand = function(self)
-			setMovableActor({"DeviceButton_period", "DeviceButton_slash"}, self, self:GetChild("Border"))
-		end,
-
-		-- DP% (above, larger font)
-		LoadFont("Common Normal") .. {
-			Name = "DPPercent",
-			InitCommand = function(self)
-				self:y(-18):halign(0):zoom(0.5)
-				self:settext("0.00%")
-				self:diffuse(color("#b3b3b3"))
-			end,
-			JudgmentMessageCommand = function(self, msg)
-				self:stoptweening()
-				
-				local current_perc = pss:GetWifeScore() * 100
-				if total_max > 0 then
-					current_perc = math.max(0, (actual_dp / total_max) * 100)
+			self:stoptweening()
+			
+			if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
+				if msg.TapNoteOffset then
+					local ts = ms.JudgeScalers[GetTimingDifficulty()] or PREFSMAN:GetPreference("TimingWindowScale") or 1.0
+					actual_dp = actual_dp + wife3(math.abs(msg.TapNoteOffset) * 1000, ts, "Wife3")
+				elseif msg.TapNoteScore == "TapNoteScore_Miss" then
+					actual_dp = actual_dp - 5.5
+				elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
+					actual_dp = actual_dp - 7.0
 				end
-				
-				self:settextf("%.2f%%", current_perc)
+			elseif msg.HoldNoteScore == "HoldNoteScore_MissedHold" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
+				actual_dp = actual_dp - 4.5
 			end
-		},
-
-		-- Current DP score (larger font)
-		LoadFont("Common Normal") .. {
-			Name = "DPScore",
-			InitCommand = function(self)
-				self:y(0):halign(0):zoom(0.6)
-				self:settext("0.00")
-				self:diffuse(color("#ffffff"))
-			end,
-			JudgmentMessageCommand = function(self, msg)
-				self:stoptweening()
-				self:settextf("%.2f", actual_dp)
+			
+			local current_perc = pss:GetWifeScore() * 100
+			if total_max > 0 then
+				current_perc = math.max(0, (actual_dp / total_max) * 100)
 			end
-		},
-
-		-- Max score (smaller font, to the right of DP score)
-		LoadFont("Common Normal") .. {
-			Name = "MaxScore",
-			InitCommand = function(self)
-				self:y(0):x(42):halign(0):zoom(0.35)
-				self:settextf("/ %d", total_max)
-				self:diffuse(color("#888888"))
-			end,
-			JudgmentMessageCommand = function(self)
-				self:stoptweening()
-				local score = self:GetParent():GetChild("DPScore")
-				if score then
-					self:x(score:GetZoomedWidth() + 6)
-				end
-				self:settextf("/ %d", total_max)
-			end
-		},
-
-		-- Movable border
-		MovableBorder(120, 40, 1, 0, 0)
+			
+			self:settextf("%.2f DP (%.2f%%)", actual_dp, current_perc)
+		end
 	},
 }
 

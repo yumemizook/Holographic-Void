@@ -1,5 +1,5 @@
--- Holographic Void: ScreenCoreBundleSelect underlay
--- Ported from Til Death, styled for Holographic Void
+-- Etternity: ScreenCoreBundleSelect underlay
+-- Ported from Til Death, styled for Etternity
 
 local minidoots = {"Beginner", "Novice", "Intermediate", "Advanced", "Expert"}
 local diffcolors = {"#66ccff", "#099948", "#ddaa00", "#ff6666", "#c97bff"}

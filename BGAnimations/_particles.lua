@@ -1,4 +1,4 @@
---- Holographic Void: Shared Background Particles
+--- Etternity: Shared Background Particles
 -- Loads animated background particles based on ThemePrefs.
 
 local t = Def.ActorFrame {}

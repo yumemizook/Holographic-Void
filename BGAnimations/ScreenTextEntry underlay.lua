@@ -1,4 +1,4 @@
---- Holographic Void: ScreenTextEntry Underlay
+--- Etternity: ScreenTextEntry Underlay
 -- Provides the themed background and "Censor" toggle for native prompts.
 
 local accentColor = HVColor.Accent

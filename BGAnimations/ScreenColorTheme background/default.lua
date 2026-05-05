@@ -1,4 +1,4 @@
---- Holographic Void: ScreenColorTheme Background
+--- Etternity: ScreenColorTheme Background
 
 
 local t = Def.ActorFrame {}

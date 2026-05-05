@@ -3,7 +3,6 @@ local profile = PROFILEMAN:GetProfile(PLAYER_1)
 
 local curType = 2 -- Default to Avatar
 local assetTypes = {
-	"toasty",
 	"avatar",
 	"judgment",
 }
@@ -27,28 +26,6 @@ local spacing = 20
 local lastClickTime = 0
 local lastClickIdx = 0
 
-local function getToastyPreview(dirPath)
-	local files = FILEMAN:GetDirListing(dirPath .. "/")
-	for _, f in ipairs(files) do
-		local ext = f:sub(-4):lower()
-		if ext == ".png" or ext == ".jpg" or ext == "jpeg" then
-			return dirPath .. "/" .. f
-		end
-	end
-	return nil
-end
-
-local function getToastySoundPath(dirPath)
-	local files = FILEMAN:GetDirListing(dirPath .. "/")
-	for _, f in ipairs(files) do
-		local ext = f:sub(-4):lower()
-		if ext == ".wav" or ext == ".mp3" or ext == ".ogg" then
-			return dirPath .. "/" .. f
-		end
-	end
-	return nil
-end
-
 local function loadAssetTable()
 	local type = assetTypes[curType]
 	local dir = assetFolders[type]
@@ -57,17 +34,11 @@ local function loadAssetTable()
 	local files = FILEMAN:GetDirListing(dir)
 	for _, f in ipairs(files) do
 		-- For toasties, we list directories. For others, we list image files.
-		if type == "toasty" then
-			if f ~= "." and f ~= ".." then
-				table.insert(assetTable, f)
-			end
-		else
 			local ext = f:sub(-4):lower()
 			if ext == ".png" or ext == ".jpg" or ext == "jpeg" then
 				table.insert(assetTable, f)
 			end
 		end
-	end
 	
 	maxPage = math.max(1, math.ceil(#assetTable / (maxRows * maxColumns)))
 	-- Keep curPage within bounds but try to show selected
@@ -96,13 +67,6 @@ local function confirmPick(idx)
 	MESSAGEMAN:Broadcast("AssetChanged", {type = type, path = path})
 	if type == "avatar" then MESSAGEMAN:Broadcast("AvatarChanged") end
 	
-	if type == "toasty" then
-		local soundPath = getToastySoundPath(path)
-		if soundPath then
-			MESSAGEMAN:Broadcast("ToastyPreviewSound", {path = soundPath})
-		end
-	end
-	
 	MESSAGEMAN:Broadcast("UpdateAssetDisplay")
 	ms.ok(string.format(THEME:GetString("AssetSettings", "AppliedFormatted"), THEME:GetString("AssetSettings", HV.Capitalize(type)), name))
 end
@@ -116,17 +80,7 @@ local t = Def.ActorFrame {
 	RefreshCommand = function(self)
 		MESSAGEMAN:Broadcast("UpdateAssetDisplay")
 	end,
-	
-	Def.Sound {
-		Name = "PreviewSound",
-		ToastyPreviewSoundMessageCommand = function(self, params)
-			if params.path then
-				self:stop():load(params.path):play()
-			end
-		end
-	}
 }
-
 -- Background
 t[#t+1] = Def.Quad {
 	InitCommand = function(self)
@@ -208,12 +162,7 @@ for r = 0, maxRows-1 do
 					local path = assetFolders[type] .. name
 					
 					local loadPath = path
-					if type == "toasty" then
-						loadPath = getToastyPreview(path)
-						label:visible(true):settext(name)
-					else
-						label:visible(false)
-					end
+					label:visible(false)
 					
 					if loadPath and FILEMAN:DoesFileExist(loadPath) then
 						sprite:visible(true)
@@ -314,13 +263,6 @@ t[#t+1] = Def.Actor {
 										lastClickTime = now
 										lastClickIdx = idx
 										
-										if assetTypes[curType] == "toasty" then
-											local path = assetFolders["toasty"] .. assetTable[idx]
-											local soundPath = getToastySoundPath(path)
-											if soundPath then
-												MESSAGEMAN:Broadcast("ToastyPreviewSound", {path = soundPath})
-											end
-										end
 										
 										MESSAGEMAN:Broadcast("UpdateAssetDisplay")
 									end

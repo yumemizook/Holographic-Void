@@ -1,4 +1,4 @@
---- Holographic Void: Tags Tab
+--- Etternity: Tags Tab
 -- Uses TAGMAN (tags.lua) to match other themes (Til Death, Rebirth)
 -- Allows adding/removing personal tags to charts for better organization
 

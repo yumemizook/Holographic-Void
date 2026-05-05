@@ -1,4 +1,4 @@
---- Holographic Void: Global Initialization
+--- Etternity: Global Initialization
 -- @module 01_Init
 -- Loaded after _Fallback's 00 init.lua. Sets up the theme namespace
 -- and common helper utilities.
@@ -120,7 +120,7 @@ function HV.Text(params)
 	}
 end
 
-Trace("Holographic Void: 01 Init.lua loaded.")
+Trace("Etternity: 01 Init.lua loaded.")
 
 -- ============================================================
 -- RATE HELPERS (used across screens)

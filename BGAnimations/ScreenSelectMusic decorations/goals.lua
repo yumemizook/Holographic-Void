@@ -1,4 +1,4 @@
---- Holographic Void: Goals Tab
+--- Etternity: Goals Tab
 
 local accentColor = HVColor.Accent
 local dimText = color("0.45,0.45,0.45,1")
@@ -40,10 +40,16 @@ local function formatGoalPercent(pct)
 	elseif p < 99.7 then
 		return string.format("%.2f%%", p)
 	elseif p < 99.955 then
+		-- Hitting AAA threshold exactly
+		if math.abs(p - 99.7) < 0.00001 then return "99.700% (AAA)" end
 		return string.format("%.3f%%", p)
 	elseif p < 99.9935 then
+		-- Hitting AAAA threshold exactly
+		if math.abs(p - 99.955) < 0.00001 then return "99.955% (AAAA)" end
 		return string.format("%.4f%%", p)
 	else
+		-- Hitting AAAAA threshold exactly
+		if math.abs(p - 99.9935) < 0.00001 then return "99.9935% (AAAAA)" end
 		return string.format("%.5f%%", p)
 	end
 end
@@ -156,7 +162,7 @@ local t = Def.ActorFrame {
 		InitCommand = function(self) self:xy(-overlayW/2 + 24, -overlayH/2 + 52) end,
 
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(45):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "PriorityColumn")) end },
-		LoadFont("Zpix Normal") .. { InitCommand = function(self) self:halign(0):x(85):zoom(0.4):diffuse(accentColor):settext(THEME:GetString("Goals", "SongColumn")) end },
+		LoadFont("_open sans 48px") .. { InitCommand = function(self) self:halign(0):x(85):zoom(0.4):diffuse(accentColor):settext(THEME:GetString("Goals", "SongColumn")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(385):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "RateColumn")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(465):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "TargetColumn")) end },
 		LoadFont("Common Normal") .. { InitCommand = function(self) self:halign(0.5):x(545):zoom(0.35):diffuse(accentColor):settext(THEME:GetString("Goals", "PBColumn") or "PB") end },
@@ -234,7 +240,7 @@ local function makeGoalRow(i)
 			Name = "SongDetails",
 			InitCommand = function(self) self:xy(85, rowH/2 - 2) end,
 			
-			LoadFont("Zpix Normal") .. {
+			LoadFont("_open sans 48px") .. {
 				Name = "SongName",
 				InitCommand = function(self)
 					self:halign(0):zoom(0.5):diffuse(brightText):maxwidth(280 / 0.5)
@@ -457,14 +463,10 @@ t[#t + 1] = Def.ActorFrame {
 
 							-- Target % (The request: Direct overlay entry)
 							if hx >= 410 and hx <= 510 then
-								easyInputStringOKCancel(THEME:GetString("Goals", "TargetLabel"), 10, false, function(answer)
+								easyInputStringOKCancel(THEME:GetString("Goals", "TargetLabel"), 8, false, function(answer)
 									local p = tonumber((answer:gsub("%%", "")))
 									if p then
-										-- Fix: Round to 6 decimal places before storing to avoid floating-point truncation issues
-										-- This ensures values like 99.35% don't get corrupted by FP representation errors
-										local clamped = math.max(0, math.min(100.0, p))
-										local rounded = notShit.round(clamped, 6) / 100
-										pcall(function() sg:SetPercent(rounded) end)
+										pcall(function() sg:SetPercent(math.max(0, math.min(100.0, p)) / 100) end)
 										goalsActor:playcommand("GoalTableRefresh")
 									end
 								end)

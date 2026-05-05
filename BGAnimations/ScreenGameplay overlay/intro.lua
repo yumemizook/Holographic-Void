@@ -28,6 +28,13 @@ local t = Def.ActorFrame{
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y - 50)
 		self:diffusealpha(0)
 	end,
+	BeginCommand = function(self)
+		-- Fetch invalidating mods
+		local po = GAMESTATE:GetPlayerState():GetCurrentPlayerOptions()
+		if po and po.GetInvalidatingMods then
+			invalidMods = po:GetInvalidatingMods()
+		end
+	end,
 	CurrentSongChangedMessageCommand = function(self)
 		self:stoptweening()
 		self:decelerate(0.8)
@@ -121,7 +128,7 @@ t[#t+1] = Def.Sprite{
 local metaX = -totalW / 2 + bannerW + 12  -- right of banner + gap
 
 -- Song Title
-t[#t+1] = LoadFont("Zpix Normal") .. {
+t[#t+1] = LoadFont("_open sans 48px") .. {
 	InitCommand = function(self)
 		self:x(metaX):y(-16):halign(0):zoom(0.5)
 		self:maxwidth(metaW / 0.5)
@@ -186,52 +193,30 @@ t[#t+1] = LoadFont("Common Normal") .. {
 }
 
 -- ============================================================
--- INVALIDATING MODS BADGE ROW
+-- INVALIDATING MODS WARNING
 -- ============================================================
--- Shorthand abbreviations for each mod ID
-local modShorthand = {
-	NoMines = "NM",   Mines = "+M",
-	NoHolds = "NH",   NoRolls = "NR",
-	NoHands = "NHD",  NoJumps = "NJ",
-	NoLifts = "NL",   NoQuads = "NQ",
-	NoStretch = "NST",NoFakes = "NF",
-	Little = "LIT",
-	Wide = "WD",  Big = "BIG",  Quick = "QCK",
-	BMRize = "BMR", Skippy = "SKP",
-	Echo = "ECH", Stomp = "STP",
-	JackJS = "JJS", AnchorJS = "AJS", IcyWorld = "ICY",
-	Backwards = "BWD", TurnLeft = "LFT", TurnRight = "RGT",
-	Shuffle = "SHF", SoftShuffle = "SSH",
-	SuperShuffle = "SUP", HRanShuffle = "HRS",
-	Planted = "PLT", Floored = "FLR",
-	Twister = "TWS", HoldRolls = "H>R",
-	Autoplay = "AP",  PracticeMode = "PRC",
-}
-
 t[#t+1] = LoadFont("Common Normal") .. {
-	Name = "InvalidModsBadges",
+	Name = "InvalidModsText",
 	InitCommand = function(self)
-		self:y(totalH / 2 + 14):zoom(0.38):valign(0)
-		self:diffuse(color("#CF7070")):diffusealpha(0)
-		self:shadowlength(1):shadowcolor(color("0,0,0,0.8"))
+		self:y(totalH / 2 + 14):zoom(0.35):valign(0)
+		self:diffuse(color("#CF9898")):diffusealpha(0)
+	end,
+	BeginCommand = function(self)
+		if #invalidMods > 0 then
+			local translated = {}
+			for _, mod in ipairs(invalidMods) do
+				table.insert(translated, THEME:HasString("OptionNames", mod) and THEME:GetString("OptionNames", mod) or mod)
+			end
+			local header = THEME:HasString("ScreenGameplay", "InvalidMods")
+				and THEME:GetString("ScreenGameplay", "InvalidMods")
+				or "SCORE INVALIDATED BY:"
+			self:settext(header .. "\n" .. table.concat(translated, ", "))
+		end
 	end,
 	CurrentSongChangedMessageCommand = function(self)
-		-- Repopulate mods here — this fires after screen is fully loaded
-		-- and player options are applied, avoiding the BeginCommand ordering bug
-		if GetInvalidatingMods then
-			invalidMods = GetInvalidatingMods(PLAYER_1)
-		end
 		if #invalidMods > 0 then
-			local badges = {}
-			for _, mod in ipairs(invalidMods) do
-				local short = modShorthand[mod] or mod:sub(1, 3):upper()
-				table.insert(badges, "[" .. short .. "]")
-			end
-			self:settext("INVALIDATING MODS ACTIVE:  " .. table.concat(badges, "  "))
 			self:stoptweening()
 			self:decelerate(0.8):diffusealpha(1)
-		else
-			self:diffusealpha(0)
 		end
 	end,
 	SongStartingMessageCommand = function(self)
@@ -240,81 +225,6 @@ t[#t+1] = LoadFont("Common Normal") .. {
 			self:sleep(1):smooth(0.8):diffusealpha(0)
 		end
 	end
-}
-
--- ============================================================
--- TARGET GOAL & AUTO-FAIL DISPLAY (above banner)
--- ============================================================
-t[#t+1] = Def.ActorFrame{
-	Name = "IntroBannerExtra",
-	CurrentSongChangedMessageCommand = function(self)
-		local targetActor = self:GetChild("TargetGoal")
-		local failActor = self:GetChild("AutoFail")
-		local bg = self:GetChild("ExtraBG")
-		
-		-- Target Goal
-		local showGoal = ThemePrefs.Get("HV_ShowGoalTracker")
-		if showGoal then
-			local goal = ThemePrefs.Get("HV_PacemakerTargetGoal") or 93
-			targetActor:settext(string.format("Target: %.2f%%", goal))
-			targetActor:visible(true)
-		else
-			targetActor:visible(false)
-		end
-		
-		-- Auto-Fail
-		local failMode = ThemePrefs.Get("HV_AutoFailMode")
-		local hasFail = failMode and failMode ~= "Off"
-		if hasFail then
-			local condition = ThemePrefs.Get("HV_AutoFailCondition")
-			local threshold = ""
-			if condition == "Wife Percent" then
-				threshold = string.format("< %.2f%%", ThemePrefs.Get("HV_AutoFailThreshold_Wife") or 93)
-			elseif condition == "Judgement Count" then
-				local judge = ThemePrefs.Get("HV_AutoFailJudgement") or "Miss"
-				local judgeName = THEME:GetString("TapNoteScore", judge)
-				threshold = string.format(">= %d %s", ThemePrefs.Get("HV_AutoFailThreshold_Count") or 10, judgeName)
-			elseif condition == "Personal Best" then
-				local best = GetDisplayScore()
-				local pbStr = ""
-				if best then
-					pbStr = string.format(" (%.2f%%)", getJ4NormalizedPercentage(best))
-				end
-				threshold = "PB" .. pbStr
-			end
-			failActor:settext(string.format("Auto-Fail: %s (%s)", failMode, threshold))
-			failActor:visible(true)
-		else
-			failActor:visible(false)
-		end
-
-		-- Background visibility
-		bg:visible(showGoal or hasFail)
-	end,
-
-	Def.Quad{
-		Name = "ExtraBG",
-		InitCommand = function(self)
-			self:y(-48):zoomto(totalW + 20, 26)
-			self:diffuse(color("#000000")):diffusealpha(0.5)
-			self:fadeleft(0.4):faderight(0.4)
-		end
-	},
-
-	LoadFont("Common Normal") .. {
-		Name = "TargetGoal",
-		InitCommand = function(self)
-			self:y(-42):zoom(0.35):diffuse(color("#FFFFFF")):diffusealpha(0.8)
-			self:shadowlength(1):shadowcolor(color("0,0,0,0.5"))
-		end
-	},
-	LoadFont("Common Normal") .. {
-		Name = "AutoFail",
-		InitCommand = function(self)
-			self:y(-54):zoom(0.35):diffuse(color("#FF8888")):diffusealpha(0.8)
-			self:shadowlength(1):shadowcolor(color("0,0,0,0.5"))
-		end
-	}
 }
 
 return t

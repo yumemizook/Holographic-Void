@@ -1,4 +1,4 @@
---- Holographic Void: Theme Preferences
+--- Etternity: Theme Preferences
 -- @module 03_ThemePrefs
 
 -- ==========================================================================
@@ -8,37 +8,20 @@
 -- This prevents settings from being overwritten by other themes and 
 -- allows for better organization.
 
-local HVThemePrefsPath = "Save/Holographic Void_settings/themeConfig.lua"
-local NewIniPath = "Save/Holographic Void_settings/ThemePrefs.ini"
+local HVThemePrefsPath = "Save/Etternity_settings/themeConfig.lua"
+local NewIniPath = "Save/Etternity_settings/ThemePrefs.ini"
 local OldIniPath = "Save/ThemePrefs.ini"
 
 -- Internal storage for preferences (since _fallback's table is local to its script)
 local PrefsTable = {}
-local PrefDefinitions = {}
 local FallbackTheme = "_fallback"
 
+local _cachedThemeName = nil
 local function GetThemeName()
-	return (themeInfo and themeInfo.Name) or THEME:GetThemeDisplayName()
-end
-
-local function coerce_pref_value(pref, value)
-	local def = PrefDefinitions[pref]
-	if not def then return value end
-	local default = def.Default
-	if type(default) == "boolean" then
-		if value == "true" then return true end
-		if value == "false" then return false end
-	elseif type(default) == "number" then
-		if type(value) == "string" then
-			local num = tonumber(value)
-			if num ~= nil then return num end
-		end
-	elseif type(default) == "string" then
-		if value == true or value == false then
-			return tostring(value)
-		end
+	if not _cachedThemeName then
+		_cachedThemeName = (themeInfo and themeInfo.Name) or THEME:GetThemeDisplayName()
 	end
-	return value
+	return _cachedThemeName
 end
 
 -- Resolve which section a preference belongs to
@@ -104,11 +87,8 @@ ThemePrefs = {
 		local section = GetThemeName()
 		PrefsTable[section] = PrefsTable[section] or {}
 		for k, tbl in pairs(prefs) do
-			PrefDefinitions[k] = tbl
 			if PrefsTable[section][k] == nil then
 				PrefsTable[section][k] = tbl.Default
-			else
-				PrefsTable[section][k] = coerce_pref_value(k, PrefsTable[section][k])
 			end
 		end
 	end,
@@ -125,7 +105,7 @@ ThemePrefs = {
 		-- 2. Fall back to theme-specific .ini for migration
 		if FILEMAN:DoesFileExist(NewIniPath) then
 			if IniFile then
-				Trace("Holographic Void: Migrating settings from " .. NewIniPath)
+				Trace("Etternity: Migrating settings from " .. NewIniPath)
 				PrefsTable = IniFile.ReadFile(NewIniPath)
 				ThemePrefs.NeedsSaved = true
 				ThemePrefs.Save()
@@ -136,7 +116,7 @@ ThemePrefs = {
 		-- 3. Fall back to legacy .ini for migration
 		if FILEMAN:DoesFileExist(OldIniPath) then
 			if IniFile then
-				Trace("Holographic Void: Migrating legacy settings from " .. OldIniPath)
+				Trace("Etternity: Migrating legacy settings from " .. OldIniPath)
 				PrefsTable = IniFile.ReadFile(OldIniPath)
 				ThemePrefs.NeedsSaved = true
 				ThemePrefs.Save()
@@ -156,7 +136,7 @@ ThemePrefs = {
 				file:Close()
 				ThemePrefs.NeedsSaved = false
 			else
-				Warn("Holographic Void: Could not open '" .. HVThemePrefsPath .. "' for writing.")
+				Warn("Etternity: Could not open '" .. HVThemePrefsPath .. "' for writing.")
 			end
 			file:destroy()
 		end
@@ -167,34 +147,12 @@ ThemePrefs = {
 	end,
 	Get = function(name)
 		local tbl = ResolveTable(name)
-		if tbl and tbl[name] ~= nil then
-			local value = coerce_pref_value(name, tbl[name])
-			if value ~= tbl[name] then
-				tbl[name] = value
-				ThemePrefs.NeedsSaved = true
-			end
-			return value
-		end
-		local def = PrefDefinitions[name]
-		if def then
-			local section = GetThemeName()
-			PrefsTable[section] = PrefsTable[section] or {}
-			PrefsTable[section][name] = def.Default
-			ThemePrefs.NeedsSaved = true
-			ThemePrefs.Save()
-			return def.Default
-		end
-		return nil
+		return tbl and tbl[name] or nil
 	end,
 	Set = function(name, value)
 		local tbl = ResolveTable(name)
-		if not tbl and PrefDefinitions[name] then
-			local section = GetThemeName()
-			PrefsTable[section] = PrefsTable[section] or {}
-			tbl = PrefsTable[section]
-		end
 		if tbl then
-			tbl[name] = coerce_pref_value(name, value)
+			tbl[name] = value
 			ThemePrefs.NeedsSaved = true
 			ThemePrefs.Save() -- Global Consistency: persist immediately on change
 		end
@@ -218,46 +176,11 @@ end
 -- Preference definitions: each key maps to a table with a Default value.
 -- These are registered with the _Fallback ThemePrefs.Init system.
 local HVPrefs = {
-	-- Offset Graph: Hover mode (Point or Slice)
-	HV_OffsetGraphHoverMode = {
-		Default = "point",
-		Choices = {"Point", "Slice"},
-		Values = {"point", "slice"}
-	},
-
-	-- Offset Graph: Slice width percent (1-100)
-	HV_OffsetGraphSlicePercent = {
-		Default = 25,
-		Choices = (function() local c={}; for i=1,100 do c[i]=tostring(i).."%" end return c end)(),
-		Values = (function() local v={}; for i=1,100 do v[i]=i end return v end)()
-	},
-
-	-- Offset Graph: Trend metric mode
-	HV_OffsetGraphTrendMetric = {
-		Default = "wife",
-		Choices = {"Wife%", "Grade", "Clear Type", "Mean", "Std Dev", "MA", "PA"},
-		Values = {"wife", "grade", "clear", "mean", "sd", "ma", "pa"}
-	},
-
-	-- Offset Graph: Trend color mode
-	HV_OffsetGraphTrendColor = {
-		Default = "none",
-		Choices = {"None", "Grade", "Clear Type"},
-		Values = {"none", "grade", "clear"}
-	},
-
 	-- Visual: Background animation intensity (0 = off, 1 = subtle, 2 = full)
 	HV_BGAnimIntensity = {
-		Default = 1,
+		Default = 0,
 		Choices = {"Off", "Subtle", "Full"},
 		Values = {0, 1, 2}
-	},
-
-	-- Visual: Enable mouse parallax effects
-	HV_Parallax = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true}
 	},
 
 	-- Gameplay: Show MSD ratings on music wheel
@@ -277,16 +200,16 @@ local HVPrefs = {
 
 	-- Gameplay: Song Preview Mode (1: SM, 2: osu! New, 3: osu! Old)
 	HV_SongPreview = {
-		Default = 1,
+		Default = 2,
 		Choices = {"SM Style", "osu! Style (New)", "osu! Style (Old)"},
 		Values = {1, 2, 3}
 	},
 
-	-- Gameplay: MSD Color Scale (HolographicVoid or TilDeath)
+	-- Gameplay: MSD Color Scale (Etternity or TilDeath)
 	HV_MSDColorScaleV3 = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "None", "Monochrome", "Accent Color"},
-		Values = {"Holographic", "Classic", "None", "Monochrome", "Accent"}
+		Default = "Etternity",
+		Choices = {"Etternity", "Classic", "None", "Monochrome"},
+		Values = {"Etternity", "Classic", "None", "Monochrome"}
 	},
 
 	-- Visual: Enable glow/bloom effects on active elements
@@ -437,7 +360,7 @@ local HVPrefs = {
 
 	-- Visual: Background/Menu particles
 	HV_Particles = {
-		Default = true,
+		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true}
 	},
@@ -457,15 +380,10 @@ local HVPrefs = {
 	},
 
 	-- Gameplay: Mini (Receptor Size)
-	HV_Mini = { Default = 100 },
+	HV_Mini = { Default = 130 },
 
 	-- Visual: Accent color hex
 	HV_AccentColor = { Default = "#5ABAFF" },
-	HV_ColorEditSyncAccent = { Default = false },
-
-	-- Auth: Saved EtternaOnline username and login token
-	HV_Username = { Default = "" },
-	HV_PasswordToken = { Default = "" },
 
 	-- Custom Grades
 	HV_UseCustomGrades = {
@@ -476,37 +394,30 @@ local HVPrefs = {
 
 	-- Visual: Grade Coloring Style
 	HV_GradeColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "Custom"},
-		Values = {"Holographic", "Classic", "Custom"}
+		Default = "Etternity",
+		Choices = {"Etternity", "Classic"},
+		Values = {"Etternity", "Classic"}
 	},
 	
 	-- Judgment Color Style
 	HV_JudgmentColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "Custom"},
-		Values = {"Holographic", "Classic", "Custom"}
+		Default = "Etternity",
+		Choices = {"Etternity", "Classic"},
+		Values = {"Etternity", "Classic"}
 	},
 
 	-- Difficulty Color Style
 	HV_DifficultyColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "Custom"},
-		Values = {"Holographic", "Classic", "Custom"}
+		Default = "Etternity",
+		Choices = {"Etternity", "Classic"},
+		Values = {"Etternity", "Classic"}
 	},
 
 	-- Clear Type Color Style
 	HV_ClearTypeColorStyle = {
-		Default = "Holographic",
-		Choices = {"Holographic", "Classic", "Custom"},
-		Values = {"Holographic", "Classic", "Custom"}
-	},
-
-	-- Goal Tracker Color Style
-	HV_GoalTrackerColorStyle = {
-		Default = "Custom",
-		Choices = {"Custom"},
-		Values = {"Custom"}
+		Default = "Etternity",
+		Choices = {"Etternity", "Classic"},
+		Values = {"Etternity", "Classic"}
 	},
 
 	-- Visual: Background Effect Style
@@ -518,7 +429,7 @@ local HVPrefs = {
 
 	-- Visual: Show scrolling quotes/tips on Title Screen
 	HV_QuotesMode = {
-		Default = "Quotes",
+		Default = "Off",
 		Choices = {"Off", "Quotes", "Tips"},
 		Values = {"Off", "Quotes", "Tips"}
 	},
@@ -526,7 +437,7 @@ local HVPrefs = {
 	-- Alarm System Preferences
 	HV_AlarmActive = { Default = false },
 	HV_AlarmType = {
-		Default = "Timer",
+		Default = "Time",
 		Choices = {"Time", "Timer"},
 		Values = {"Time", "Timer"}
 	},
@@ -567,8 +478,8 @@ local HVPrefs = {
 	},
 	HV_ShowInGameLeaderboard = {
 		Default = "Off",
-		Choices = {"Off", "Local", "Online"},
-		Values = {"Off", "Local", "Online"}
+		Choices = {"Off", "Local"},
+		Values = {"Off", "Local"}
 	},
 	HV_ShowNPSGraph = {
 		Default = true,
@@ -610,23 +521,9 @@ local HVPrefs = {
 
 	-- Gameplay: Prioritize Lower Judgements
 	HV_PrioritizeLowerJudgements = {
-		Default = false,
+		Default = true,
 		Choices = {"Off", "On"},
 		Values = {false, true}
-	},
-
-	-- Gameplay: Display Lower Judgement Offset
-	HV_DisplayLowerJudgementOffset = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true}
-	},
-
-	-- Gameplay: Offset Display Judgement
-	HV_OffsetDisplayJudgement = {
-		Default = "W3",
-		Choices = {"Marvelous", "Perfect", "Great", "Good", "Bad"},
-		Values = {"W1", "W2", "W3", "W4", "W5"}
 	},
 	
 	-- Visual: Judgment Animation
@@ -721,12 +618,6 @@ local HVPrefs = {
 		Choices = (function() local c = {}; for i=0, 99 do c[#c+1]=tostring(i) end return c end)(),
 		Values = (function() local v = {}; for i=0, 99 do v[#v+1]=i end return v end)(),
 	},
-	-- Gameplay: Emulate Ridiculous Judgement (W0 = W1/2)
-	HV_EmulateRidiculous = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true}
-	},
 }
 
 -- bLoadFromDisk = true on the first call to read existing prefs from file.
@@ -740,7 +631,6 @@ if HVColor then
 	if HVColor.RefreshJudgmentColors then HVColor.RefreshJudgmentColors() end
 	if HVColor.RefreshClearTypeColors then HVColor.RefreshClearTypeColors() end
 	if HVColor.RefreshGradeColors then HVColor.RefreshGradeColors() end
-	if HVColor.RefreshGoalTrackerColors then HVColor.RefreshGoalTrackerColors() end
 end
 
 -- ==========================================================================
@@ -812,7 +702,7 @@ function HV.GetProgressBarPosition()
 	return ThemePrefs.Get("HV_ProgressBarPosition") or "Bottom"
 end
 
---- Get in-game leaderboard mode ("Off", "Local", or "Online").
+--- Get in-game leaderboard mode ("Off", "Local").
 function HV.ShowInGameLeaderboard()
 	local val = ThemePrefs.Get("HV_ShowInGameLeaderboard")
 	-- Backwards compat: true -> "Local", false/nil -> "Off"
@@ -900,16 +790,6 @@ function HV.PrioritizeLowerJudgements()
 	return isTrue(ThemePrefs.Get("HV_PrioritizeLowerJudgements"))
 end
 
---- Check if lower judgment offsets should be displayed.
-function HV.DisplayLowerJudgementOffset()
-	return isTrue(ThemePrefs.Get("HV_DisplayLowerJudgementOffset"))
-end
-
---- Get the lowest judgment threshold that should show hit offset text.
-function HV.GetOffsetDisplayJudgement()
-	return ThemePrefs.Get("HV_OffsetDisplayJudgement") or "W3"
-end
-
 --- Check if judgment animations are enabled.
 function HV.JudgmentAnimation()
 	return isTrue(ThemePrefs.Get("HV_JudgmentAnimation"))
@@ -935,14 +815,9 @@ function HV.GetSongBackgroundBrightness()
 	return tonumber(ThemePrefs.Get("HV_SongBackgroundBrightness")) or 0.5
 end
 
---- Check if mouse parallax effects are enabled.
-function HV.ParallaxEnabled()
-	return isTrue(ThemePrefs.Get("HV_Parallax"))
-end
-
 --- Get screen filter / lane cover opacity (0.0-1.0).
 function HV.GetScreenFilter()
 	return tonumber(ThemePrefs.Get("HV_ScreenFilter")) or 0.0
 end
 
-Trace("Holographic Void: 03 HVThemePrefs.lua loaded.")
+Trace("Etternity: 03 HVThemePrefs.lua loaded.")

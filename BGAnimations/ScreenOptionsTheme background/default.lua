@@ -1,4 +1,4 @@
---- Holographic Void: ScreenOptionsTheme Background
+--- Etternity: ScreenOptionsTheme Background
 -- Themed background for the theme options screen (ScreenOptionsServiceChild)
 
 local t = Def.ActorFrame {}

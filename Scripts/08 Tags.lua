@@ -1,6 +1,6 @@
---- Holographic Void: Tags Persistence
+--- Etternity: Tags Persistence
 -- Matches Til Death/Rebirth Tag Manager (Saves to tags.lua)
--- This allows tags to be shared across themes in the same Etterna install.
+-- This allows tags to be shared across themes in the same Etternity install.
 
 local defaultConfig = {
 	playerTags = {}
@@ -46,4 +46,4 @@ TAGMAN = {
 -- Initial load
 TAGMAN:load()
 
-Trace("Holographic Void: TAGMAN initialized (Per-Profile)")
+Trace("Etternity: TAGMAN initialized (Per-Profile)")

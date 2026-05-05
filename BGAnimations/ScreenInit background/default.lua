@@ -1,4 +1,4 @@
---- Holographic Void: ScreenInit Background
+--- Etternity: ScreenInit Background
 -- Modernized, sleek initialization screen with a holographic vibe.
 
 local t = Def.ActorFrame {}
@@ -56,7 +56,7 @@ local textGroup = Def.ActorFrame {
 	InitCommand = function(self) self:Center():y(SCREEN_CENTER_Y - 15) end,
 	-- Cyan layer (moves right to center)
 	LoadFont("Common Large") .. {
-		Text = "HOLOGRAPHIC VOID",
+		Text = "Etternity",
 		InitCommand = function(self) self:zoom(0.6):x(-15):diffuse(color("#00FFFF")):blend("BlendMode_Add") end,
 		OnCommand = function(self)
 			self:diffusealpha(0)
@@ -67,7 +67,7 @@ local textGroup = Def.ActorFrame {
 	},
 	-- Magenta layer (moves left to center)
 	LoadFont("Common Large") .. {
-		Text = "HOLOGRAPHIC VOID",
+		Text = "Etternity",
 		InitCommand = function(self) self:zoom(0.6):x(15):diffuse(color("#FF00FF")):blend("BlendMode_Add") end,
 		OnCommand = function(self)
 			self:diffusealpha(0)
@@ -78,7 +78,7 @@ local textGroup = Def.ActorFrame {
 	},
 	-- Main White layer
 	LoadFont("Common Large") .. {
-		Text = "HOLOGRAPHIC VOID",
+		Text = "Etternity",
 		InitCommand = function(self) self:zoom(0.6):x(0) end,
 		OnCommand = function(self)
 			self:diffusealpha(0)

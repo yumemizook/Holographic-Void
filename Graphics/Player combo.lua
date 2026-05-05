@@ -1,4 +1,4 @@
---- Holographic Void: Player combo
+--- Etternity: Player combo
 -- Monochromatic combo display. Uses _Fallback's combo system
 -- but with theme-appropriate styling via metrics.ini commands.
 

@@ -57,7 +57,7 @@ local function playMusic(self, delta)
 	-- Fallback: arm sampleEvent if PlayingSampleMusic never fired.
 	-- In normal wheel navigation PlayingSampleMusic arrives within ~1-2 frames.
 	-- When returning from the evaluation screen the wheel is already settled so
-	-- Etterna never re-fires PlayingSampleMusic — catch that with a 0.4s timeout.
+	-- Etternity never re-fires PlayingSampleMusic — catch that with a 0.4s timeout.
 	-- Sanity: only fire if curSong and curPath are actually valid.
 	if not sampleEvent and loops == 0 and curSong and curPath and curPath ~= ""
 		and deltaSum > 0.4 then

@@ -1,4 +1,4 @@
---- Holographic Void: ThemePrefs Option Rows
+--- Etternity: ThemePrefs Option Rows
 -- @module 04_ThemePrefsRows
 -- Defines option row handlers for the in-client ThemePrefs system.
 -- These rows appear in ScreenOptionsService when theme options are accessed.
@@ -32,13 +32,6 @@ local HVPrefRows = {
 		Default = 1,
 		Choices = {"Off", "Subtle", "Full"},
 		Values = {0, 1, 2},
-	},
-
-	-- Mouse Parallax
-	HV_Parallax = {
-		Default = true,
-		Choices = {"Off", "On"},
-		Values = {false, true},
 	},
 
 	-- Song Preview Mode
@@ -271,8 +264,8 @@ local HVPrefRows = {
 	},
 	HV_ShowInGameLeaderboard = {
 		Default = "Off",
-		Choices = {"Off", "Local", "Online"},
-		Values = {"Off", "Local", "Online"},
+		Choices = {"Off", "Local"},
+		Values = {"Off", "Local"},
 	},
 	HV_ShowNPSGraph = {
 		Default = true,
@@ -327,20 +320,6 @@ local HVPrefRows = {
 		Default = false,
 		Choices = {"Off", "On"},
 		Values = {false, true},
-	},
-
-	-- Display Lower Judgement Offset
-	HV_DisplayLowerJudgementOffset = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true},
-	},
-
-	-- Offset Display Judgement
-	HV_OffsetDisplayJudgement = {
-		Default = "W3",
-		Choices = {"Marvelous", "Perfect", "Great", "Good", "Bad"},
-		Values = {"W1", "W2", "W3", "W4", "W5"},
 	},
 
 	-- Judgment Animation
@@ -435,12 +414,6 @@ local HVPrefRows = {
 		Choices = (function() local c = {}; for i=0, 99 do c[#c+1]=tostring(i) end return c end)(),
 		Values = (function() local v = {}; for i=0, 99 do v[#v+1]=i end return v end)(),
 	},
-	-- Emulate Ridiculous Judgement
-	HV_EmulateRidiculous = {
-		Default = false,
-		Choices = {"Off", "On"},
-		Values = {false, true},
-	},
 } -- End of HVPrefRows
 
 -- Register the rows with the _Fallback ThemePrefsRows system
@@ -486,7 +459,7 @@ function HVThemeOptionsLines()
 	-- Logical grouping of theme options
 	local l = table.concat({
 		-- General / Visual
-		"HV_BGAnimIntensity", "HV_Parallax", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
+		"HV_BGAnimIntensity", "HV_BackgroundEffect", "HV_Particles", "HV_EnableGlow", "HV_QuotesMode",
 		"HV_SongBackgroundBrightness",
 		
 		-- Music Select
@@ -494,7 +467,7 @@ function HVThemeOptionsLines()
 		"HV_ShowMSD", "HV_ShowProfileStats", "HV_SongPreview", "HV_InstantSearch",
 		
 		-- Gameplay HUD
-		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_EmulateRidiculous", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_DisplayLowerJudgementOffset", "HV_OffsetDisplayJudgement", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
+		"HV_MinimalisticMode", "HV_ShowJudgment", "HV_JudgmentAnimation", "HV_RecentJudgmentDisplay", "HV_PrioritizeLowerJudgements", "HV_ShowCombo", "HV_ComboAnimation", "HV_ShowCurrentWife",
 			"HV_ShowJudgeCounter", "HV_JudgeCounterMode", "HV_ShowNGIndicator",
 		"HV_ShowPlayerInfo", "HV_ProgressBarPosition", "HV_ShowInGameLeaderboard",
 		
@@ -691,10 +664,6 @@ function OptionRowShowJudgment()
 	return row
 end
 
-function OptionRowEmulateRidiculous()
-	return HVThemePrefRow("HV_EmulateRidiculous", "Emulate Ridiculous")
-end
-
 function OptionRowShowCombo()
 	local row = ThemePrefRow("HV_ShowCombo", "Show Combo")
 	local baseLoad = row.LoadSelections
@@ -807,14 +776,6 @@ function OptionRowPrioritizeLowerJudgements()
 	return HVThemePrefRow("HV_PrioritizeLowerJudgements", "Prioritize Lower Judgements")
 end
 
-function OptionRowDisplayLowerJudgementOffset()
-	return HVThemePrefRow("HV_DisplayLowerJudgementOffset", "Display Lower Judgement Offset")
-end
-
-function OptionRowOffsetDisplayJudgement()
-	return HVThemePrefRow("HV_OffsetDisplayJudgement", "Offset Display Judgement")
-end
-
 function OptionRowJudgmentAnimation()
 	return HVThemePrefRow("HV_JudgmentAnimation", "Judgment Animation")
 end
@@ -830,35 +791,6 @@ end
 function OptionRowSongBackgroundBrightness()
 	return HVThemePrefRow("HV_SongBackgroundBrightness", "Background Brightness")
 end
-
--- Customize Gameplay toggle (used in ScreenPlayerOptions)
-function OptionRowCustomizeGameplay()
-	return {
-		Name = "HV_CustomizeGameplay",
-		LayoutType = "ShowAllInRow",
-		SelectType = "SelectOne",
-		OneChoiceForAllPlayers = true,
-		ExportOnChange = true,
-		Choices = {"Off", "On"},
-		LoadSelections = function(self, list, pn)
-			local enabled = playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay
-			if enabled then
-				list[2] = true
-			else
-				list[1] = true
-			end
-		end,
-		SaveSelections = function(self, list, pn)
-			if list[2] then
-				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = true
-			else
-				playerConfig:get_data(pn_to_profile_slot(PLAYER_1)).CustomizeGameplay = false
-				GAMESTATE:SetAutoplay(false)
-			end
-		end
-	}
-end
-_G["OptionRowCustomizeGameplay"] = OptionRowCustomizeGameplay
 
 -- Practice Mode toggle (used in ScreenPlayerOptions)
 function PracticeMode()
@@ -893,9 +825,6 @@ local function OnThemePrefChanged(params)
 		if HVColor and HVColor.RefreshAccent then
 			HVColor.RefreshAccent()
 		end
-		if HVCustomColors and HVCustomColors.SyncAccentLinkedColors then
-			HVCustomColors.SyncAccentLinkedColors(ThemePrefs.Get("HV_AccentColor"))
-		end
 	end
 end
 
@@ -923,4 +852,4 @@ function OptionRowAutoFailThresholdCount()
 	return HVThemePrefRow("HV_AutoFailThreshold_Count", "Judgement Limit")
 end
 
-Trace("Holographic Void: 04 ThemePrefsRows.lua loaded.")
+Trace("Etternity: 04 ThemePrefsRows.lua loaded.")

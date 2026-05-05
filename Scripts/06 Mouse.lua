@@ -1,4 +1,4 @@
---- Holographic Void: Mouse Support Utilities
+--- Etternity: Mouse Support Utilities
 -- Provides helper functions for mouse-driven interaction across screens.
 -- Loaded globally by the Scripts/ auto-load system.
 

@@ -1,4 +1,4 @@
---- Holographic Void: ScreenGameplay Background
+--- Etternity: ScreenGameplay Background
 -- Minimal OLED black with subtle animated accent elements.
 
 local t = Def.ActorFrame {}

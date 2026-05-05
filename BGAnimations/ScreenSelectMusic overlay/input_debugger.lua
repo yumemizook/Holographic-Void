@@ -1,4 +1,4 @@
---- Holographic Void: Isolated Input Debugger
+--- Etternity: Isolated Input Debugger
 -- This actor is designed to be loaded by the main overlay but stay functional
 -- even if other parts of the overlay script crash.
 

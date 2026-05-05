@@ -1,4 +1,4 @@
--- Holographic Void: Scrolling Quotes & Tips Display
+-- Etternity: Scrolling Quotes & Tips Display
 -- A horizontally scrolling text component for the title screen.
 
 local quotes = {
@@ -28,7 +28,6 @@ local tips = {
     "TIP: The Pacemaker Graph adds an IIDX-like pacemaker graph! (found it somewhere on the Etterna server)",
     "TIP: The MSD and the player stats can be hidde.",
     "TIP: You can search for songs by title, artist, or author.",
-    "TIP: Join the Etterna Discord! There are a lot of underrated goats",
     "TIP: Don't forget to set up your online profile for leaderboards and ranking.",
 }
 

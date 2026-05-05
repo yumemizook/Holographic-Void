@@ -1,4 +1,4 @@
---- Holographic Void: OptionRow Frame
+--- Etternity: OptionRow Frame
 -- Monochromatic option row styling for the options screens.
 
 local t = Def.ActorFrame {}

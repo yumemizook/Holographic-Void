@@ -1,4 +1,4 @@
---- Holographic Void: ScreenSelectProfile Overlay (REBUILT)
+--- Etternity: ScreenSelectProfile Overlay (REBUILT)
 -- Features a seamless zoom transition from the Title Screen chip.
 -- Uses native ScreenSelectProfile methods for stability.
 

@@ -1,4 +1,4 @@
--- Holographic Void: Score Tracking
+-- Etternity: Score Tracking
 -- Broadcasts timing messages for the pacemaker and other overlay elements.
 
 local startFlag = false

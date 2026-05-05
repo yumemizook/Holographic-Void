@@ -101,7 +101,7 @@ function GRADECOUNTERSTORAGE:init()
     local currentProfileName = profile:GetDisplayName()
 
     if not self.initialized or self.lastProfileName ~= currentProfileName then
-        local xmlData = File.Read(PROFILEMAN:GetProfileDir(1) .. "Etterna.xml")
+        local xmlData = File.Read(PROFILEMAN:GetProfileDir(1) .. "Etternity.xml")
         local grades = {}
         if xmlData then
             grades = ParseXML(xmlData)

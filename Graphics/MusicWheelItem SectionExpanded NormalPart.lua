@@ -1,4 +1,4 @@
---- Holographic Void: MusicWheelItem SectionExpanded NormalPart
+--- Etternity: MusicWheelItem SectionExpanded NormalPart
 -- Group header row: left-aligned pack name, right-aligned song count (engine).
 -- Scratch re-implementation of the pack progression bar.
 
