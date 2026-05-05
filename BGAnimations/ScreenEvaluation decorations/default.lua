@@ -1677,7 +1677,7 @@ local function scoreBoard(pn)
 	end
 
 	-- Column 2: Note Types
-	local ntStartY = ratioStartY
+	local ntStartY = ratioStartY - 20
 	local noteTypeLabels = {"Taps", "Holds", "Rolls", "Lifts", "Mines"}
 	local noteTypeRadars = {"RadarCategory_Notes", "RadarCategory_Holds", "RadarCategory_Rolls", "RadarCategory_Lifts", "RadarCategory_Mines"}
 	for ni, nlabel in ipairs(noteTypeLabels) do
