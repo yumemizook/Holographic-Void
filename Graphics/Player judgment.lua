@@ -102,6 +102,8 @@ local t = Def.ActorFrame {
 			local baseIdx = jdgIdx
 			if emulateRidiculous then
 				baseIdx = isRidiculous and 0 or (jdgIdx + 1)
+			else
+				baseIdx = jdgIdx == 0 and 0 or (jdgIdx + 1)
 			end
 			state = baseIdx * 2 + isLate
 		elseif numStates == 7 then
@@ -109,6 +111,8 @@ local t = Def.ActorFrame {
 			local baseIdx = jdgIdx
 			if emulateRidiculous then
 				baseIdx = isRidiculous and 0 or (jdgIdx + 1)
+			else
+				baseIdx = jdgIdx == 0 and 0 or (jdgIdx + 1)
 			end
 			state = baseIdx
 		elseif numStates == 12 then
