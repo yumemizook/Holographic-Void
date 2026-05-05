@@ -967,7 +967,7 @@ local function scoreBoard(pn)
 			-- Shorthand (colored by difficulty type)
 			LoadFont("Common Normal") .. {
 				InitCommand = function(self)
-					self:halign(1):valign(1):xy(-58, 16):zoom(0.55)
+					self:halign(1):valign(1):xy(-51, 14):zoom(0.55)
 				end,
 				OnCommand = function(self)
 					if steps then

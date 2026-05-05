@@ -576,6 +576,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self)
 			self:zoom(0.45):diffuse(brightText):diffusealpha(0.7)
 			self.currWifePoints = 0
+			self.currScoredTaps = 0
 			local scoreMode = ThemePrefs.Get("HV_ScoreDisplayMode") or "Normal"
 			if scoreMode == "Subtractive" then
 				self:settext("100.0000%")
@@ -595,36 +596,39 @@ t[#t + 1] = Def.ActorFrame {
 		JudgmentMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
 			if msg.HoldNoteScore then return end -- Skip holds, handled in HoldNoteScoreMessageCommand
-			if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" then
+			if msg.TapNoteScore and msg.TapNoteScore ~= "TapNoteScore_AvoidMine" and msg.TapNoteScore ~= "TapNoteScore_CheckpointHit" and msg.TapNoteScore ~= "TapNoteScore_CheckpointMiss" then
 				if msg.TapNoteOffset then
 					self.currWifePoints = self.currWifePoints + wife3(math.abs(msg.TapNoteOffset) * 1000, HV_JudgeScale, "Wife3")
+					self.currScoredTaps = self.currScoredTaps + 1
 				elseif msg.TapNoteScore == "TapNoteScore_Miss" then
 					self.currWifePoints = self.currWifePoints - 5.5
+					self.currScoredTaps = self.currScoredTaps + 1
 				elseif msg.TapNoteScore == "TapNoteScore_HitMine" then
 					self.currWifePoints = self.currWifePoints - 7.0
 				elseif msg.TapNoteScore ~= "TapNoteScore_None" then
 					self.currWifePoints = self.currWifePoints + 2.0
+					self.currScoredTaps = self.currScoredTaps + 1
 				end
 			end
-			self:queuecommand("Update")
+			self:playcommand("Update")
 		end,
 		HoldNoteScoreMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
 			-- The engine applies the hold penalty even if the head was completely missed
 			if msg.HoldNoteScore == "HoldNoteScore_LetGo" or msg.HoldNoteScore == "HoldNoteScore_MissedHold" then
 				self.currWifePoints = self.currWifePoints - 4.5
-				self:queuecommand("Update")
+				self:playcommand("Update")
 			end
 		end,
 		RollNoteScoreMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
 			if msg.RollNoteScore == "RollNoteScore_LetGo" or msg.RollNoteScore == "RollNoteScore_MissedRoll" then
 				self.currWifePoints = self.currWifePoints - 4.5
-				self:queuecommand("Update")
+				self:playcommand("Update")
 			end
 		end,
 		HV_PointsUpdateMessageCommand = function(self)
-			self:queuecommand("Update")
+			self:playcommand("Update")
 		end,
 		UpdateCommand = function(self)
 			local wifePct
@@ -654,29 +658,14 @@ t[#t + 1] = Def.ActorFrame {
 				wifePct = ((HV_MaxPoints - HV_PointsLost) / HV_MaxPoints) * 100
 			else
 				if pss then
-					local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
-									   pss:GetTapNoteScores("TapNoteScore_W2") +
-									   pss:GetTapNoteScores("TapNoteScore_W3") +
-									   pss:GetTapNoteScores("TapNoteScore_W4") +
-									   pss:GetTapNoteScores("TapNoteScore_W5") +
-									   pss:GetTapNoteScores("TapNoteScore_Miss")
-					local currentMaxPoints = notesPassed * 2
-					if currentMaxPoints > 0 and type(pss.GetWifePoints) == "function" then
-						local ok, value = pcall(pss.GetWifePoints, pss)
-						value = ok and tonumber(value) or nil
-						if value then wifePct = math.min((value / currentMaxPoints) * 100, 100) end
-					end
-					if not wifePct then
-						if currentMaxPoints > 0 then
-							local raw = (self.currWifePoints / currentMaxPoints) * 100
-							wifePct = math.min(raw, 100)
-						elseif self.currWifePoints < 0 then
-							-- Handle penalty before any tap notes (e.g. hitting a mine at the start)
-							-- Show the current penaltied score before the first tap note
-							wifePct = (self.currWifePoints / 2) * 100
-						else
-							wifePct = 100.0000
-						end
+					local currentMaxPoints = self.currScoredTaps * 2
+					if currentMaxPoints > 0 then
+						local raw = (self.currWifePoints / currentMaxPoints) * 100
+						wifePct = math.min(raw, 100)
+					elseif self.currWifePoints < 0 then
+						wifePct = (self.currWifePoints / 2) * 100
+					else
+						wifePct = 100.0000
 					end
 				end
 			end			
