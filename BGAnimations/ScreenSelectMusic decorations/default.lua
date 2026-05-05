@@ -1680,10 +1680,14 @@ t[#t + 1] = Def.ActorFrame {
 				end
 			end
 			
+			local blocks = self:GetChild("Blocks")
+			local gap = 2
+			local blockW = (panelW - 32 - (gap * (#judges - 1))) / #judges
 			for i = 1, 7 do
-				local block = self:GetChild("Blocks"):GetChild("Block_" .. i)
+				local block = blocks:GetChild("Block_" .. i)
 				local j = judges[i]
 				block:visible(j ~= nil)
+				if j then block:playcommand("SetLayout", {x = (i - 1) * (blockW + gap), width = blockW}) end
 				if not j then break end
 				local bg = block:GetChild("Bg")
 				local lbl = block:GetChild("Lbl")
@@ -1722,6 +1726,12 @@ t[#t + 1] = Def.ActorFrame {
 					Name = "Block_" .. i,
 					InitCommand = function(self)
 						self:x((i - 1) * (blockW + gap))
+					end,
+					SetLayoutCommand = function(self, params)
+						self:x(params.x)
+						self:GetChild("Bg"):zoomto(params.width, 22)
+						self:GetChild("Val"):x(params.width / 2)
+						self:GetChild("Lbl"):x(params.width / 2)
 					end,
 					Def.Quad {
 						Name = "Bg",
