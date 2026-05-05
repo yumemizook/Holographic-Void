@@ -583,6 +583,15 @@ t[#t + 1] = Def.ActorFrame {
 				self:settext("0.0000%")
 			end
 		end,
+		OnCommand = function(self)
+			self:queuecommand("UpdateAutoplay")
+		end,
+		UpdateAutoplayCommand = function(self)
+			if getAutoplay and getAutoplay() ~= 0 then
+				self:queuecommand("Update")
+			end
+			self:sleep(0.05):queuecommand("UpdateAutoplay")
+		end,
 		JudgmentMessageCommand = function(self, msg)
 			if msg.Player ~= GAMESTATE:GetMasterPlayerNumber() then return end
 			if msg.HoldNoteScore then return end -- Skip holds, handled in HoldNoteScoreMessageCommand
@@ -624,10 +633,17 @@ t[#t + 1] = Def.ActorFrame {
 			local isAutoplay = getAutoplay and getAutoplay() ~= 0
 			
 			if isAutoplay and pss then
-				if type(pss.GetWifePoints) == "function" then
+				local notesPassed = pss:GetTapNoteScores("TapNoteScore_W1") +
+								   pss:GetTapNoteScores("TapNoteScore_W2") +
+								   pss:GetTapNoteScores("TapNoteScore_W3") +
+								   pss:GetTapNoteScores("TapNoteScore_W4") +
+								   pss:GetTapNoteScores("TapNoteScore_W5") +
+								   pss:GetTapNoteScores("TapNoteScore_Miss")
+				local currentMaxPoints = notesPassed * 2
+				if currentMaxPoints > 0 and type(pss.GetWifePoints) == "function" then
 					local ok, value = pcall(pss.GetWifePoints, pss)
 					value = ok and tonumber(value) or nil
-					if value then wifePct = (value / HV_MaxPoints) * 100 end
+					if value then wifePct = math.min((value / currentMaxPoints) * 100, 100) end
 				end
 				if not wifePct and type(pss.GetWifeScore) == "function" then
 					local ok, value = pcall(pss.GetWifeScore, pss)
@@ -645,15 +661,22 @@ t[#t + 1] = Def.ActorFrame {
 									   pss:GetTapNoteScores("TapNoteScore_W5") +
 									   pss:GetTapNoteScores("TapNoteScore_Miss")
 					local currentMaxPoints = notesPassed * 2
-					if currentMaxPoints > 0 then
-						local raw = (self.currWifePoints / currentMaxPoints) * 100
-						wifePct = math.min(raw, 100)
-					elseif self.currWifePoints < 0 then
-						-- Handle penalty before any tap notes (e.g. hitting a mine at the start)
-						-- Show the current penaltied score before the first tap note
-						wifePct = (self.currWifePoints / 2) * 100
-					else
-						wifePct = 100.0000
+					if currentMaxPoints > 0 and type(pss.GetWifePoints) == "function" then
+						local ok, value = pcall(pss.GetWifePoints, pss)
+						value = ok and tonumber(value) or nil
+						if value then wifePct = math.min((value / currentMaxPoints) * 100, 100) end
+					end
+					if not wifePct then
+						if currentMaxPoints > 0 then
+							local raw = (self.currWifePoints / currentMaxPoints) * 100
+							wifePct = math.min(raw, 100)
+						elseif self.currWifePoints < 0 then
+							-- Handle penalty before any tap notes (e.g. hitting a mine at the start)
+							-- Show the current penaltied score before the first tap note
+							wifePct = (self.currWifePoints / 2) * 100
+						else
+							wifePct = 100.0000
+						end
 					end
 				end
 			end			

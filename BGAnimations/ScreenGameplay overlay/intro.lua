@@ -255,8 +255,19 @@ t[#t+1] = Def.ActorFrame{
 		-- Target Goal
 		local showGoal = ThemePrefs.Get("HV_ShowGoalTracker")
 		if showGoal then
-			local goal = ThemePrefs.Get("HV_PacemakerTargetGoal") or 93
-			targetActor:settext(string.format("Target: %.2f%%", goal))
+			local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType") or "Target"
+			if pacemakerMode == "PB" or pacemakerMode == "PBReplay" then
+				local best = GetDisplayScore()
+				if best then
+					targetActor:settext(string.format("Target: PB %.2f%%", getJ4NormalizedPercentage(best)))
+				else
+					local goal = ThemePrefs.Get("HV_PacemakerTargetGoal") or 93
+					targetActor:settext(string.format("Target: %.2f%%", goal))
+				end
+			else
+				local goal = ThemePrefs.Get("HV_PacemakerTargetGoal") or 93
+				targetActor:settext(string.format("Target: %.2f%%", goal))
+			end
 			targetActor:visible(true)
 		else
 			targetActor:visible(false)
