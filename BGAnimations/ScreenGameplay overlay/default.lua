@@ -59,13 +59,88 @@ local function gameplaySize(name)
 	return (MovableValues and MovableValues[name]) or getDefaultGameplaySize(name) or 1
 end
 
+local function minimalisticHUDVisible(baseVisible, enabled)
+	if enabled == nil then enabled = HV.MinimalisticMode() end
+	return baseVisible and not enabled
+end
+
+local function animateGameplayHUDVisibility(self, visible, instant)
+	self:stoptweening()
+	if visible then
+		self:visible(true)
+		if instant then
+			self:diffusealpha(1):zoom(1)
+		else
+			self:diffusealpha(0):zoom(0.96):decelerate(0.18):diffusealpha(1):zoom(1)
+		end
+	else
+		if instant then
+			self:diffusealpha(0):zoom(0.96):visible(false)
+		else
+			self:accelerate(0.14):diffusealpha(0):zoom(0.96):sleep(0):visible(false)
+		end
+	end
+end
+
+local function applyMinimalisticVisibility(self, baseVisible, enabled, instant)
+	animateGameplayHUDVisibility(self, minimalisticHUDVisible(baseVisible, enabled), instant)
+end
+
+local function hideFallbackLifeBar()
+	local top = SCREENMAN and SCREENMAN:GetTopScreen()
+	if not top or not top.GetLifeMeter then return end
+	for _, player in ipairs(GAMESTATE:GetEnabledPlayers()) do
+		local lifeMeter = top:GetLifeMeter(player)
+		if lifeMeter then
+			lifeMeter:visible(false)
+			lifeMeter:diffusealpha(0)
+		end
+	end
+end
+
+local function toggleMinimalisticModePreference()
+	local enabled = not HV.MinimalisticMode()
+	ThemePrefs.Set("HV_MinimalisticMode", enabled)
+	local top = SCREENMAN and SCREENMAN:GetTopScreen()
+	if top and top.GetChild then
+		local overlay = top:GetChild("GameplayOverlay")
+		if overlay then
+			overlay:playcommand("ApplyMinimalisticMode", { Enabled = enabled })
+		end
+	end
+	if SCREENMAN then
+		SCREENMAN:SystemMessage("Minimalistic Mode: " .. (enabled and "On" or "Off"))
+	end
+	MESSAGEMAN:Broadcast("HV_MinimalisticModeChanged", { Enabled = enabled })
+end
+
+local function toggleInGameLeaderboardPreference()
+	local mode = HV.ShowInGameLeaderboard()
+	if mode == "Off" then
+		local lastMode = ThemePrefs.Get("HV_LastInGameLeaderboardMode") or "Local"
+		if lastMode ~= "Local" and lastMode ~= "Online" then lastMode = "Local" end
+		ThemePrefs.Set("HV_ShowInGameLeaderboard", lastMode)
+		MESSAGEMAN:Broadcast("HV_InGameLeaderboardModeChanged", { Mode = lastMode })
+	else
+		if mode == "Local" or mode == "Online" then
+			ThemePrefs.Set("HV_LastInGameLeaderboardMode", mode)
+		end
+		ThemePrefs.Set("HV_ShowInGameLeaderboard", "Off")
+		MESSAGEMAN:Broadcast("HV_InGameLeaderboardModeChanged", { Mode = "Off" })
+	end
+end
+
 local function isRidiculousJudgment(params)
-	return HV.EmulateRidiculousEnabled() and params and params.TapNoteScore == "TapNoteScore_W1" and params.TapNoteOffset and math.abs(params.TapNoteOffset) <= 0.01125
+	return HV.EmulateRidiculousEnabled() and params and params.TapNoteScore == "TapNoteScore_W1" and params.TapNoteOffset and math.abs(params.TapNoteOffset) <= 0.01125 * (tonumber(HV_JudgeScale) or 1)
 end
 
 local t = Def.ActorFrame {
 	Name = "GameplayOverlay",
+	ApplyMinimalisticModeCommand = function(self, params)
+		self:playcommand("HV_MinimalisticModeChangedMessage", params)
+	end,
 	BeginCommand = function(self)
+		hideFallbackLifeBar()
 		failSfxPlayed = false
 		HV_AutoFailJudgeCounts = { W2 = 0, W3 = 0, W4 = 0, W5 = 0, Miss = 0 }
 		-- Re-check sync mode via SCREENMAN now that it's safer
@@ -121,6 +196,7 @@ local t = Def.ActorFrame {
 		end
 	end,
 	OnCommand = function(self)
+		hideFallbackLifeBar()
 		-- Double check mods on OnCommand just in case
 		if isSync then
 			for _, pn_loop in ipairs(GAMESTATE:GetEnabledPlayers()) do
@@ -138,6 +214,14 @@ local t = Def.ActorFrame {
 				if event.type == "InputEventType_Release" then return end
 				if event.type == "InputEventType_FirstPress" then
 					local b = event.button
+					local db = event.DeviceInput and event.DeviceInput.button or ""
+					if db == "DeviceButton_tab" and INPUTFILTER and INPUTFILTER:IsControlPressed() then
+						toggleMinimalisticModePreference()
+						return true
+					elseif db == "DeviceButton_tab" then
+						toggleInGameLeaderboardPreference()
+						return true
+					end
 					-- Filter for common gameplay buttons to avoid menu buttons triggering HUD animations
 					if b == "Left" or b == "Down" or b == "Up" or b == "Right" or
 					   b == "Key 1" or b == "Key 2" or b == "Key 3" or b == "Key 4" or
@@ -182,6 +266,7 @@ local t = Def.ActorFrame {
 
 	
 	CurrentSongChangedMessageCommand = function(self)
+		hideFallbackLifeBar()
 		HV_RidiculousCount = 0
 		-- Re-apply sync mods on every loop start to prevent engine resets
 		if isSync then
@@ -255,6 +340,9 @@ local t = Def.ActorFrame {
 			HV_PointsLost = HV_PointsLost + 4.5
 			MESSAGEMAN:Broadcast("HV_PointsUpdate")
 		end
+	end,
+	PlayingUpdateMessageCommand = function(self)
+		hideFallbackLifeBar()
 	end
 }
 
@@ -357,7 +445,7 @@ local barW = SCREEN_WIDTH * 0.4
 local barH = 6
 local barY = progressBarPosition == "Top" and 12 or (progressBarPosition == "Bottom" and SCREEN_BOTTOM - 12 or 12)
 
-local showProgressBar = progressBarPosition ~= "Off" and not HV.MinimalisticMode() and not isSync
+local showProgressBar = progressBarPosition ~= "Off" and not isSync
 
 -- Load cursor system for mouse button support (required for practice_input.lua QuadButton)
 t[#t + 1] = LoadActor("../_cursor")
@@ -368,6 +456,10 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "ProgressBarContainer",
 	InitCommand = function(self)
 		self:xy(gameplayCoord("FullProgressBarX"), gameplayCoord("FullProgressBarY"))
+		self:visible(minimalisticHUDVisible(showProgressBar))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(showProgressBar, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_9"}, self, self:GetChild("Border"))
@@ -447,125 +539,19 @@ t[#t + 1] = Def.ActorFrame {
 end -- End progress bar visibility check
 
 -- ============================================================
--- VERTICAL LIFE BAR (right edge) with % counter
--- ============================================================
-local lifeBarW = 8
-local lifeBarH = SCREEN_HEIGHT * 0.5
-local lifeBarX = SCREEN_CENTER_X + 220
-local lifeBarY = SCREEN_CENTER_Y
-
-if not HV.MinimalisticMode() and not isSync then
-t[#t + 1] = Def.ActorFrame {
-	Name = "VerticalLifeBar",
-	InitCommand = function(self)
-		self:xy(gameplayCoord("LifeP1X"), gameplayCoord("LifeP1Y")):rotationz(gameplayCoord("LifeP1Rotation")):visible(false)
-	end,
-
-	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(lifeBarW, lifeBarH):diffuse(color("0.1,0.1,0.1,0.8"))
-		end
-	},
-
-	Def.Quad {
-		Name = "LifeFill",
-		InitCommand = function(self)
-			self:valign(1):y(lifeBarH / 2)
-				:zoomto(lifeBarW, 0)
-				:diffuse(accentColor):diffusealpha(0.8)
-		end,
-		JudgmentMessageCommand = function(self)
-			self:queuecommand("RefreshLife")
-		end,
-		PlayingUpdateMessageCommand = function(self)
-			self:playcommand("RefreshLife")
-		end,
-		RefreshLifeCommand = function(self)
-			local screen = SCREENMAN:GetTopScreen()
-			local lifeVal = 0
-			if screen and screen:GetLifeMeter(pn) then
-				lifeVal = screen:GetLifeMeter(pn):GetLife()
-			else
-				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-				lifeVal = pss:GetCurrentLife() or 0
-			end
-			
-			if lifeVal then
-				local fillH = lifeBarH * lifeVal
-				self:zoomto(lifeBarW, fillH)
-
-				local diff = GetLifeDifficulty()
-				local lifeKey = "L7"
-				if diff <= 1 then
-					lifeKey = "L1"
-				elseif diff == 2 then
-					lifeKey = "L2"
-				elseif diff == 3 then
-					lifeKey = "L3"
-				elseif diff == 4 then
-					lifeKey = "L4"
-				elseif diff == 5 then
-					lifeKey = "L5"
-				elseif diff == 6 then
-					lifeKey = "L6"
-				end
-				self:diffuse(HVColor.GetLifeBarColor(lifeKey))
-				self:diffusealpha(0.8)
-			end
-		end
-	},
-
-	Def.Quad {
-		InitCommand = function(self)
-			self:zoomto(lifeBarW + 2, lifeBarH + 2)
-				:diffuse(color("0.2,0.2,0.2,0.3"))
-		end
-	},
-
-	-- Life % counter
-	LoadFont("Common Normal") .. {
-		Name = "LifePct",
-		InitCommand = function(self)
-			self:y(-lifeBarH / 2 - 10):zoom(0.25):diffuse(subText)
-		end,
-		BeginCommand = function(self)
-			self:playcommand("RefreshLifePct")
-		end,
-		JudgmentMessageCommand = function(self)
-			self:queuecommand("RefreshLifePct")
-		end,
-		PlayingUpdateMessageCommand = function(self)
-			self:playcommand("RefreshLifePct")
-		end,
-		RefreshLifePctCommand = function(self)
-			local screen = SCREENMAN:GetTopScreen()
-			local lifeVal = 0
-			if screen and screen:GetLifeMeter(pn) then
-				lifeVal = screen:GetLifeMeter(pn):GetLife()
-			else
-				local pss = STATSMAN:GetCurStageStats():GetPlayerStageStats()
-				lifeVal = pss:GetCurrentLife() or 0
-			end
-			
-			if lifeVal then
-				self:settext(string.format("%.1f%%", lifeVal * 100))
-			end
-		end,
-
-	}
-}
-end -- End Vertical Life Bar
-
--- ============================================================
 -- SCORE % (REAL-TIME)
 -- ============================================================
-local showCurrentWife = HV.ShowCurrentWife() and not HV.MinimalisticMode() and not isSync
+local showCurrentWife = HV.ShowCurrentWife() and not isSync
 
 if showCurrentWife then
 t[#t + 1] = Def.ActorFrame {
 	Name = "CenteredScore",
 	InitCommand = function(self)
 		self:xy(gameplayCoord("DisplayPercentX"), gameplayCoord("DisplayPercentY")):zoom(gameplaySize("DisplayPercentZoom")):diffusealpha(0.8)
+		self:visible(minimalisticHUDVisible(showCurrentWife))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(showCurrentWife, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_w", "DeviceButton_e"}, self, self:GetChild("Border"))
@@ -686,7 +672,7 @@ end
 -- ============================================================
 -- GOAL TRACKER
 -- ============================================================
-local showGoalTrackerText = HV.ShowGoalTrackerText() and not HV.MinimalisticMode() and not isSync
+local showGoalTrackerText = HV.ShowGoalTrackerText() and not isSync
 if showGoalTrackerText then
 	local pacemakerMode = ThemePrefs.Get("HV_PacemakerTargetType")
 	if not pacemakerMode or pacemakerMode == "" then pacemakerMode = "Target" end
@@ -703,6 +689,10 @@ if showGoalTrackerText then
 		Name = "TextPacemaker",
 		InitCommand = function(self)
 			self:xy(gameplayCoord("TargetTrackerX"), gameplayCoord("TargetTrackerY")):zoom(gameplaySize("TargetTrackerZoom"))
+			self:visible(minimalisticHUDVisible(showGoalTrackerText))
+		end,
+		HV_MinimalisticModeChangedMessageCommand = function(self, params)
+			animateGameplayHUDVisibility(self, minimalisticHUDVisible(showGoalTrackerText, params and params.Enabled))
 		end,
 		OnCommand = function(self)
 			setMovableActor({"DeviceButton_7", "DeviceButton_8"}, self, self:GetChild("Border"))
@@ -752,8 +742,12 @@ t[#t + 1] = Def.ActorFrame {
 		self:xy(gameplayCoord("DisplayMeanX"), gameplayCoord("DisplayMeanY")):zoom(gameplaySize("DisplayMeanZoom")):diffusealpha(0)
 		-- Check if notefield stat should be shown
 		local statType = HV.GetNotefieldStat()
-		local showStat = statType ~= "Off" and not HV.MinimalisticMode() and not isSync
-		self:visible(showStat)
+		local showStat = statType ~= "Off" and not isSync
+		self.HVBaseVisible = showStat
+		self:visible(minimalisticHUDVisible(showStat))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(self.HVBaseVisible, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_m", "DeviceButton_comma"}, self, self:GetChild("Border"))
@@ -855,7 +849,7 @@ t[#t + 1] = Def.ActorFrame {
 -- ============================================================
 -- CENTERED COMBO / MISS COMBO
 -- ============================================================
-local showCombo = HV.ShowCombo() and not HV.MinimalisticMode()
+local showCombo = HV.ShowCombo()
 
 if showCombo then
 t[#t + 1] = Def.ActorFrame {
@@ -863,6 +857,10 @@ t[#t + 1] = Def.ActorFrame {
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X + gameplayCoord("ComboX"), SCREEN_CENTER_Y + gameplayCoord("ComboY")):zoom(gameplaySize("ComboZoom"))
 		self.comboBreaks = 0
+		self:visible(minimalisticHUDVisible(showCombo))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(showCombo, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_3", "DeviceButton_4"}, self, self:GetChild("Border"))
@@ -1003,7 +1001,7 @@ end -- End combo visibility check
 -- ============================================================
 -- COMBO BREAK LANE HIGHLIGHT
 -- ============================================================
-local showComboBreakHighlight = HV.ComboBreakHighlight() and not HV.MinimalisticMode() and not isSync
+local showComboBreakHighlight = HV.ComboBreakHighlight() and not isSync
 
 if showComboBreakHighlight then
 
@@ -1054,6 +1052,10 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "ComboBreakHighlight",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_CENTER_Y)
+		self:visible(minimalisticHUDVisible(showComboBreakHighlight))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(showComboBreakHighlight, params and params.Enabled))
 	end,
 
 	-- 4 gradient lane highlights for standard 4K (64px wide, spaced 64px apart)
@@ -1177,7 +1179,7 @@ local showStandard = (ebMode == "Standard" or ebMode == "Both")
 				HVColor.GetJudgmentColor("W1")
 			}
 			if HV.EmulateRidiculousEnabled() then
-				table.insert(windows, 11.25)
+				table.insert(windows, 11.25 * (tonumber(HV_JudgeScale) or 1))
 				table.insert(colors, HVColor.GetJudgmentColor("Ridiculous"))
 			end
 			for i=1, #windows do
@@ -1305,11 +1307,15 @@ local showJudgeCounter = HV.ShowJudgeCounter()
 local tallyX = SCREEN_CENTER_X + 160
 local tallyY = SCREEN_HEIGHT - 176
 
-if showJudgeCounter and not HV.MinimalisticMode() and not isSync then
+if showJudgeCounter and not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "TallyAndMetrics",
 	InitCommand = function(self)
 		self:xy(gameplayCoord("JudgeCounterX"), gameplayCoord("JudgeCounterY")):diffusealpha(0.8)
+		self:visible(minimalisticHUDVisible(showJudgeCounter))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(showJudgeCounter, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_p"}, self, self:GetChild("Border"))
@@ -1663,11 +1669,15 @@ end
 -- ============================================================
 -- SONG TITLE (BOTTOM of screen)
 -- ============================================================
-if not HV.MinimalisticMode() and not isSync then
+if not isSync then
 t[#t + 1] = Def.ActorFrame {
 	Name = "BPMText",
 	InitCommand = function(self)
 		self:xy(gameplayCoord("BPMTextX"), gameplayCoord("BPMTextY")):zoom(gameplaySize("BPMTextZoom"))
+		self:visible(minimalisticHUDVisible(true))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(true, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_x", "DeviceButton_c"}, self, self:GetChild("Border"))
@@ -1695,6 +1705,10 @@ t[#t + 1] = Def.ActorFrame {
 	Name = "SongInfoHUD",
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X, SCREEN_BOTTOM - 14)
+		self:visible(minimalisticHUDVisible(true))
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateGameplayHUDVisibility(self, minimalisticHUDVisible(true, params and params.Enabled))
 	end,
 	OnCommand = function(self)
 		self:diffusealpha(0.6)
@@ -1872,10 +1886,6 @@ if not isSync then
 				self:visible(false)
 				return
 			end
-			if HV.MinimalisticMode() then
-				self:visible(false)
-				return
-			end
 			self:visible(true)
 			local condition = ThemePrefs.Get("HV_AutoFailCondition")
 			local iconWife = self:GetChild("IconWife")
@@ -1969,12 +1979,20 @@ t[#t + 1] = LoadActor("messagebox")
 -- ============================================================
 -- NG INDICATOR (POPUP)
 -- ============================================================
-if HV.ShowNGIndicator() and not HV.MinimalisticMode() and not isSync then
+if HV.ShowNGIndicator() and not isSync then
 	local isReverse = GAMESTATE:GetPlayerState(PLAYER_1):GetCurrentPlayerOptions():UsingReverse()
 	local ngY = isReverse and (SCREEN_CENTER_Y + 164 - 40) or (SCREEN_CENTER_Y - 164 + 40)
 	local colOffsets = {-96, -32, 32, 96}
 
-	local ngFrame = Def.ActorFrame { Name = "NGIndicator" }
+	local ngFrame = Def.ActorFrame {
+		Name = "NGIndicator",
+		InitCommand = function(self)
+			self:visible(minimalisticHUDVisible(true))
+		end,
+		HV_MinimalisticModeChangedMessageCommand = function(self, params)
+			animateGameplayHUDVisibility(self, minimalisticHUDVisible(true, params and params.Enabled))
+		end,
+	}
 	for i = 1, 4 do
 		ngFrame[#ngFrame + 1] = LoadFont("Common Normal") .. {
 			Name = "NG_" .. i,

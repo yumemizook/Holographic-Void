@@ -18,6 +18,15 @@ local dimText = color("0.5,0.5,0.5,1")
 local fontZoom = 0.55
 local fontZoomSmall = 0.45
 
+local function animateAvatarVisibility(self, visible)
+	self:stoptweening()
+	if visible then
+		self:visible(true):diffusealpha(0):decelerate(0.18):diffusealpha(1)
+	else
+		self:accelerate(0.14):diffusealpha(0)
+	end
+end
+
 -- Life helper
 local function PLife()
 	-- Priority 1: Direct LifeMeter actor polling (Smoothest, most reliable)
@@ -65,12 +74,16 @@ local t = Def.ActorFrame {
 		-- Check if player info should be shown
 		local showPlayerInfo = HV.ShowPlayerInfo() and not HV.MinimalisticMode()
 		self:visible(showPlayerInfo)
+		self:diffusealpha(showPlayerInfo and 1 or 0)
 		actual_dp = 0
 		total_max = 0
 		local steps = GAMESTATE:GetCurrentSteps()
 		if steps then
 			total_max = steps:GetRadarValues(PLAYER_1):GetValue("RadarCategory_Notes") * 2
 		end
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateAvatarVisibility(self, HV.ShowPlayerInfo() and not (params and params.Enabled))
 	end,
 
 	-- Panel background

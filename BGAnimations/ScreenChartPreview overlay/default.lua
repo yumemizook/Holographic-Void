@@ -49,8 +49,17 @@ local musicStartTime = 0
 local musicStartOffset = 0
 local isPaused = false
 local pausedPos = 0
+local visualSeekActive = false
+local visualSeekStartTime = 0
+local visualSeekStartPos = 0
 
 local fullSongMode = false
+
+local function startVisualSeekClock(pos)
+	visualSeekActive = true
+	visualSeekStartTime = GetTimeSinceStart()
+	visualSeekStartPos = math.max(0, pos or 0)
+end
 
 local function playFrom(pos, forceRestart, isInitialOpen)
 	if not song then return end
@@ -166,6 +175,14 @@ local function updateSync(self)
 	if not ssm then return end
 	
 	local pos = ssm:GetSampleMusicPosition()
+	if visualSeekActive then
+		local visualPos = visualSeekStartPos + ((GetTimeSinceStart() - visualSeekStartTime) * math.max(MIN_MUSIC_RATE, getCurRateValue()))
+		if pos and math.abs(pos - visualPos) < 0.15 then
+			visualSeekActive = false
+		else
+			pos = visualPos
+		end
+	end
 	if pos > musicLength then pos = musicLength end
 	
 	-- Keep NoteField locked to the actual audio clock every frame
@@ -375,7 +392,10 @@ local function input(event)
 				local mx = INPUTFILTER:GetMouseX()
 				local fx = cdgFrameRef:GetTrueX() - (SCREEN_WIDTH - 120)/2
 				local p = (mx - fx) / (SCREEN_WIDTH - 120)
-				playFrom(p * musicLength)
+				p = math.max(0, math.min(1, p))
+				local pos = p * musicLength
+				startVisualSeekClock(pos)
+				playFrom(pos)
 				return true
 			end
 		end
@@ -940,6 +960,7 @@ local t = Def.ActorFrame {
 		if not song or not steps then return end
 		
 		musicLength = song:GetLastSecond()
+		visualSeekActive = false
 		
 		-- Always remove any stale callback first to prevent double-registration
 		-- across repeated open/close cycles (even if RemoveOldCallback hasn't fired yet).
@@ -1009,6 +1030,7 @@ local t = Def.ActorFrame {
 		SCREENMAN:set_input_redirected(PLAYER_1, false)
 		-- Don't stop music — let the screen handle it naturally
 		fullSongMode = false
+		visualSeekActive = false
 		-- Always clear pause state so re-entry does not inherit a stale flag
 		isPaused = false
 		pausedPos = 0

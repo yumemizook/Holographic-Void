@@ -58,9 +58,9 @@ local function getBestScoreForCurrentRate()
 	return nil
 end
 
--- Abort completely if disabled via ThemePrefs or Minimalistic Mode
+-- Abort completely if disabled via ThemePrefs
 local showPacemakerGraph = ThemePrefs.Get("HV_ShowPacemakerGraph")
-if not showPacemakerGraph or HV.MinimalisticMode() then
+if not showPacemakerGraph then
 	return Def.ActorFrame {}
 end
 
@@ -70,16 +70,30 @@ local score = nil
 local fontZoom = (SCREEN_HEIGHT / 1000) * 1.3
 local fontZoomSmall = (SCREEN_HEIGHT / 1200) * 1.3
 
+local function animatePacemakerVisibility(self, visible)
+	self:stoptweening()
+	if visible then
+		self:visible(true):diffusealpha(0):decelerate(0.18):diffusealpha(1)
+	else
+		self:accelerate(0.14):diffusealpha(0)
+	end
+end
+
 local t = Def.ActorFrame {
 	Name = "PaceMaker",
 
 	InitCommand = function(self)
 		self:xy(SCREEN_CENTER_X + ((SCREEN_WIDTH - panelWidth) / 2 * panelPos), SCREEN_CENTER_Y)
+		self:visible(not HV.MinimalisticMode())
+		self:diffusealpha(HV.MinimalisticMode() and 0 or 1)
 		score = getBestScoreForCurrentRate()
 		if score then
 			target1 = score:GetWifeScore() * 100
 		end
 		self:queuecommand("Display")
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animatePacemakerVisibility(self, not (params and params.Enabled))
 	end,
 	JudgmentMessageCommand = function(self, msg)
 		if msg.Judgment == "TapNoteScore_W1" or

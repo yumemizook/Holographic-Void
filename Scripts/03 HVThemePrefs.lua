@@ -570,6 +570,11 @@ local HVPrefs = {
 		Choices = {"Off", "Local", "Online"},
 		Values = {"Off", "Local", "Online"}
 	},
+	HV_LastInGameLeaderboardMode = {
+		Default = "Local",
+		Choices = {"Local", "Online"},
+		Values = {"Local", "Online"}
+	},
 	HV_ShowNPSGraph = {
 		Default = true,
 		Choices = {"Off", "On"},

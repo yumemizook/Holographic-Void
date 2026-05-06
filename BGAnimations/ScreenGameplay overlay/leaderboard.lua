@@ -6,7 +6,7 @@
 local leaderboardMode = HV.ShowInGameLeaderboard() or "Off"
 local topScreen = SCREENMAN:GetTopScreen()
 local isNetMultiplayer = NSMAN and NSMAN.IsETTP and NSMAN:IsETTP() and topScreen and topScreen:GetName() and topScreen:GetName():find("Net") ~= nil or false
-if (leaderboardMode == "Off" and not isNetMultiplayer) or HV.MinimalisticMode() or GAMESTATE:IsPracticeMode() then
+if GAMESTATE:IsPracticeMode() then
 	return Def.ActorFrame {}
 end
 
@@ -52,6 +52,19 @@ end
 
 -- Score data storage (shared between logic and commands)
 local highScores = {}
+
+local function leaderboardVisible()
+	return (isNetMultiplayer or leaderboardMode ~= "Off") and not HV.MinimalisticMode()
+end
+
+local function animateLeaderboardVisibility(self, visible)
+	self:stoptweening()
+	if visible then
+		self:visible(true):diffusealpha(0):decelerate(0.18):diffusealpha(1)
+	else
+		self:accelerate(0.14):diffusealpha(0)
+	end
+end
 
 -- ============================================================
 -- Data Fetching Logic
@@ -162,9 +175,20 @@ local t = Def.ActorFrame {
 	Name = "InGameLeaderboard",
 	InitCommand = function(self)
 		self:xy((MovableValues and MovableValues.LeaderboardX) or getDefaultGameplayCoordinate("LeaderboardX") or startX, (MovableValues and MovableValues.LeaderboardY) or getDefaultGameplayCoordinate("LeaderboardY") or startY):zoomtowidth((MovableValues and MovableValues.LeaderboardWidth) or getDefaultGameplaySize("LeaderboardWidth") or 1):zoomtoheight((MovableValues and MovableValues.LeaderboardHeight) or getDefaultGameplaySize("LeaderboardHeight") or 1)
+		self:visible(leaderboardVisible())
+		self:diffusealpha(leaderboardVisible() and 1 or 0)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_a", "DeviceButton_s"}, self, self:GetChild("Border"))
+	end,
+	HV_InGameLeaderboardModeChangedMessageCommand = function(self, params)
+		leaderboardMode = params and params.Mode or HV.ShowInGameLeaderboard() or "Off"
+		animateLeaderboardVisibility(self, leaderboardVisible())
+		UpdateScores()
+		self:playcommand("RefreshScores")
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self)
+		animateLeaderboardVisibility(self, leaderboardVisible())
 	end,
 	RefreshLeaderboardMessageCommand = function(self)
 		UpdateScores()
@@ -179,10 +203,14 @@ local t = Def.ActorFrame {
 
 	-- Mode Tag
 	LoadFont("Common Normal") .. {
+		Name = "ModeTag",
 		InitCommand = function(self)
 			self:halign(0):valign(0):xy(4, -12):zoom(0.24)
 				:diffuse(accentColor):diffusealpha(0.6)
 				:settext((isNetMultiplayer and "MULTI") or leaderboardMode:upper())
+		end,
+		HV_InGameLeaderboardModeChangedMessageCommand = function(self)
+			self:settext((isNetMultiplayer and "MULTI") or leaderboardMode:upper())
 		end
 	}
 }

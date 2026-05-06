@@ -260,12 +260,13 @@ function HV.EmulateRidiculousEnabled()
 	return ThemePrefs and ThemePrefs.Get and (ThemePrefs.Get("HV_EmulateRidiculous") == true or ThemePrefs.Get("HV_EmulateRidiculous") == "true")
 end
 
-function HV.GetRidiculousCountFromOffsets(offsetVector)
+function HV.GetRidiculousCountFromOffsets(offsetVector, judgeScale)
 	local count = 0
 	if type(offsetVector) ~= "table" then return count end
+	local threshold = 11.25 * (tonumber(judgeScale) or 1)
 	for i = 1, #offsetVector do
 		local offset = tonumber(offsetVector[i])
-		if offset and math.abs(offset) <= 11.25 then
+		if offset and math.abs(offset) <= threshold then
 			count = count + 1
 		end
 	end
@@ -276,7 +277,8 @@ function HV.GetRidiculousCountFromScore(score)
 	if not HV.EmulateRidiculousEnabled() then return nil end
 	local rst = getRescoreElementsFromScore(score)
 	if not rst or type(rst.dvt) ~= "table" or #rst.dvt == 0 then return nil end
-	return HV.GetRidiculousCountFromOffsets(rst.dvt)
+	local judgeScale = (score and type(score.GetJudgeScale) == "function") and score:GetJudgeScale() or nil
+	return HV.GetRidiculousCountFromOffsets(rst.dvt, judgeScale)
 end
 
 function HV.GetRidiculousTallyString(score)
@@ -578,7 +580,8 @@ function getDetailedClearType(obj)
 		local ridiculous
 		if obj.GetTapNoteScores then
 			local ok, offsets = pcall(function() return obj:GetOffsetVector() end)
-			ridiculous = ok and HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(offsets) or nil
+			local judgeScale = PREFSMAN:GetPreference("TimingWindowScale") or 1
+			ridiculous = ok and HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(offsets, judgeScale) or nil
 		else
 			ridiculous = HV.GetRidiculousCountFromScore(obj)
 		end

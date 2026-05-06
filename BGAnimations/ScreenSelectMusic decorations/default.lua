@@ -28,13 +28,14 @@ local function getPBJudgeRows(score, rst)
 	local miss = 0
 
 	if rst then
+		local judgeScale = ms.JudgeScalers[4] or 1
 		w1 = getRescoredJudge(rst.dvt, 4, 1)
 		w2 = getRescoredJudge(rst.dvt, 4, 2)
 		w3 = getRescoredJudge(rst.dvt, 4, 3)
 		w4 = getRescoredJudge(rst.dvt, 4, 4)
 		w5 = getRescoredJudge(rst.dvt, 4, 5)
 		miss = getRescoredJudge(rst.dvt, 4, 6)
-		ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt) or nil
+		ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt, judgeScale) or nil
 	elseif score then
 		w1 = score:GetTapNoteScore("TapNoteScore_W1")
 		w2 = score:GetTapNoteScore("TapNoteScore_W2")
@@ -92,7 +93,7 @@ local function getPBRescoredClearType(rst)
 		else return "PFC" end
 	end
 
-	local ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt) or nil
+	local ridic = HV.EmulateRidiculousEnabled() and HV.GetRidiculousCountFromOffsets(rst.dvt, ms.JudgeScalers[4] or 1) or nil
 	if ridic and ridic == w1 then return "RFC"
 	elseif ridic and w1 - ridic == 1 then return "RF"
 	elseif ridic and w1 - ridic < 10 then return "SDM" end

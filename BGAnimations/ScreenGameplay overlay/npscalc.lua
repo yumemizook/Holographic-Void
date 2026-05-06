@@ -6,7 +6,7 @@ local pn = GAMESTATE:GetEnabledPlayers()[1]
 local countNotesSeparately = GAMESTATE:CountNotesSeparately()
 
 -- Check preferences
-if not HV.ShowNPS() or HV.MinimalisticMode() then
+if not HV.ShowNPS() then
 	return Def.ActorFrame {}
 end
 
@@ -39,6 +39,15 @@ local curNPS = 0
 
 -- Cached UI references
 local npsTextActor = nil
+
+local function animateNPSVisibility(self, visible)
+	self:stoptweening()
+	if visible then
+		self:visible(true):diffusealpha(0):decelerate(0.18):diffusealpha(1)
+	else
+		self:accelerate(0.14):diffusealpha(0)
+	end
+end
 
 local function addNote(time, size)
 	if countNotesSeparately then size = 1 end
@@ -84,6 +93,13 @@ end
 
 local t = Def.ActorFrame {
 	Name = "NPSCalcContainer",
+	InitCommand = function(self)
+		self:visible(not HV.MinimalisticMode())
+		self:diffusealpha(HV.MinimalisticMode() and 0 or 1)
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self, params)
+		animateNPSVisibility(self, not (params and params.Enabled))
+	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_y", "DeviceButton_u"}, self:GetChild("NPSTextContainer"), self:GetChild("NPSTextContainer"):GetChild("Border"))
 		setMovableActor({"DeviceButton_i", "DeviceButton_o"}, self:GetChild("NPSGraph"), self:GetChild("NPSGraph"):GetChild("Border"))

@@ -12,17 +12,35 @@ local function shouldShowLowerJudgementOffset(tns)
 	return currentIndex ~= nil and currentIndex >= thresholdIndex
 end
 
+local function recentJudgmentVisible()
+	return HV.RecentJudgmentDisplay() and not HV.MinimalisticMode()
+end
+
+local function animateRecentJudgmentVisibility(self, visible)
+	self:stoptweening()
+	if visible then
+		self:visible(true):diffusealpha(0):decelerate(0.18):diffusealpha(1)
+	else
+		self:accelerate(0.14):diffusealpha(0)
+	end
+end
+
 -- Create the Recent Judgment display dots statically first
 local recentJudgmentDisplay = Def.ActorFrame {
 	Name = "RecentJudgmentDisplay",
 	InitCommand = function(self)
 		self:xy((MovableValues and MovableValues.RecentJudgmentDisplayX) or getDefaultGameplayCoordinate("RecentJudgmentDisplayX") or -160, (MovableValues and MovableValues.RecentJudgmentDisplayY) or getDefaultGameplayCoordinate("RecentJudgmentDisplayY") or 50):zoom((MovableValues and MovableValues.RecentJudgmentDisplayZoom) or getDefaultGameplaySize("RecentJudgmentDisplayZoom") or 1)
+		self:visible(recentJudgmentVisible())
+		self:diffusealpha(recentJudgmentVisible() and 1 or 0)
 	end,
 	OnCommand = function(self)
 		setMovableActor({"DeviceButton_v", "DeviceButton_b"}, self, self:GetChild("Border"))
 	end,
 	UpdateRowsMessageCommand = function(self)
-		self:visible(HV.RecentJudgmentDisplay() and not HV.MinimalisticMode())
+		animateRecentJudgmentVisibility(self, recentJudgmentVisible())
+	end,
+	HV_MinimalisticModeChangedMessageCommand = function(self)
+		animateRecentJudgmentVisibility(self, recentJudgmentVisible())
 	end
 }
 
@@ -58,7 +76,8 @@ local t = Def.ActorFrame {
 		
 		local isRidiculous = false
 		if HV.EmulateRidiculousEnabled() and tns == "W1" and params.TapNoteOffset then
-			if math.abs(params.TapNoteOffset) <= 0.01125 then
+			local judgeScale = tonumber(HV_JudgeScale) or PREFSMAN:GetPreference("TimingWindowScale") or 1
+			if math.abs(params.TapNoteOffset) <= 0.01125 * judgeScale then
 				isRidiculous = true
 			end
 		end

@@ -362,7 +362,7 @@ if not HV.EmulateRidiculousEnabled() then table.remove(judgmentColors, 1) end
 local ridiculousCount = nil
 if HV.EmulateRidiculousEnabled() then
 	local ok, offsets = pcall(function() return pss:GetOffsetVector() end)
-	ridiculousCount = ok and HV.GetRidiculousCountFromOffsets(offsets) or nil
+	ridiculousCount = ok and HV.GetRidiculousCountFromOffsets(offsets, ms.JudgeScalers[getJudgeForScore(curScore)] or 1) or nil
 end
 
 local function getEvaluationJudgeCount(judgeName, judgeIndex)
@@ -372,11 +372,12 @@ local function getEvaluationJudgeCount(judgeName, judgeIndex)
 end
 
 local function getEvaluationRescoredJudgeCount(offsetVector, judgeScale, judgeName, judgeIndex)
-	if judgeName == "Ridiculous" then return HV.GetRidiculousCountFromOffsets(offsetVector) end
+	local ridiculousScale = ms.JudgeScalers[judgeScale] or judgeScale
+	if judgeName == "Ridiculous" then return HV.GetRidiculousCountFromOffsets(offsetVector, ridiculousScale) end
 	local index = HV.EmulateRidiculousEnabled() and judgeIndex - 1 or judgeIndex
 	local count = getRescoredJudge(offsetVector, judgeScale, index)
 	if judgeName == "TapNoteScore_W1" and HV.EmulateRidiculousEnabled() then
-		count = count - HV.GetRidiculousCountFromOffsets(offsetVector)
+		count = count - HV.GetRidiculousCountFromOffsets(offsetVector, ridiculousScale)
 	end
 	return count
 end
