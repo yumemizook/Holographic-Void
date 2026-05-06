@@ -32,12 +32,11 @@ local genericSpacing = 15
 local saturationOverlay = nil
 local saturationSliderPos = nil
 local colorPickPosition = nil
-local colorPreview = nil
 local alphaSliderPos = nil
 local mouseLeftDown = false
 local syncAccentEnabled = false
-local syncBtnX = SCREEN_WIDTH / 2 + 140
-local syncBtnY = SCREEN_HEIGHT / 8 + 32
+local syncBtnX = SCREEN_WIDTH / 2 + 200
+local syncBtnY = SCREEN_HEIGHT / 8 + 38
 local syncBtnW = 170
 local syncBtnH = 26
 
@@ -280,7 +279,7 @@ local function inputeater(event)
 				hueNum, satNum, valNum, alphaNum = colorToHSV(color(def))
 				aboutToSave = false
 				applyHSV()
-			end
+			end                       
 		elseif INPUTFILTER:IsBeingPressed("right alt") or INPUTFILTER:IsBeingPressed("left alt") then
 			-- Reset to saved
 			hueNum, satNum, valNum, alphaNum = colorToHSV(color(themeColor))
@@ -538,20 +537,6 @@ t[#t + 1] = Def.ActorFrame {
 		end,
 	},
 
-	-- Current color preview
-	Def.Quad {
-		Name = "PickedColorPreview",
-		InitCommand = function(self)
-			self:zoomto(colorBoxHeight/4, colorBoxHeight/4)
-			self:x(colorBoxHeight + saturationSliderWidth + 10)
-			self:valign(0):halign(0)
-			colorPreview = self
-		end,
-		ClickedNewColorMessageCommand = function(self)
-			self:diffuse(currentColor)
-		end
-	},
-
 	-- Labels
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
@@ -593,18 +578,23 @@ t[#t + 1] = Def.ActorFrame {
 	Def.Quad {
 		Name = "CursorPosition",
 		InitCommand = function(self)
-			self:x(12):halign(0):valign(0):zoomto(10,2):y(45)
+			self:x(12):halign(0):valign(0):zoomto(14,2):y(45)
 			self:diffuse(HVColor.Accent)
 		end,
 		UpdateCursorDisplayCommand = function(self)
 			local pos = 12
 			local txt = self:GetParent():GetChild("InputText")
 			if textCursorPos ~= #hexEntryString + 1 then
-				local glyphWidth = getWidthOfChar(txt, textCursorPos) - 1
+				local glyphWidth = getWidthOfChar(txt, textCursorPos) + 3
 				self:zoomto(glyphWidth, 2)
 				pos = getXPositionInText(txt, textCursorPos)
 			else
 				pos = getXPositionInText(txt, textCursorPos-1) + getWidthOfChar(txt, textCursorPos-1)
+				if #hexEntryString <= 1 then
+					self:zoomto(10, 2)
+				else
+					self:zoomto(14, 2)
+				end
 			end
 			self:finishtweening():linear(0.05):x(pos)
 		end
@@ -613,7 +603,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "SavingIndicator",
 		InitCommand = function(self)
-			self:y(60):halign(0):valign(0):zoom(0.4):diffuse(HVColor.Accent)
+			self:xy(-20, 60):halign(0):valign(0):zoom(0.4):diffuse(HVColor.Accent)
 			self:settext("READY TO SAVE")
 			self:visible(false)
 		end,
@@ -627,7 +617,7 @@ t[#t + 1] = Def.ActorFrame {
 
 	LoadFont("Common Normal") .. {
 		InitCommand = function(self)
-			self:y(85):halign(0):valign(0):zoom(0.25):diffuse(color("#666666"))
+			self:y(135):halign(0):valign(0):zoom(0.25):diffuse(color("#666666"))
 			self:maxwidth(400)
 			self:settext("Type hex code and press Enter to save\nCtrl+Delete = Reset to default\nAlt+Delete = Reset to saved color\nTab/Select = Toggle accent sync")
 		end
@@ -651,7 +641,7 @@ t[#t + 1] = Def.ActorFrame {
 	LoadFont("Common Normal") .. {
 		Name = "SelectedRGB",
 		InitCommand = function(self)
-			self:y(20):x(colorBoxHeight):valign(0):halign(1):zoom(0.4)
+			self:y(0):x(colorBoxHeight):valign(0):halign(1):zoom(0.4)
 		end,
 		ClickedNewColorMessageCommand = function(self)
 			local r = math.floor(currentColor[1] * 255)

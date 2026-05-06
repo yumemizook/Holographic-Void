@@ -1,6 +1,6 @@
 -- Global State Initialization
 HV.TitleState = HV.TitleState or {}
-HV.TitleState.player = HV.TitleState.player or { song = nil, paused = true, offset = 0, lastStart = 0, duration = 0, history = {} }
+HV.TitleState.player = HV.TitleState.player or { song = nil, paused = true, offset = 0, lastStart = 0, duration = 0, history = {}, lastToggleAt = 0 }
 HV.TitleState.mouse = HV.TitleState.mouse or { lastHovered = nil }
 HV.TitleState.selectedProfile = HV.TitleState.selectedProfile or 0
 HV.TitleState.showEffectsPopup = HV.TitleState.showEffectsPopup or false
@@ -107,6 +107,8 @@ local mpPlayPath = THEME:GetPathG("", "mp_play")
 local mpPausePath = THEME:GetPathG("", "mp_pause")
 local mpPrevPath = THEME:GetPathG("", "mp_prev")
 local mpNextPath = THEME:GetPathG("", "mp_next")
+local vizH = 32
+local vizY = mpBarY - (mpBarH / 2)
 
 local t = Def.ActorFrame {
 	InitCommand = function(self)
@@ -119,10 +121,12 @@ local t = Def.ActorFrame {
 				local prof = af:GetChild("ProfileChip")
 				local online = af:GetChild("OnlineProfileChip")
 				local mp = af:GetChild("MediaPlayer")
+				local viz = af:GetChild("MediaVisualizer")
 				local quotes = af:GetChild("QuotesOverlay")
 				if prof then prof:visible(not isSelect) end
 				if online then online:visible(not isSelect) end
 				if mp then mp:visible(not isSelect) end
+				if viz then viz:visible(not isSelect) end
 				if quotes then quotes:visible(not isSelect) end
 			end
 			
@@ -298,15 +302,24 @@ local function jukeboxPlaySong(song)
 	p.duration = song:MusicLengthSeconds()
 	local start = 0
 	SOUND:PlayMusicPart(mp, start, p.duration)
-	p.lastStart = os.clock()
+	p.lastStart = GetTimeSinceStart()
 	p.paused = false
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
+	MESSAGEMAN:Broadcast("ResetVisualizer")
+end
+
+local function canTogglePlayback()
+	local p = HV.TitleState.player
+	local now = GetTimeSinceStart()
+	if now - (p.lastToggleAt or 0) < 0.08 then return false end
+	p.lastToggleAt = now
+	return true
 end
 
 local function jukeboxPause()
 	local p = HV.TitleState.player
 	if p.paused or not p.song then return end
-	p.offset = p.offset + (os.clock() - p.lastStart)
+	p.offset = p.offset + (GetTimeSinceStart() - p.lastStart)
 	SOUND:StopMusic()
 	p.paused = true
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
@@ -321,9 +334,10 @@ local function jukeboxResume()
 	local len = p.duration - p.offset
 	if len <= 0 then len = p.duration; p.offset = 0; start = 0 end
 	SOUND:PlayMusicPart(mp, start, len)
-	p.lastStart = os.clock()
+	p.lastStart = GetTimeSinceStart()
 	p.paused = false
 	MESSAGEMAN:Broadcast("PlayStatusChanged")
+	MESSAGEMAN:Broadcast("ResetVisualizer")
 end
 
 local function jukeboxNext()
@@ -345,6 +359,24 @@ local function jukeboxPrev()
 	if #p.history == 0 then return end
 	local prevSong = table.remove(p.history)
 	if prevSong then jukeboxPlaySong(prevSong) end
+end
+
+local function getPlayerStateKey(p)
+	if not p.song then return "no_track" end
+	if p.paused then return "paused" end
+	return "playing"
+end
+
+local function jukeboxToggle()
+	if not canTogglePlayback() then return end
+	local p = HV.TitleState.player
+	if not p.song then
+		jukeboxNext()
+	elseif p.paused then
+		jukeboxResume()
+	else
+		jukeboxPause()
+	end
 end
 
 -- Visual Elements
@@ -549,6 +581,26 @@ bgEffectsFrame[#bgEffectsFrame + 1] = rays
 
 t[#t + 1] = bgEffectsFrame
 
+-- Read Author from ThemeInfo.ini
+local themeAuthor = "Unknown"
+local themeName = THEME:GetCurThemeName()
+local paths = {
+	"Themes/" .. themeName .. "/ThemeInfo.ini",
+	"ThemeInfo.ini"
+}
+
+if THEME.GetCurrentThemeDirectory then
+	table.insert(paths, 1, THEME:GetCurrentThemeDirectory() .. "ThemeInfo.ini")
+end
+
+for _, path in ipairs(paths) do
+	local info = IniFile.ReadFile(path)
+	if info and info["ThemeInfo"] and info["ThemeInfo"]["Author"] then
+		themeAuthor = info["ThemeInfo"]["Author"]
+		break
+	end
+end
+
 t[#t + 1] = Def.Quad { 
 	Name = "TopBar",
 	InitCommand=function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP+2):zoomto(SCREEN_WIDTH*0.6, 2):diffuse(accentColor):diffusealpha(0.6) end, 
@@ -589,9 +641,14 @@ t[#t + 1] = Def.ActorFrame {
 		ThemePrefChangedMessageCommand=function(self, params) if params.Name == "HV_EnableGlow" then self:playcommand("Refresh") end end
 	},
 	-- Main Text
-	LoadFont("Common Large") .. { 
-		Text="HOLOGRAPHIC VOID", 
-		InitCommand=function(self) self:zoom(0.75):diffuse(brightText) end 
+	LoadFont("Common Large") .. {
+		Text="HOLOGRAPHIC VOID",
+		InitCommand=function(self) self:zoom(0.75):diffuse(brightText) end
+	},
+	-- Author Text
+	LoadFont("Common Normal") .. {
+		Text="by " .. themeAuthor,
+		InitCommand=function(self) self:y(25):zoom(0.4):diffuse(subText) end
 	}
 }
 
@@ -856,12 +913,7 @@ end
 -- Custom Message Handlers
 t[#t + 1] = Def.Actor {
 	TriggerJukeboxPauseMessageCommand = function(self)
-		local p = HV.TitleState.player
-		if p.paused then
-			if not p.song then jukeboxNext() else jukeboxResume() end
-		else
-			jukeboxPause()
-		end
+		jukeboxToggle()
 	end
 }
 
@@ -878,11 +930,56 @@ t[#t + 1] = Def.ActorFrame {
 	LoadActor("quotes.lua")
 }
 
+-- Media Visualizer
+do
+	local visCore = nil
+	if audioVisualizer and audioVisualizer.new then
+		visCore = audioVisualizer:new {
+			x = 0,
+			y = 0,
+			width = SCREEN_WIDTH,
+			maxHeight = vizH,
+			freqIntervals = audioVisualizer.multiplyIntervals(audioVisualizer.defaultIntervals, 4),
+			color = accentColor,
+			onBarUpdate = function(self)
+				self:diffuse(accentColor):diffusealpha(0.55)
+			end
+		}
+	end
+
+	t[#t + 1] = Def.ActorFrame {
+		Name = "MediaVisualizer",
+		InitCommand = function(self)
+			self:xy(SCREEN_LEFT, vizY):draworder(-10000)
+		end,
+		Def.Quad {
+			InitCommand = function(self)
+				self:xy(SCREEN_WIDTH / 2, -vizH / 2):zoomto(SCREEN_WIDTH, vizH + 2)
+				self:diffuse(color("0.05,0.05,0.05,0.35"))
+			end
+		},
+		(visCore and (visCore .. {
+			Name = "VisualizerCore",
+			InitCommand = function(self)
+				self:draworder(-9999)
+			end,
+			PlayStatusChangedMessageCommand = function(self)
+				local p = HV.TitleState.player
+				if p.song and p.paused then
+					self:RunCommandsOnChildren(function(bar)
+						bar:stoptweening():smooth(0.15):zoomtoheight(2):diffuse(subText):diffusealpha(0.18)
+					end)
+				end
+			end
+		}) or Def.Actor {})
+	}
+end
+
 -- Media Player Bar
 t[#t + 1] = Def.ActorFrame {
 	Name = "MediaPlayer",
 	InitCommand = function(self)
-		local lastPausedState = nil
+		local lastStateKey = nil
 		self:SetUpdateFunction(function(af)
 			local p = HV.TitleState.player
 			-- Update song text
@@ -902,7 +999,7 @@ t[#t + 1] = Def.ActorFrame {
 			local timeTxt = af:GetChild("ElapsedTime")
 			if timeTxt then
 				if p.song and not p.paused then
-					local elapsed = p.offset + (os.clock() - p.lastStart)
+					local elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
 					timeTxt:settext(SecondsToMSS(elapsed))
 					timeTxt:diffuse(subText)
 				elseif p.song and p.offset then
@@ -919,7 +1016,7 @@ t[#t + 1] = Def.ActorFrame {
 				if p.song and p.duration > 0 then
 					local elapsed = p.offset
 					if not p.paused then
-						elapsed = p.offset + (os.clock() - p.lastStart)
+						elapsed = p.offset + (GetTimeSinceStart() - p.lastStart)
 					end
 					local percent = math.max(0, math.min(1, elapsed / p.duration))
 					bar:zoomto(SCREEN_WIDTH * percent, 2)
@@ -929,14 +1026,20 @@ t[#t + 1] = Def.ActorFrame {
 			end
 
 			-- Swap play/pause icon only when state changes
-			if lastPausedState ~= p.paused then
-				lastPausedState = p.paused
+			local stateKey = getPlayerStateKey(p)
+			if lastStateKey ~= stateKey then
+				lastStateKey = stateKey
 				local playBtn = af:GetChild("PlayBtn")
 				if playBtn then
-					if p.paused then
-						playBtn:Load(mpPlayPath)
-					else
+					if stateKey == "playing" then
 						playBtn:Load(mpPausePath)
+						playBtn:diffusealpha(0.7)
+					elseif stateKey == "paused" then
+						playBtn:Load(mpPlayPath)
+						playBtn:diffusealpha(0.7)
+					else
+						playBtn:Load(mpPlayPath)
+						playBtn:diffusealpha(0.45)
 					end
 					playBtn:zoomto(mpBtnSize, mpBtnSize)
 				end
@@ -982,12 +1085,7 @@ t[#t + 1] = Def.ActorFrame {
 		MouseOutCommand = function(self) self:stoptweening():linear(0.1):diffusealpha(0.7) end,
 		MouseDownCommand = function(self, params)
 			if params.event == "DeviceButton_left mouse button" then
-				local p = HV.TitleState.player
-				if p.paused then
-					if not p.song then jukeboxNext() else jukeboxResume() end
-				else
-					jukeboxPause()
-				end
+				jukeboxToggle()
 			end
 		end
 	},
