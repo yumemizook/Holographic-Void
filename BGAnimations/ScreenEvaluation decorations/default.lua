@@ -222,6 +222,35 @@ local function localWifeAbsMean(dvt) return wifeAbsMean(dvt) end
 local function localWifeSd(dvt) return wifeSd(dvt) end
 local function localWifeMax(dvt) return wifeMax(dvt) end
 
+local function getKeycountLabelForSteps(curSteps)
+	if not curSteps then return nil end
+
+	local st = tostring(curSteps:GetStepsType() or ""):lower()
+	local stepsTypeToKeys = {
+		stepstype_dance_single = 4,
+		stepstype_dance_double = 8,
+		stepstype_pump_single = 5,
+		stepstype_pump_halfdouble = 6,
+		stepstype_pump_double = 10,
+		stepstype_kb7_single = 7,
+		stepstype_beat_single5 = 5,
+		stepstype_beat_single7 = 7,
+		stepstype_popn_five = 5,
+		stepstype_popn_nine = 9,
+	}
+
+	local keys = stepsTypeToKeys[st]
+	if not keys then
+		local style = GAMESTATE:GetCurrentStyle()
+		if style and style.ColumnsPerPlayer then
+			keys = tonumber(style:ColumnsPerPlayer())
+		end
+	end
+
+	if not keys or keys <= 0 then return nil end
+	return tostring(math.floor(keys + 0.5)) .. "K"
+end
+
 -- LA/RA Ratio calculation (ported from Til Death)
 -- Calculates Ludicrous Attack and Ridiculous Attack ratios from replay offsets
 local function calculateRatios(score)
@@ -976,7 +1005,9 @@ local function scoreBoard(pn)
 						local diffShort = {
 							Beginner = "BG", Easy = "EZ", Medium = "NM", Hard = "HD", Challenge = "IN", Edit = "ED"
 						}
-						self:settext(diffShort[diff] or diff:sub(1,2):upper())
+						local diffLabel = diffShort[diff] or diff:sub(1,2):upper()
+						local keyLabel = getKeycountLabelForSteps(steps)
+						self:settext((keyLabel and (keyLabel .. " " .. diffLabel)) or diffLabel)
 						self:diffuse(HVColor.GetDifficultyColor(diff))
 					end
 				end
@@ -991,6 +1022,7 @@ local function scoreBoard(pn)
 						local msd = steps:GetMSD(getCurRateValue(), 1)
 						if HV.ShowMSD() and msd > 0 then
 							self:settextf("%.2f", msd)
+							self:diffuse(HVColor.GetMSDRatingColor(msd))
 							self:diffuse(HVColor.GetMSDRatingColor(msd))
 						else
 							self:settext(tostring(steps:GetMeter()))

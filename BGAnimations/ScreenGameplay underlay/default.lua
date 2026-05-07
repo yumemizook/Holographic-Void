@@ -9,8 +9,25 @@ local t = Def.ActorFrame {
 
 setMovableKeymode(getCurrentKeyMode())
 
--- Standard 4K column width (64px each * 4 columns = 256px)
-local filterW = 256
+local function getLaneFilterWidth()
+	local baseColumnWidth = 64
+	local columns = 4
+	local style = GAMESTATE:GetCurrentStyle()
+	if style and style.ColumnsPerPlayer then
+		local ok, value = pcall(function() return style:ColumnsPerPlayer() end)
+		if ok and tonumber(value) then
+			columns = math.max(1, tonumber(value))
+		end
+	end
+
+	local widthScale = (MovableValues and tonumber(MovableValues.NotefieldWidth)) or getDefaultGameplaySize("NotefieldWidth") or 1
+	local spacing = (MovableValues and tonumber(MovableValues.NotefieldSpacing)) or getDefaultGameplaySize("NotefieldSpacing") or 0
+
+	local filterWidth = (columns * baseColumnWidth * widthScale) + ((columns - 1) * spacing)
+	return math.max(baseColumnWidth, filterWidth)
+end
+
+local filterW = getLaneFilterWidth()
 
 t[#t + 1] = Def.Quad {
 	Name = "LaneFilter",

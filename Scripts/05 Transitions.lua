@@ -41,6 +41,13 @@ function HV.CircleTransitionIn()
 				self:Center():diffuse(color("0,0,0,1")):zoom(24)
 			end,
 			OnCommand = function(self)
+				local top = SCREENMAN and SCREENMAN:GetTopScreen()
+				local screenName = (top and top.GetName and top:GetName()) or ""
+				if screenName == "ScreenSelectProfile" and HV.SkipNextTitleProfileTransitionIn then
+					HV.SkipNextTitleProfileTransitionIn = false
+					self:zoom(0)
+					return
+				end
 				self:decelerate(0.25):zoom(0)
 			end
 		}
@@ -55,6 +62,18 @@ function HV.CircleTransitionOut()
 				self:Center():diffuse(color("0,0,0,1")):zoom(0)
 			end,
 			OffCommand = function(self)
+				local top = SCREENMAN and SCREENMAN:GetTopScreen()
+				local screenName = (top and top.GetName and top:GetName()) or ""
+				local nextScreenName = ""
+				if top and top.GetNextScreenName then
+					local ok, value = pcall(function() return top:GetNextScreenName() end)
+					if ok and value then nextScreenName = tostring(value) end
+				end
+				if screenName == "ScreenTitleMenu" and nextScreenName == "ScreenSelectProfile" then
+					HV.SkipNextTitleProfileTransitionIn = true
+					self:zoom(0)
+					return
+				end
 				self:accelerate(0.25):zoom(24)
 			end
 		}

@@ -32,6 +32,29 @@ local selectedIdx = HV.DirectLaunchProfileIdx or HV.TitleState.selectedProfile o
 selectedIdx = tonumber(selectedIdx)
 if selectedIdx >= numProfiles then selectedIdx = 0 end
 
+local function ensureCurrentStyle()
+	if GAMESTATE:GetCurrentStyle() then return true end
+
+	local game = GAMESTATE:GetCurrentGame()
+	local gameName = (game and game.GetName and tostring(game:GetName())) or "dance"
+	local candidates = {
+		gameName .. "-single",
+		gameName .. "-versus",
+		gameName .. "-double",
+	}
+
+	for _, styleName in ipairs(candidates) do
+		local ok = pcall(function()
+			GAMESTATE:SetCurrentStyle(styleName)
+		end)
+		if ok and GAMESTATE:GetCurrentStyle() then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function updateRows(self)
 	for i = 1, #profiles do
 		local row = self:GetChild("Row_" .. i)
@@ -91,9 +114,7 @@ local t = Def.ActorFrame {
 		if screen and screen.SetProfileIndex then
 			-- Ensure player is joined and style is set before finishing
 			GAMESTATE:JoinPlayer(PLAYER_1)
-			if not GAMESTATE:GetCurrentStyle() then
-				GAMESTATE:SetCurrentStyle("dance-single")
-			end
+			ensureCurrentStyle()
 			screen:SetProfileIndex(PLAYER_1, tonumber(directIdx) + 1)
 			screen:Finish()
 		end

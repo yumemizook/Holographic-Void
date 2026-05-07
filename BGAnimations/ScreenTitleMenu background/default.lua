@@ -87,6 +87,19 @@ local function getIntensitySpeed(base)
 	return base
 end
 
+local function getSelectedGamemodeLabel()
+	local game = GAMESTATE:GetCurrentGame()
+	local gameName = (game and game:GetName() or "unknown"):upper()
+	local style = GAMESTATE:GetCurrentStyle()
+	if style and style.GetName then
+		local styleName = tostring(style:GetName() or ""):upper()
+		if styleName ~= "" then
+			return "Current Gamemode: " .. gameName .. " · " .. styleName
+		end
+	end
+	return "Current Gamemode: " .. gameName
+end
+
 -- Hitbox Constants
 local pBtnW = 260
 local pBtnH = 70
@@ -624,6 +637,25 @@ t[#t + 1] = Def.Quad {
 t[#t + 1] = Def.ActorFrame {
 	Name = "LogoContainer",
 	InitCommand=function(self) self:xy(SCREEN_CENTER_X, SCREEN_TOP+50) end,
+	-- Selected gamemode
+	LoadFont("Common Normal") .. {
+		Name = "GamemodeLabel",
+		InitCommand = function(self)
+			self:y(-24):zoom(0.4):diffuse(subText)
+		end,
+		OnCommand = function(self)
+			self:playcommand("Set")
+		end,
+		CurrentGameChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		CurrentStyleChangedMessageCommand = function(self)
+			self:playcommand("Set")
+		end,
+		SetCommand = function(self)
+			self:settext(getSelectedGamemodeLabel())
+		end
+	},
 	-- Persistent Glow Layer
 	LoadFont("Common Large") .. { 
 		Text="HOLOGRAPHIC VOID", 
