@@ -18,6 +18,13 @@ local footerH = 40
 local profileOverlayActor = nil
 local IsMouseInSelectMusicInteractiveArea
 
+local function styleModeSupportsSingleDoubleToggle()
+	local game = GAMESTATE:GetCurrentGame()
+	local gameName = game and game.GetName and game:GetName() or ""
+	gameName = tostring(gameName):lower()
+	return gameName == "dance" or gameName == "beat"
+end
+
 local function getPBJudgeRows(score, rst)
 	local ridic = nil
 	local w1 = 0
@@ -1142,7 +1149,7 @@ t[#t + 1] = Def.ActorFrame {
 		InitCommand = function(self) self:xy(diffTabW - 25, 0) end,
 		SetCommand = function(self)
 			local data = HV.CurrentSongData
-			self:visible(data.hasSingle and data.hasDouble)
+			self:visible(styleModeSupportsSingleDoubleToggle() and data.hasSingle and data.hasDouble)
 		end,
 		DelayedChartUpdateMessageCommand = function(self) self:playcommand("Set") end,
 		
@@ -1876,7 +1883,9 @@ t[#t + 1] = Def.ActorFrame {
 				local rank = parent:GetChild("Rank")
 				if rank then rank:playcommand("Set") end
 				local rating = parent:GetChild("Rating")
-				if rating then rating:playcommand("FadeIn") end
+				if rating then
+					rating:stoptweening():playcommand("FadeIn")
+				end
 			end
 			self.showOnline = not self.showOnline
 			self:stoptweening():linear(self.transitionDuration * 0.5):diffusealpha(1):sleep(self.displayDuration):queuecommand("UpdateName")
@@ -2039,6 +2048,7 @@ t[#t + 1] = Def.ActorFrame {
 			local parent = self:GetParent()
 			if not parent or not parent.hv_nameCycling then
 				self:playcommand("Set")
+				self:diffusealpha(1)
 				return
 			end
 			self:playcommand("Set")

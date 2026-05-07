@@ -1227,8 +1227,8 @@ t[#t+1] = LoadFont("Common Normal") .. {
 		params = checkParams(params)
 		self:xy(params.width - 5, -5 - 10)
 		if params.dvt and #params.dvt > 0 and params.ctt and #params.ctt > 0 then
-			local leftPts, rightPts = 0, 0
-			local leftTaps, rightTaps = 0, 0
+			local leftPts, rightPts, middlePts = 0, 0, 0
+			local leftTaps, rightTaps, middleTaps = 0, 0, 0
 			local tso = tst[judge] or 1
 			for i = 1, #params.dvt do
 				local pts = wife3(math.abs(params.dvt[i]), tso)
@@ -1238,18 +1238,38 @@ t[#t+1] = LoadFont("Common Normal") .. {
 				elseif params.ctt[i] > middleColumn then
 					rightPts = rightPts + pts
 					rightTaps = rightTaps + 1
+				else
+					middlePts = middlePts + pts
+					middleTaps = middleTaps + 1
 				end
 			end
 			local leftScore = leftTaps > 0 and (leftPts / (leftTaps * 2)) or 0
 			local rightScore = rightTaps > 0 and (rightPts / (rightTaps * 2)) or 0
-			local delta = math.abs(leftScore - rightScore) * 100
-			local symbol = ""
-			if leftScore > rightScore then
-				symbol = "> "
-			elseif leftScore < rightScore then
-				symbol = "< "
+			local middleScore = middleTaps > 0 and (middlePts / (middleTaps * 2)) or 0
+			
+			local delta, symbol
+			if oddColumns then
+				-- Odd keymodes: range across three hands
+				local scores = {L = leftScore, M = middleScore, R = rightScore}
+				local minScore = math.min(leftScore, middleScore, rightScore)
+				local maxScore = math.max(leftScore, middleScore, rightScore)
+				delta = (maxScore - minScore) * 100
+				
+				-- Build ranking symbol
+				local sorted = {"L", "M", "R"}
+				table.sort(sorted, function(a, b) return scores[a] > scores[b] end)
+				symbol = table.concat(sorted, ">")
+			else
+				-- Even keymodes: keep current behavior
+				delta = math.abs(leftScore - rightScore) * 100
+				symbol = leftScore > rightScore and "> " or "< "
 			end
-			self:settextf("Δ Hand: %s%.4f%%", symbol, delta)
+			
+			if oddColumns then
+				self:settextf("Δ Hand: %s %.4f%%", symbol, delta)
+			else
+				self:settextf("Δ Hand: %s%.4f%%", symbol, delta)
+			end
 		else
 			self:settext("")
 		end
