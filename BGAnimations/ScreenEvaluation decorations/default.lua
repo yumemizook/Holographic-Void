@@ -57,6 +57,47 @@ local function formatWifePercent(pct)
 	return string.format("%." .. precision .. "f%%", rounded)
 end
 
+local evalModShorthands = {
+	-- Turn
+	["Mirror"] = "MIR", ["Back"] = "BAK", ["Left"] = "LFT", ["Right"] = "RGT",
+	["Shuffle"] = "SHU", ["SoftShuffle"] = "SSH", ["SuperShuffle"] = "XSH",
+	-- Appearance
+	["Hidden"] = "HID", ["Sudden"] = "SUD", ["Stealth"] = "STL", ["Blink"] = "BLK", ["RandomVanish"] = "RVN",
+	-- Hide
+	["Dark"] = "DRK", ["Blind"] = "BLN", ["Cover"] = "COV",
+	-- Remove
+	["NoMines"] = "NOM", ["NoHolds"] = "NOH", ["NoRolls"] = "NOR", ["NoLifts"] = "NOL", ["NoFakes"] = "NOF",
+	-- Other
+	["Reverse"] = "REV", ["Mines"] = "MNS",
+}
+
+local function formatEvalSpeedMode(mode, speed)
+	mode = mode or "C"
+	speed = speed or 400
+	if mode == "x" then
+		return string.format("%.2fx", speed / 100)
+	end
+	return mode .. tostring(speed)
+end
+
+local function formatEvalRateValue(rate)
+	local formatted = string.format("%.2f", tonumber(rate) or 1):gsub("%.?0+$", "") .. "x"
+	if formatted == "1x" then formatted = "1.0x" end
+	if formatted == "2x" then formatted = "2.0x" end
+	return formatted
+end
+
+local function hasEvaluationAssistEnabled(po, modStr)
+	local normalizedModStr = (modStr or ""):lower():gsub("[%s_]+", "")
+	if po then
+		if po.AssistClap and po:AssistClap() then return true end
+		if po.AssistTick and po:AssistTick() then return true end
+	end
+	return string.find(normalizedModStr, "assistclap")
+		or string.find(normalizedModStr, "assisttick")
+		or string.find(normalizedModStr, "autoplay")
+end
+
 local function setDPTextActors(wholeActor, decimalActor, dp, precision)
 	local roundedDp = roundTo(dp, precision)
 	local format = "%0." .. precision .. "f"
@@ -594,6 +635,8 @@ local function scoreBoard(pn)
 	local frameW = SCREEN_CENTER_X - 20
 	local frameH = SCREEN_HEIGHT - 20
 	local pad = 12
+	local modIconsY = 8
+	local topHeaderY = pad + 10
 
 	local board = Def.ActorFrame {
 		InitCommand = function(self)
@@ -709,10 +752,123 @@ local function scoreBoard(pn)
 			end
 		},
 
+		Def.ActorFrame {
+			Name = "ModIcons",
+			InitCommand = function(self)
+				self:xy(20, modIconsY):diffusealpha(0)
+			end,
+			OnCommand = function(self)
+				self:playcommand("Update")
+				self:sleep(0.12):linear(0.25):diffusealpha(1)
+			end,
+			UpdateCommand = function(self)
+				local ps = GAMESTATE:GetPlayerState(pn)
+				if not ps then return end
+
+				local po = ps:GetPlayerOptions("ModsLevel_Current")
+				local modStr = (curScore and curScore.GetModifiers and curScore:GetModifiers())
+					or ps:GetPlayerOptionsString("ModsLevel_Current")
+					or ""
+				if modStr == "" then
+					modStr = ps:GetPlayerOptionsString("ModsLevel_Preferred") or ""
+				end
+				local normalizedModStr = modStr:lower():gsub("[%s_]+", "")
+
+				local speed, mode = 400, "C"
+				if GetSpeedModeAndValueFromPoptions then
+					speed, mode = GetSpeedModeAndValueFromPoptions(pn)
+				end
+
+				local rate = (curScore and curScore.GetMusicRate and curScore:GetMusicRate())
+					or (getCurRateValue and getCurRateValue())
+					or 1
+				local life = GetLifeDifficulty()
+				local playedJudge = curScore and getJudgeForScore(curScore) or GetTimingDifficulty()
+				local fail = po and po:FailSetting() or "FailType_Immediate"
+				local assist = hasEvaluationAssistEnabled(po, modStr)
+
+				local accent = accentColor or (HVColor and HVColor.Accent) or color("#5ABAFF")
+				local dim = (HVColor and HVColor.TextDim) or color("0.4,0.4,0.4,1")
+				local warn = color("#CF9898")
+
+				self:GetChild("Speed"):settext(formatEvalSpeedMode(mode, speed)):diffuse(accent)
+				self:GetChild("Rate"):settext(formatEvalRateValue(rate)):diffuse(accent)
+
+				local lifeKey = "L7"
+				if life <= 1 then
+					lifeKey = "L1"
+				elseif life == 2 then
+					lifeKey = "L2"
+				elseif life == 3 then
+					lifeKey = "L3"
+				elseif life == 4 then
+					lifeKey = "L4"
+				elseif life == 5 then
+					lifeKey = "L5"
+				elseif life == 6 then
+					lifeKey = "L6"
+				end
+				local lifeColor = (HVColor and HVColor.GetLifeBarColor and HVColor.GetLifeBarColor(lifeKey))
+					or color("#FFFFFF")
+				self:GetChild("Life"):settext(string.format("L%d", life)):diffuse(lifeColor)
+				self:GetChild("Judge"):settext(string.format("J%d", playedJudge)):diffuse(accent)
+
+				local failText = "F:IMM"
+				if fail == "FailType_Off" then
+					failText = "F:OFF"
+				elseif fail == "FailType_EndOfSong" then
+					failText = "F:END"
+				end
+				self:GetChild("Fail"):settext(failText):diffuse(fail == "FailType_Immediate" and accent or warn)
+				self:GetChild("Assist"):settext("AST"):diffuse(assist and accent or dim)
+
+				local active = {}
+				for mod, short in pairs(evalModShorthands) do
+					local normalizedMod = mod:lower()
+					local matched = string.find(normalizedModStr, normalizedMod)
+					if mod == "Mines" then
+						matched = string.find(normalizedModStr, "mines") and not string.find(normalizedModStr, "nomines")
+					elseif mod == "Shuffle" then
+						matched = string.find(normalizedModStr, "shuffle")
+							and not string.find(normalizedModStr, "softshuffle")
+							and not string.find(normalizedModStr, "supershuffle")
+					end
+					if matched then
+						table.insert(active, short)
+					end
+				end
+
+				local receptorSize = tonumber(ThemePrefs.Get("HV_Mini")) or 100
+				if math.abs(receptorSize - 100) > 0.001 then
+					table.insert(active, "MN" .. math.round(receptorSize))
+				end
+
+				self:GetChild("Separator"):visible(#active > 0)
+				self:GetChild("Mods"):settext(table.concat(active, "  ")):diffuse(accent)
+			end,
+			ScoreChangedMessageCommand = function(self)
+				self:finishtweening():sleep(0):queuecommand("Update")
+			end,
+			LoadFont("Common Normal") .. { Name = "Speed", InitCommand = function(self) self:zoom(0.4):halign(0) end },
+			LoadFont("Common Normal") .. { Name = "Rate", InitCommand = function(self) self:x(42):zoom(0.4):halign(0) end },
+			LoadFont("Common Normal") .. { Name = "Life", InitCommand = function(self) self:x(82):zoom(0.4):halign(0) end },
+			LoadFont("Common Normal") .. { Name = "Judge", InitCommand = function(self) self:x(110):zoom(0.4):halign(0):diffuse(accentColor or (HVColor and HVColor.Accent) or color("#5ABAFF")) end },
+			LoadFont("Common Normal") .. { Name = "Fail", InitCommand = function(self) self:x(138):zoom(0.4):halign(0):diffuse(color("#CF9898")) end },
+			LoadFont("Common Normal") .. { Name = "Assist", InitCommand = function(self) self:x(182):zoom(0.4):halign(0):diffuse(accentColor or (HVColor and HVColor.Accent) or color("#5ABAFF")) end },
+			LoadFont("Common Normal") .. {
+				Name = "Separator",
+				InitCommand = function(self) self:x(217):zoom(0.4):halign(0):settext("|"):diffuse(color("0.4,0.4,0.4,1")) end
+			},
+			LoadFont("Common Normal") .. {
+				Name = "Mods",
+				InitCommand = function(self) self:x(232):zoom(0.4):halign(0):diffuse(accentColor or (HVColor and HVColor.Accent) or color("#5ABAFF")) end
+			}
+		},
+
 		-- Banner + Profile Display
 		Def.ActorFrame {
 			Name = "TopHeader",
-			InitCommand = function(self) self:xy(20, pad + 10) end,
+			InitCommand = function(self) self:xy(20, topHeaderY) end,
 
 			Def.Sprite {
 				Name = "Banner",
