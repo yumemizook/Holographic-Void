@@ -148,29 +148,23 @@ local t = Def.ActorFrame {
 		if curScreen and curScreen:GetName():find("Sync") then
 			isSync = true
 		end
-		-- Apply Mini mod (Receptor Size)
-		local miniValue = tonumber(ThemePrefs.Get("HV_Mini")) or 100
-		local miniPct = 100 - miniValue
-		local modStr = miniPct .. "% mini"
-		
 		-- Apply Measure Lines (Beat Bars) mod
 		local beatBarMod = HV.ShowMeasureLines() and "beatbars" or "nobeatbars"
 		
 		-- Apply mods to all enabled players
 		for _, pn in ipairs(GAMESTATE:GetEnabledPlayers()) do
 			local ps = GAMESTATE:GetPlayerState(pn)
-			local po = ps:GetPlayerOptions("ModsLevel_Preferred")
-			po:FromString(modStr)
-			po:FromString(beatBarMod)
+			for _, level in ipairs({"ModsLevel_Preferred", "ModsLevel_Stage", "ModsLevel_Current"}) do
+				ps:GetPlayerOptions(level):FromString(beatBarMod)
+			end
 
 			-- Sync Mode overrides
 			if isSync then
-				po:CMod(400)
-				po:Reverse(0) -- Upscroll
-				-- Apply to Current level as well
-				local co = ps:GetPlayerOptions("ModsLevel_Current")
-				co:CMod(400)
-				co:Reverse(0)
+				for _, level in ipairs({"ModsLevel_Preferred", "ModsLevel_Stage", "ModsLevel_Current"}) do
+					local po = ps:GetPlayerOptions(level)
+					po:CMod(400)
+					po:Reverse(0) -- Upscroll
+				end
 			end
 		end
 		

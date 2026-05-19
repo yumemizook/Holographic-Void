@@ -174,8 +174,10 @@ t[#t + 1] = Def.ActorFrame {
 				table.insert(active, short)
 			end
 		end
-		local mini = po:Mini()
-		if mini ~= 0 then table.insert(active, "MN" .. math.round(mini * 100)) end
+		local receptorSize = tonumber(ThemePrefs.Get("HV_Mini")) or 100
+		if math.abs(receptorSize - 100) > 0.001 then
+			table.insert(active, "MN" .. math.round(receptorSize))
+		end
 
 		local modsText = table.concat(active, "  ")
 		self:GetChild("Separator"):visible(#active > 0)

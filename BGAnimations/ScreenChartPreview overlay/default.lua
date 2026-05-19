@@ -55,6 +55,20 @@ local visualSeekStartPos = 0
 
 local fullSongMode = false
 
+local function syncPreviewSongPosition(pos)
+	local screen = ssm or SCREENMAN:GetTopScreen()
+	if not screen or not screen.SetSongPosition then return end
+
+	local ok = pcall(function()
+		screen:SetSongPosition(pos, 0, false)
+	end)
+	if not ok then
+		pcall(function()
+			screen:SetSongPosition(pos)
+		end)
+	end
+end
+
 local function setPreviewClock(pos)
 	if not song then return end
 	pos = math.max(0, pos or 0)
@@ -417,6 +431,7 @@ local function input(event)
 				local pos = p * musicLength
 				pausedPos = pos
 				startVisualSeekClock(pos)
+				syncPreviewSongPosition(pos)
 				applyPreviewPosition(pos)
 				playFrom(pos)
 				scheduleVerifiedSeek(pos)
@@ -1019,9 +1034,12 @@ local t = Def.ActorFrame {
 		if capturedPos < 0 then capturedPos = 0 end
 		self.pendingSeekPos = capturedPos
 		
-		-- Start the screen-managed audio (isInitialOpen=true skips the immediate seek)
-		playFrom(capturedPos, false, true)
+		-- Try the seek immediately on open so audio can snap to the
+		-- notefield ASAP, then let the deferred seek path verify it.
+		playFrom(capturedPos, false, false)
+		syncPreviewSongPosition(capturedPos)
 		applyPreviewPosition(capturedPos)
+		scheduleVerifiedSeek(capturedPos)
 		
 		SCREENMAN:set_input_redirected(PLAYER_1, true)
 		self:visible(true)
@@ -1037,6 +1055,7 @@ local t = Def.ActorFrame {
 		if self.pendingSeekPos ~= nil and ssm and ssm.SetSampleMusicPosition then
 			-- First attempt: immediate
 			ssm:SetSampleMusicPosition(self.pendingSeekPos)
+			syncPreviewSongPosition(self.pendingSeekPos)
 			applyPreviewPosition(self.pendingSeekPos)
 			startVisualSeekClock(self.pendingSeekPos)
 			-- Second attempt: verification after a short delay to be certain
@@ -1048,6 +1067,7 @@ local t = Def.ActorFrame {
 		if not HV.ChartPreviewActive then return end
 		if self.pendingSeekPos ~= nil and ssm and ssm.SetSampleMusicPosition then
 			ssm:SetSampleMusicPosition(self.pendingSeekPos)
+			syncPreviewSongPosition(self.pendingSeekPos)
 			applyPreviewPosition(self.pendingSeekPos)
 			startVisualSeekClock(self.pendingSeekPos)
 		end

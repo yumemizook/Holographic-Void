@@ -1,6 +1,26 @@
 --- Holographic Void: ScreenGameplay Underlay (Lane Filter)
 -- Localized dimming for the notefield area.
 
+local loadingScreen = Var "LoadingScreen" or ""
+local miniSizePct = tonumber(ThemePrefs.Get("HV_Mini")) or 100
+local miniModValue = 2 - (miniSizePct / 50)
+
+for _, player in ipairs(GAMESTATE:GetEnabledPlayers()) do
+	local ps = GAMESTATE:GetPlayerState(player)
+	if ps then
+		for _, level in ipairs({
+			loadingScreen == "ScreenEditOptions" and "ModsLevel_Stage" or "ModsLevel_Preferred",
+			"ModsLevel_Stage",
+			"ModsLevel_Current",
+		}) do
+			local po = ps:GetPlayerOptions(level)
+			if po and po.Mini then
+				po:Mini(miniModValue)
+			end
+		end
+	end
+end
+
 local t = Def.ActorFrame {
 	EndCommand = function(self)
 		unsetMovableKeymode()
@@ -22,8 +42,9 @@ local function getLaneFilterWidth()
 
 	local widthScale = (MovableValues and tonumber(MovableValues.NotefieldWidth)) or getDefaultGameplaySize("NotefieldWidth") or 1
 	local spacing = (MovableValues and tonumber(MovableValues.NotefieldSpacing)) or getDefaultGameplaySize("NotefieldSpacing") or 0
+	local receptorScale = HV.Clamp((tonumber(ThemePrefs.Get("HV_Mini")) or 100) / 100, 0.01, 2.5)
 
-	local filterWidth = (columns * baseColumnWidth * widthScale) + ((columns - 1) * spacing)
+	local filterWidth = ((columns * baseColumnWidth * widthScale) + ((columns - 1) * spacing)) * receptorScale
 	return math.max(baseColumnWidth, filterWidth)
 end
 
